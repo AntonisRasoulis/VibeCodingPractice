@@ -125,13 +125,16 @@ const Game = (() => {
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
-    if (["countdown", "playing", "ending"].includes(world.state)) {
+    const isActive = () => ["countdown", "playing", "ending"].includes(world.state);
+    if (isActive()) {
       accumulator += dt;
-      while (accumulator >= STEP) {
+      // Stop as soon as the round is over, so leftover steps can't restart the ending
+      while (accumulator >= STEP && isActive()) {
         step(STEP);
         accumulator -= STEP;
       }
     }
+    if (!isActive()) accumulator = 0;
     Renderer.render(ctx, world, dt);
     requestAnimationFrame(frame);
   }
