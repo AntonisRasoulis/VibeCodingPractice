@@ -28,14 +28,19 @@
 
     <section id="play" class="game-section">
       <div class="game-wrapper">
-        <canvas id="game-canvas"></canvas>
+        <canvas id="game-canvas" width="800" height="484"></canvas>
         <div id="game-overlay" class="game-overlay">
           <p id="game-message" class="game-message">Outrun the fire!</p>
           <div class="overlay-controls">
             <span class="red">Red: <kbd>W</kbd> jump · <kbd>A</kbd> <kbd>D</kbd> run</span>
             <span class="blue">Blue: <kbd>↑</kbd> jump · <kbd>←</kbd> <kbd>→</kbd> run</span>
           </div>
-          <button id="start-button" class="button">Start</button>
+          <noscript>
+            <p class="game-warning">The game can't run here because JavaScript is turned off. Open <code>index.html</code> in a web browser such as Chrome, Edge, Safari or Firefox.</p>
+          </noscript>
+          <p id="game-error" class="game-warning" hidden></p>
+          <!-- Stays disabled until the game has loaded (see js/main.js) -->
+          <button id="start-button" class="button" disabled>Start</button>
         </div>
       </div>
       <div class="game-hud">

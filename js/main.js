@@ -6,10 +6,11 @@ const overlay = document.getElementById("game-overlay");
 const message = document.getElementById("game-message");
 const canvas = document.getElementById("game-canvas");
 const wins = { RED: 0, BLUE: 0 };
+let gameLoaded = false;
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
-Game.init(canvas, {
+const gameCallbacks = {
   onGameOver(winner) {
     if (winner) {
       wins[winner]++;
@@ -28,7 +29,20 @@ Game.init(canvas, {
   onPauseChange(paused) {
     pauseButton.textContent = paused ? "Resume" : "Pause";
   },
-});
+};
+
+// If the game's files are missing or broken, say so instead of leaving a dead Start button.
+// (The button starts out disabled in index.html and is only switched on here.)
+try {
+  Game.init(canvas, gameCallbacks);
+  gameLoaded = true;
+  startButton.disabled = false;
+} catch (error) {
+  const box = document.getElementById("game-error");
+  box.textContent = "The game couldn't load. Make sure the whole folder was downloaded and unzipped, " +
+    `then open index.html again. (Details: ${error.message})`;
+  box.hidden = false;
+}
 
 function startGame() {
   overlay.classList.add("hidden");
@@ -46,5 +60,5 @@ pauseButton.addEventListener("click", () => {
 });
 
 window.addEventListener("keydown", (e) => {
-  if ((e.code === "KeyP" || e.code === "Escape") && Game.isRunning()) Game.togglePause();
+  if (gameLoaded && (e.code === "KeyP" || e.code === "Escape") && Game.isRunning()) Game.togglePause();
 });

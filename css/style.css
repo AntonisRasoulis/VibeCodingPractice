@@ -119,6 +119,9 @@ section {
   background: #000;
   image-rendering: pixelated;
   border-radius: var(--radius);
+  /* Keeps the game area full size even if the game can't draw (e.g. JavaScript is off).
+     800 x 484 is the canvas size set in js/game/game.js. */
+  aspect-ratio: auto 800 / 484;
 }
 
 .game-overlay {
@@ -144,6 +147,12 @@ section {
   font-family: var(--pixel-font);
   font-size: clamp(0.8rem, 3vw, 1.4rem);
   line-height: 1.5;
+}
+
+.game-warning {
+  max-width: 34rem;
+  margin: 0;
+  color: #ffb347;
 }
 
 .overlay-controls {
@@ -232,7 +241,13 @@ kbd {
 }
 
 @media (max-width: 600px) {
-  .overlay-controls {
+  .game-warning {
+  max-width: 34rem;
+  margin: 0;
+  color: #ffb347;
+}
+
+.overlay-controls {
     display: none;
   }
 }
