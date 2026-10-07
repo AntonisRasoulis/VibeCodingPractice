@@ -241,13 +241,7 @@ kbd {
 }
 
 @media (max-width: 600px) {
-  .game-warning {
-  max-width: 34rem;
-  margin: 0;
-  color: #ffb347;
-}
-
-.overlay-controls {
+  .overlay-controls {
     display: none;
   }
 }
