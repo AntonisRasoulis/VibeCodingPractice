@@ -212,10 +212,41 @@ section {
 
 .game-hud {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem 1rem;
   max-width: 800px;
   margin: 0.75rem auto 0;
+}
+
+.hud-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.score-line {
+  margin: 0;
+  font-family: var(--pixel-font);
+  font-size: 0.8rem;
+}
+
+/* Fullscreen: the game fills the screen, as big as it can be without stretching */
+.game-wrapper:fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: none;
+  background: #000;
+}
+
+.game-wrapper:fullscreen #game-canvas {
+  width: min(100vw, 100vh * 800 / 484);
+  border-radius: 0;
+}
+
+.game-wrapper:fullscreen .game-overlay {
+  border-radius: 0;
 }
 
 kbd {

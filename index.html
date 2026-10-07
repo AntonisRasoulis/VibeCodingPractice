@@ -31,6 +31,7 @@
         <canvas id="game-canvas" width="800" height="484"></canvas>
         <div id="game-overlay" class="game-overlay">
           <p id="game-message" class="game-message">Outrun the fire!</p>
+          <p id="score-line" class="score-line" hidden></p>
           <div class="overlay-controls">
             <span class="red">Red: <kbd>W</kbd> jump · <kbd>A</kbd> <kbd>D</kbd> run</span>
             <span class="blue">Blue: <kbd>↑</kbd> jump · <kbd>←</kbd> <kbd>→</kbd> run</span>
@@ -46,7 +47,10 @@
       <div class="game-hud">
         <span class="red">Red wins: <strong id="red-wins">0</strong></span>
         <span class="blue">Blue wins: <strong id="blue-wins">0</strong></span>
-        <button id="pause-button" class="button secondary" disabled>Pause</button>
+        <div class="hud-buttons">
+          <button id="fullscreen-button" class="button secondary" hidden>Fullscreen</button>
+          <button id="pause-button" class="button secondary" disabled>Pause</button>
+        </div>
       </div>
       <p class="keyboard-note">Fire Run needs a keyboard — two players share one.</p>
     </section>
@@ -73,7 +77,7 @@
         <li><strong>Portals</strong> — a blue portal on a high ledge teleports you to the orange one ahead, skipping a spiky stretch.</li>
         <li><strong>Swap orbs</strong> — golden orbs floating in the air. Jump into one and you and the other player swap places! Each orb only works once.</li>
       </ul>
-      <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause.</p>
+      <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause. Press <kbd>F</kbd> or the Fullscreen button to make the game fill the screen.</p>
     </section>
 
     <section id="about">

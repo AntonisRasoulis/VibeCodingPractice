@@ -5,6 +5,9 @@ const pauseButton = document.getElementById("pause-button");
 const overlay = document.getElementById("game-overlay");
 const message = document.getElementById("game-message");
 const canvas = document.getElementById("game-canvas");
+const gameWrapper = document.querySelector(".game-wrapper");
+const fullscreenButton = document.getElementById("fullscreen-button");
+const scoreLine = document.getElementById("score-line");
 const wins = { RED: 0, BLUE: 0 };
 let gameLoaded = false;
 
@@ -21,6 +24,9 @@ const gameCallbacks = {
       message.textContent = "It's a draw!";
       message.className = "game-message";
     }
+    // The win counters are hidden in fullscreen, so show the score on the game-over screen too
+    scoreLine.innerHTML = `<span class="red">Red ${wins.RED}</span> &middot; <span class="blue">Blue ${wins.BLUE}</span>`;
+    scoreLine.hidden = false;
     startButton.textContent = "Play again";
     overlay.classList.remove("hidden");
     pauseButton.disabled = true;
@@ -61,4 +67,29 @@ pauseButton.addEventListener("click", () => {
 
 window.addEventListener("keydown", (e) => {
   if (gameLoaded && (e.code === "KeyP" || e.code === "Escape") && Game.isRunning()) Game.togglePause();
+  if (e.code === "KeyF" && document.fullscreenEnabled) toggleFullscreen();
 });
+
+// ---- Fullscreen ----
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    gameWrapper.requestFullscreen().catch(() => {}); // e.g. blocked by the browser
+  }
+}
+
+if (document.fullscreenEnabled) {
+  fullscreenButton.hidden = false;
+  fullscreenButton.addEventListener("click", () => {
+    toggleFullscreen();
+    fullscreenButton.blur(); // so the space bar / Enter don't press it again
+  });
+  document.addEventListener("fullscreenchange", () => {
+    const isFullscreen = document.fullscreenElement === gameWrapper;
+    fullscreenButton.textContent = isFullscreen ? "Exit fullscreen" : "Fullscreen";
+    // Leaving fullscreen with Esc mid-race pauses the game, so nobody gets caught by surprise
+    if (!isFullscreen && gameLoaded && Game.isRunning() && Game.world.state === "playing") Game.togglePause();
+  });
+}
