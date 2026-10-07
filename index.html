@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Site</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="#">Game Site</a>
+    <nav>
+      <a href="#play">Play</a>
+      <a href="#how-to-play">How to play</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Welcome!</h1>
+      <p>A small website with a game inside. The game is still being decided — for now, enjoy the demo.</p>
+      <a class="button" href="#play">Play now</a>
+    </section>
+
+    <section id="play" class="game-section">
+      <h2>Play</h2>
+      <div class="game-wrapper">
+        <canvas id="game-canvas" width="640" height="400"></canvas>
+        <div id="game-overlay" class="game-overlay">
+          <p id="game-message">Press Start to play</p>
+          <button id="start-button" class="button">Start</button>
+        </div>
+      </div>
+      <div class="game-hud">
+        <span>Score: <strong id="score">0</strong></span>
+        <span>Best: <strong id="best-score">0</strong></span>
+        <button id="pause-button" class="button secondary" disabled>Pause</button>
+      </div>
+    </section>
+
+    <section id="how-to-play">
+      <h2>How to play</h2>
+      <p>Use the <kbd>←</kbd> <kbd>→</kbd> arrow keys (or <kbd>A</kbd> <kbd>D</kbd>) to move. Catch the falling squares. Press <kbd>P</kbd> to pause.</p>
+    </section>
+
+    <section id="about">
+      <h2>About</h2>
+      <p>This is a practice project. The demo game will be replaced with the real game once it's decided.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; <span id="year"></span> Game Site</p>
+  </footer>
+
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
