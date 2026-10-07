@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Game Site</title>
+  <title>Fire Run</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="site-header">
-    <a class="logo" href="#">Game Site</a>
+    <a class="logo" href="#">Fire Run</a>
     <nav>
       <a href="#play">Play</a>
       <a href="#how-to-play">How to play</a>
@@ -18,43 +21,72 @@
 
   <main>
     <section class="hero">
-      <h1>Welcome!</h1>
-      <p>A small website with a game inside. The game is still being decided — for now, enjoy the demo.</p>
+      <h1>Fire Run</h1>
+      <p>A 2-player race across an endless prairie. Same course, two runners, and a wall of fire that keeps getting faster.</p>
       <a class="button" href="#play">Play now</a>
     </section>
 
     <section id="play" class="game-section">
-      <h2>Play</h2>
       <div class="game-wrapper">
-        <canvas id="game-canvas" width="640" height="400"></canvas>
+        <canvas id="game-canvas"></canvas>
         <div id="game-overlay" class="game-overlay">
-          <p id="game-message">Press Start to play</p>
+          <p id="game-message" class="game-message">Outrun the fire!</p>
+          <div class="overlay-controls">
+            <span class="red">Red: <kbd>W</kbd> jump · <kbd>A</kbd> <kbd>D</kbd> run</span>
+            <span class="blue">Blue: <kbd>↑</kbd> jump · <kbd>←</kbd> <kbd>→</kbd> run</span>
+          </div>
           <button id="start-button" class="button">Start</button>
         </div>
       </div>
       <div class="game-hud">
-        <span>Score: <strong id="score">0</strong></span>
-        <span>Best: <strong id="best-score">0</strong></span>
+        <span class="red">Red wins: <strong id="red-wins">0</strong></span>
+        <span class="blue">Blue wins: <strong id="blue-wins">0</strong></span>
         <button id="pause-button" class="button secondary" disabled>Pause</button>
       </div>
+      <p class="keyboard-note">Fire Run needs a keyboard — two players share one.</p>
     </section>
 
     <section id="how-to-play">
       <h2>How to play</h2>
-      <p>Use the <kbd>←</kbd> <kbd>→</kbd> arrow keys (or <kbd>A</kbd> <kbd>D</kbd>) to move. Catch the falling squares. Press <kbd>P</kbd> to pause.</p>
+      <div class="controls-grid">
+        <div class="player-card red-card">
+          <h3>Red (top screen)</h3>
+          <p><kbd>W</kbd> jump</p>
+          <p><kbd>A</kbd> <kbd>D</kbd> run left / right</p>
+        </div>
+        <div class="player-card blue-card">
+          <h3>Blue (bottom screen)</h3>
+          <p><kbd>↑</kbd> jump</p>
+          <p><kbd>←</kbd> <kbd>→</kbd> run left / right</p>
+        </div>
+      </div>
+      <p>Both runners race through the exact same course. Keep running right — a wall of fire is chasing each of you, and it gets faster and faster. <strong>If the fire catches you, the other player wins.</strong></p>
+      <ul class="things">
+        <li><strong>Spikes and pits</strong> — touch one and you'll come back a little way behind after a second. That's time the fire uses to catch up.</li>
+        <li><strong>Moving platforms</strong> — slide back and forth over big gaps. Hop on and ride across.</li>
+        <li><strong>Crumbling platforms</strong> — shake when you land on them, then fall. Keep moving!</li>
+        <li><strong>Portals</strong> — a blue portal on a high ledge teleports you to the orange one ahead, skipping a spiky stretch.</li>
+        <li><strong>Swap orbs</strong> — golden orbs floating in the air. Jump into one and you and the other player swap places! Each orb only works once.</li>
+      </ul>
+      <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause.</p>
     </section>
 
     <section id="about">
       <h2>About</h2>
-      <p>This is a practice project. The demo game will be replaced with the real game once it's decided.</p>
+      <p>A practice project. The course is generated as you play, so every race is different and it never ends.</p>
     </section>
   </main>
 
   <footer class="site-footer">
-    <p>&copy; <span id="year"></span> Game Site</p>
+    <p>&copy; <span id="year"></span> Fire Run</p>
   </footer>
 
-  <script src="js/game.js"></script>
+  <script src="js/game/config.js"></script>
+  <script src="js/game/level.js"></script>
+  <script src="js/game/player.js"></script>
+  <script src="js/game/sprites.js"></script>
+  <script src="js/game/render.js"></script>
+  <script src="js/game/game.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

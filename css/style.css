@@ -6,6 +6,9 @@
   --accent: #ffcc00;
   --accent-text: #1a1b33;
   --radius: 10px;
+  --red: #ff5a63;
+  --blue: #5aa9ff;
+  --pixel-font: "Press Start 2P", monospace;
 }
 
 * {
@@ -34,8 +37,8 @@ a {
 }
 
 .logo {
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-family: var(--pixel-font);
+  font-size: 1rem;
   text-decoration: none;
 }
 
@@ -51,7 +54,7 @@ a {
 
 /* Layout */
 main {
-  max-width: 800px;
+  max-width: 880px;
   margin: 0 auto;
   padding: 0 1rem;
 }
@@ -66,7 +69,9 @@ section {
 }
 
 .hero h1 {
-  font-size: 2.5rem;
+  font-family: var(--pixel-font);
+  font-size: clamp(1.5rem, 6vw, 2.5rem);
+  color: var(--accent);
   margin: 0 0 0.5rem;
 }
 
@@ -103,7 +108,7 @@ section {
 .game-wrapper {
   position: relative;
   width: 100%;
-  max-width: 640px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -112,6 +117,7 @@ section {
   width: 100%;
   height: auto;
   background: #000;
+  image-rendering: pixelated;
   border-radius: var(--radius);
 }
 
@@ -122,6 +128,9 @@ section {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  text-align: center;
   background: rgba(0, 0, 0, 0.65);
   border-radius: var(--radius);
 }
@@ -130,16 +139,73 @@ section {
   display: none;
 }
 
-.game-overlay p {
-  font-size: 1.25rem;
-  margin: 0 0 1rem;
+.game-message {
+  margin: 0;
+  font-family: var(--pixel-font);
+  font-size: clamp(0.8rem, 3vw, 1.4rem);
+  line-height: 1.5;
+}
+
+.overlay-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1.5rem;
+}
+
+.red {
+  color: var(--red);
+}
+
+.blue {
+  color: var(--blue);
+}
+
+.keyboard-note {
+  display: none;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* How to play */
+.controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.player-card {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border-left: 4px solid;
+}
+
+.player-card h3 {
+  margin: 0 0 0.25rem;
+}
+
+.player-card p {
+  margin: 0.25rem 0;
+}
+
+.red-card {
+  border-color: var(--red);
+}
+
+.blue-card {
+  border-color: var(--blue);
+}
+
+.things li {
+  margin-bottom: 0.5rem;
 }
 
 .game-hud {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 640px;
+  max-width: 800px;
   margin: 0.75rem auto 0;
 }
 
@@ -156,6 +222,19 @@ kbd {
   text-align: center;
   padding: 2rem 1rem;
   color: var(--muted);
+}
+
+/* Phones and tablets without a keyboard */
+@media (hover: none) and (pointer: coarse) {
+  .keyboard-note {
+    display: block;
+  }
+}
+
+@media (max-width: 600px) {
+  .overlay-controls {
+    display: none;
+  }
 }
 
 @media (max-width: 500px) {
