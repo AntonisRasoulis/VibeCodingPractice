@@ -300,7 +300,9 @@ const SECTIONS = {
   // to reach it, so the player in front can choose to run underneath.
   orb() {
     this.flat(4);
-    this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false });
+    // Some orbs are freeze orbs in disguise: only the arrows in the middle are flipped
+    const kind = this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
+    this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false, kind });
     this.lastOrbCol = this.col;
     this.flat(6);
   },

@@ -30,6 +30,7 @@ class Player {
     this.deadTimer = 0;
     this.caught = false;     // caught by the fire: game over for this player
     this.blink = 0;
+    this.frozen = 0;         // seconds left frozen by a freeze orb
     this.respawnX = x;
     this.respawnY = y;
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
@@ -55,6 +56,13 @@ class Player {
       return;
     }
     this.portalCooldown -= dt;
+
+    // Frozen by a freeze orb: no running or jumping, but gravity still works
+    if (this.frozen > 0) {
+      this.frozen -= dt;
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+      this.jumpBuffer = 0;
+    }
 
     // Running
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
@@ -263,6 +271,7 @@ class Player {
 
   respawn() {
     this.dead = false;
+    this.frozen = 0;
     this.x = this.respawnX;
     this.y = this.respawnY;
     this.vx = 0;

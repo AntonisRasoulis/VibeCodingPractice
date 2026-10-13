@@ -32,6 +32,9 @@ const DEATH = {
   respawnBehind: 40, // how far behind the death spot you come back (5 tiles)
 };
 
+const FREEZE_TIME = 3;   // seconds a freeze orb holds you in place
+const FREEZE_CHANCE = 0.5; // share of orbs that freeze instead of swap
+
 const MACE_RADIUS = 5;   // how close a mace's ball can get before it hits you
 
 const FALLING = {

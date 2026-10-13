@@ -75,6 +75,9 @@ const ORB_ROWS = [
   "..oooo..",
 ];
 
+// The freeze orb is the swap orb with its middle (the arrows) flipped upside down
+const FREEZE_ORB_ROWS = [ORB_ROWS[0], ORB_ROWS[1], ...ORB_ROWS.slice(2, 6).reverse(), ORB_ROWS[6], ORB_ROWS[7]];
+
 const CLOUD_ROWS = [
   "....wwww......",
   "..wwwwwwww.ww.",
@@ -154,6 +157,7 @@ function buildSprites() {
     dirt,
     spike: spriteFromRows(SPIKE_ROWS, { l: "#e8e8f0", g: "#9a9ab0", o: "#5a5a70" }),
     orb: spriteFromRows(ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
+    freezeOrb: spriteFromRows(FREEZE_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     cloud: spriteFromRows(CLOUD_ROWS, { w: "#ffffff", b: "#d6eefc" }),
   };
 }

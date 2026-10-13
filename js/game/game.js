@@ -97,9 +97,15 @@ const Game = (() => {
       if (orb.used) continue;
       for (const p of world.players) {
         const other = p === a ? b : a;
-        if (p.dead || other.dead) continue;
+        if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
+          if (orb.kind === "freeze") {
+            p.frozen = FREEZE_TIME;
+            p.vx = 0;
+            p.sparkle("#a6e1ff");
+            return;
+          }
           for (const f of SWAP_FIELDS) [a[f], b[f]] = [b[f], a[f]];
           Renderer.swapCameras();
           world.swapFlash = 1;

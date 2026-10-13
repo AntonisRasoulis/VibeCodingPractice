@@ -61,6 +61,7 @@ const Renderer = (() => {
     }
     if (!player.dead && !player.caught && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
       drawRunner(player, camX);
+      if (player.frozen > 0) drawIce(player, camX);
     }
     drawMaces(world.level, camX, world.time);
     drawParticles(player, camX);
@@ -217,8 +218,29 @@ const Renderer = (() => {
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      b.drawImage(sprites.orb, sx, o.y + bob);
+      b.drawImage(o.kind === "freeze" ? sprites.freezeOrb : sprites.orb, sx, o.y + bob);
     }
+  }
+
+  // A block of ice around a frozen runner, with a bar showing how long is left
+  function drawIce(p, camX) {
+    const x = Math.round(p.x - camX) - 2;
+    const y = Math.round(p.y) - 2;
+    b.fillStyle = "rgba(170, 225, 255, 0.55)";
+    b.fillRect(x, y, HITBOX_W + 4, HITBOX_H + 3);
+    b.fillStyle = "#e8f8ff";
+    b.fillRect(x, y, HITBOX_W + 4, 1);
+    b.fillRect(x, y, 1, HITBOX_H + 3);
+    b.fillRect(x + 2, y + 2, 1, 3);
+    b.fillStyle = "#6cc4f0";
+    b.fillRect(x + HITBOX_W + 3, y + 1, 1, HITBOX_H + 2);
+    b.fillRect(x + 1, y + HITBOX_H + 2, HITBOX_W + 3, 1);
+    // time left
+    const w = Math.ceil((HITBOX_W + 4) * (p.frozen / FREEZE_TIME));
+    b.fillStyle = "#1b2a4a";
+    b.fillRect(x, y - 3, HITBOX_W + 4, 2);
+    b.fillStyle = "#a6e1ff";
+    b.fillRect(x, y - 3, w, 2);
   }
 
   // ---- Swinging maces ----
@@ -384,6 +406,7 @@ const Renderer = (() => {
 
       const mid = top + viewH / 2;
       if (p.caught) text(ctx, "CAUGHT!", W / 2, mid, "#ff4d3d", 24, "center");
+      else if (p.frozen > FREEZE_TIME - 0.8) text(ctx, "FROZEN!", W / 2, mid, "#a6e1ff", 24, "center");
       else if (world.swapFlash > 0) text(ctx, "SWAP!", W / 2, mid, "#ffd23f", 24, "center");
     });
 
