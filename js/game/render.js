@@ -65,6 +65,9 @@ const Renderer = (() => {
       if (player.frozen > 0) drawIce(player, camX);
     }
     drawMaces(world.level, camX, world.time);
+    if (player.zapDir && !player.dead) drawCrackle(player, camX, world.time);
+    for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
+    drawBoltWarnings(world, player, camX);
     drawParticles(player, camX);
     drawFire(world.fire, player, camX, world.time);
   }
@@ -219,7 +222,7 @@ const Renderer = (() => {
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb }[o.kind] || sprites.orb;
       b.drawImage(sprite, sx, o.y + bob);
     }
   }
@@ -248,6 +251,104 @@ const Renderer = (() => {
         const ly = y + 1 + ((k * 3 + Math.floor(time * 30)) % 10);
         b.fillRect(x - 30 + ((k * 11) % 12), ly, 10, 1);
       }
+    }
+  }
+
+  // ---- Lightning ----
+
+  // The bolt is redrawn with a new random zigzag 25 times a second so it crackles.
+  // hash() keeps the shape the same in both halves of the screen at the same moment.
+  function drawBolt(bolt, level, camX, time) {
+    const tail = bolt.x - bolt.dir * ZAP.length;
+    const left = Math.min(tail, bolt.x) - camX;
+    if (left > VIEW_W + 4 || left + ZAP.length < -4) return; // not in this view
+    const tick = Math.floor(time * 25);
+
+    // Points along the bolt, following the ground, each nudged up or down at random
+    const pts = [];
+    for (let k = 0; k <= ZAP.length; k += 4) {
+      const wx = bolt.x - bolt.dir * k;
+      const ground = level.groundTop(wx);
+      const baseY = ground === null ? bolt.y : ground - ZAP.height;
+      const jitter = k === 0 ? 0 : Math.round((hash(bolt.id * 31 + k, tick) - 0.5) * 7);
+      pts.push({ x: Math.round(wx - camX), y: Math.round(baseY) + jitter });
+    }
+    const fade = Math.max(0, 1 - bolt.traveled / ZAP.range);
+
+    // Deep purple edge (so it stands out against the sky), electric blue glow, white-hot core
+    pixelPath(pts, `rgba(70, 30, 160, ${0.6 * fade})`, 2);
+    pixelPath(pts, `rgba(40, 170, 255, ${0.95 * fade})`, 1);
+    pixelPath(pts, Math.floor(time * 30) % 3 ? "#ffffff" : "#d8f6ff", 0);
+
+    // Two little forks branching off
+    for (let f = 0; f < 2; f++) {
+      const p = pts[1 + Math.floor(hash(bolt.id + f * 7, tick) * (pts.length - 2))];
+      const up = hash(bolt.id + f, tick + 3) < 0.5 ? -1 : 1;
+      const back = -bolt.dir;
+      const fork = [p, { x: p.x + back * 3, y: p.y + up * 3 }, { x: p.x + back * 5, y: p.y + up * 6 }];
+      pixelPath(fork, `rgba(40, 170, 255, ${0.9 * fade})`, 0);
+    }
+
+    // Blazing head with sparks flying off it
+    const head = pts[0];
+    b.fillStyle = `rgba(70, 30, 160, ${0.45 * fade})`;
+    b.fillRect(head.x - 4, head.y - 4, 9, 9);
+    b.fillStyle = `rgba(40, 170, 255, ${0.8 * fade})`;
+    b.fillRect(head.x - 2, head.y - 2, 5, 5);
+    b.fillStyle = "#ffffff";
+    b.fillRect(head.x - 1, head.y - 1, 3, 3);
+    for (let s = 0; s < 4; s++) {
+      const sx = head.x + Math.round((hash(bolt.id + s * 3, tick) - 0.5) * 12);
+      const sy = head.y + Math.round((hash(bolt.id + s * 5, tick + 1) - 0.5) * 10);
+      b.fillStyle = s % 2 ? "#fff27a" : "#28aaff";
+      b.fillRect(sx, sy, 1, 1);
+    }
+  }
+
+  // Draws a pixel-sharp line through the points; `thick` adds rows above and below
+  function pixelPath(pts, color, thick) {
+    b.fillStyle = color;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1];
+      const c = pts[i];
+      const steps = Math.max(Math.abs(c.x - a.x), Math.abs(c.y - a.y), 1);
+      for (let s = 0; s <= steps; s++) {
+        const x = Math.round(a.x + ((c.x - a.x) * s) / steps);
+        const y = Math.round(a.y + ((c.y - a.y) * s) / steps);
+        b.fillRect(x, y - thick, 1, 1 + thick * 2);
+      }
+    }
+  }
+
+  // Flashing warning at the edge of the screen when a bolt is coming at you from off-screen
+  function drawBoltWarnings(world, player, camX) {
+    if (Math.floor(world.time * 8) % 2) return;
+    for (const bolt of world.bolts) {
+      if (world.players[bolt.owner] === player) continue;
+      const sx = bolt.x - camX;
+      const coming = (bolt.dir > 0 && sx < 0 && sx > -260) || (bolt.dir < 0 && sx > VIEW_W && sx < VIEW_W + 260);
+      if (!coming) continue;
+      const y = Math.round(Math.min(VIEW_H - 8, Math.max(8, bolt.y)));
+      const x = bolt.dir > 0 ? 2 : VIEW_W - 9;
+      // a little lightning symbol
+      b.fillStyle = "#ffd23f";
+      [[4, -4], [3, -3], [2, -2], [3, -1], [4, -1], [5, -1], [4, 0], [3, 1], [2, 2]].forEach(([dx, dy]) =>
+        b.fillRect(x + (bolt.dir > 0 ? dx : 7 - dx), y + dy, 1, 1));
+      b.fillStyle = "rgba(255, 210, 63, 0.35)";
+      b.fillRect(bolt.dir > 0 ? 0 : VIEW_W - 3, y - 6, 3, 12);
+    }
+  }
+
+  // Little sparks dancing around a runner who is holding a lightning shot
+  function drawCrackle(p, camX, time) {
+    const tick = Math.floor(time * 20);
+    const cx = Math.round(p.x - camX) + HITBOX_W / 2;
+    const cy = Math.round(p.y) + HITBOX_H / 2;
+    for (let k = 0; k < 4; k++) {
+      const a = hash(k, tick) * Math.PI * 2;
+      const r = 6 + hash(k + 9, tick) * 3;
+      b.fillStyle = ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"][k];
+      b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }
   }
 
@@ -433,9 +534,19 @@ const Renderer = (() => {
       const gapColor = gap < 10 ? "#ff4d3d" : gap < 25 ? "#ffb347" : "#ffffff";
       text(ctx, `${p.name} ${meters}m`, 12, top + 16, p.palette.c, 12);
       text(ctx, `FIRE ${gap}m`, W - 12, top + 16, gapColor, 12, "right");
+      if (p.zapDir) {
+        const key = i === 0 ? "S" : "DOWN";
+        const arrow = p.zapDir > 0 ? ">>" : "<<";
+        text(ctx, `ZAP ${arrow} press ${key}`, 12, top + 36, "#fff27a", 10);
+      }
+      if (p.flash > 0) {
+        ctx.fillStyle = `rgba(220, 245, 255, ${Math.min(1, p.flash) * 0.45})`;
+        ctx.fillRect(0, top, W, viewH);
+      }
 
       const mid = top + viewH / 2;
       if (p.caught) text(ctx, "CAUGHT!", W / 2, mid, "#ff4d3d", 24, "center");
+      else if (p.zappedText > 0) text(ctx, "ZAPPED!", W / 2, mid, "#bff4ff", 24, "center");
       else if (p.frozen > FREEZE_TIME - 0.8) text(ctx, "FROZEN!", W / 2, mid, "#a6e1ff", 24, "center");
       else if (p.dashHold > 0 || p.dashTime > 0) text(ctx, "DASH!", W / 2, mid, "#ffd23f", 24, "center");
       else if (world.swapFlash > 0) text(ctx, "SWAP!", W / 2, mid, "#ffd23f", 24, "center");

@@ -6,8 +6,8 @@
 const Game = (() => {
   const STEP = 1 / 120; // physics runs in small fixed steps so it's the same on every computer
   const CONTROLS = [
-    { left: "KeyA", right: "KeyD", jump: "KeyW" },
-    { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp" },
+    { left: "KeyA", right: "KeyD", jump: "KeyW", fire: "KeyS" },
+    { left: "ArrowLeft", right: "ArrowRight", jump: "ArrowUp", fire: "ArrowDown" },
   ];
   const GAME_KEYS = new Set(CONTROLS.flatMap((c) => Object.values(c)));
   // Everything that makes up "where a player is" gets swapped by a swap orb
@@ -20,6 +20,8 @@ const Game = (() => {
   let accumulator = 0;
   const keys = new Set();
   const jumpQueued = [false, false];
+  const fireQueued = [false, false];
+  let nextBoltId = 1;
 
   function newWorld() {
     const level = new Level(Math.floor(Math.random() * 1e9));
@@ -38,6 +40,7 @@ const Game = (() => {
       endTimer: 0,
       time: 0,
       swapFlash: 0,
+      bolts: [], // lightning bolts flying along the course
       winner: null,
     };
     for (const p of world.players) p.onGround = true;
@@ -51,8 +54,10 @@ const Game = (() => {
       right: keys.has(c.right),
       jump: keys.has(c.jump),
       jumpPressed: jumpQueued[i],
+      firePressed: fireQueued[i],
     };
     jumpQueued[i] = false;
+    fireQueued[i] = false;
     return input;
   }
 
@@ -65,6 +70,7 @@ const Game = (() => {
       world.countdown -= dt;
       if (world.countdown <= 0) world.state = "playing";
       jumpQueued[0] = jumpQueued[1] = false;
+      fireQueued[0] = fireQueued[1] = false;
       return;
     }
 
@@ -86,7 +92,10 @@ const Game = (() => {
       return;
     }
 
-    players.forEach((p, i) => p.update(dt, readInput(i), level));
+    const inputs = [readInput(0), readInput(1)];
+    players.forEach((p, i) => p.update(dt, inputs[i], level));
+    players.forEach((p, i) => { if (inputs[i].firePressed) fireBolt(p, i); });
+    updateBolts(dt);
     checkOrbs();
     checkFire();
   }
@@ -100,6 +109,11 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
+          if (orb.kind === "zap") {
+            p.zapDir = p.facing; // shoots whichever way you faced when you grabbed it
+            p.sparkle("#bff4ff");
+            return;
+          }
           if (orb.kind === "dash") {
             p.dashHold = DASH.hold;
             p.x = orb.x + 1;
@@ -124,6 +138,52 @@ const Game = (() => {
         }
       }
     }
+  }
+
+  // ---- Lightning bolts ----
+
+  function fireBolt(p, owner) {
+    if (!p.zapDir || p.dead || p.caught || p.frozen > 0 || p.dashHold > 0) return;
+    const ground = world.level.groundTop(p.x + HITBOX_W / 2);
+    world.bolts.push({
+      id: nextBoltId++,
+      owner,
+      dir: p.zapDir,
+      x: p.zapDir > 0 ? p.x + HITBOX_W : p.x, // the bolt's head
+      y: (ground ?? p.y + HITBOX_H) - ZAP.height,
+      traveled: 0,
+      born: world.time,
+    });
+    p.zapDir = 0;
+    p.flash = 0.35;
+    p.sparkle("#ffffff");
+    p.sparkle("#bff4ff");
+  }
+
+  function updateBolts(dt) {
+    const { level, players } = world;
+    for (const bolt of world.bolts) {
+      const move = ZAP.speed * dt;
+      bolt.x += bolt.dir * move;
+      bolt.traveled += move;
+      // Hug the ground: climb steps and drop down them, glide straight over pits
+      const ground = level.groundTop(bolt.x);
+      if (ground !== null) bolt.y += (ground - ZAP.height - bolt.y) * Math.min(1, dt * 40);
+
+      // Only the other player can be hit, and only if they're touching the bolt
+      const target = players[1 - bolt.owner];
+      if (target.dead || target.caught) continue;
+      const tail = bolt.x - bolt.dir * ZAP.length;
+      const left = Math.min(tail, bolt.x);
+      if (target.x + HITBOX_W < left || target.x > left + ZAP.length) continue;
+      const groundThere = level.groundTop(target.x + HITBOX_W / 2);
+      const boltY = groundThere === null ? bolt.y : groundThere - ZAP.height;
+      if (overlaps(target.x, target.y, HITBOX_W, HITBOX_H, left, boltY - 1, ZAP.length, 3)) {
+        target.zap();
+        bolt.done = true;
+      }
+    }
+    world.bolts = world.bolts.filter((b) => !b.done && b.traveled < ZAP.range);
   }
 
   function checkFire() {
@@ -179,6 +239,7 @@ const Game = (() => {
         if (!e.repeat) {
           CONTROLS.forEach((c, i) => {
             if (e.code === c.jump) jumpQueued[i] = true;
+            if (e.code === c.fire) fireQueued[i] = true;
           });
         }
         keys.add(e.code);

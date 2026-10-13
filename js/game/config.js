@@ -42,6 +42,14 @@ const DASH = {
   time: 0.65,   // seconds the launch lasts: about 310px, plus your fall afterwards
 };
 
+const ZAP = {
+  chance: 0.25, // share of orbs that are lightning orbs
+  speed: 320,   // how fast a bolt travels (normal running is 96)
+  length: 48,   // bolt length: 6 tiles, short enough to jump over
+  height: 5,    // how high above the ground the bolt runs
+  range: 2400,  // how far a bolt travels before fizzling out
+};
+
 const MACE_RADIUS = 5;   // how close a mace's ball can get before it hits you
 
 const FALLING = {

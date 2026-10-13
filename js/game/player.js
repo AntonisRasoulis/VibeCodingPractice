@@ -33,6 +33,9 @@ class Player {
     this.frozen = 0;         // seconds left frozen by a freeze orb
     this.dashHold = 0;       // seconds left hanging in the air before a dash
     this.dashTime = 0;       // seconds left in a dash
+    this.zapDir = 0;         // holding a lightning shot: -1 left, 1 right, 0 none
+    this.flash = 0;          // white flash on this player's half of the screen
+    this.zappedText = 0;     // how long to show "ZAPPED!"
     this.respawnX = x;
     this.respawnY = y;
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
@@ -50,6 +53,8 @@ class Player {
     this.updateParticles(dt);
     this.updateFallingPlatforms(dt);
     if (this.blink > 0) this.blink -= dt;
+    if (this.flash > 0) this.flash -= dt * 2;
+    if (this.zappedText > 0) this.zappedText -= dt;
     if (this.caught) return;
 
     if (this.dead) {
@@ -312,6 +317,15 @@ class Player {
     this.jumpBuffer = 0;
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
+  }
+
+  // Hit by a lightning bolt
+  zap() {
+    this.sparkle("#bff4ff");
+    this.sparkle("#c792ff");
+    this.flash = 0.8;
+    this.zappedText = 1;
+    this.die();
   }
 
   burnUp() {

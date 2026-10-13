@@ -90,6 +90,18 @@ const DASH_ORB_ROWS = [
   "..oooo..",
 ];
 
+// The lightning orb has a white zigzag bolt in the middle
+const ZAP_ORB_ROWS = [
+  "..oooo..",
+  ".oyyywo.",
+  "oyyywyyo",
+  "oyywwwyo",
+  "oywwwyyo",
+  "oyywyyyo",
+  ".owyyyo.",
+  "..oooo..",
+];
+
 const CLOUD_ROWS = [
   "....wwww......",
   "..wwwwwwww.ww.",
@@ -171,6 +183,7 @@ function buildSprites() {
     orb: spriteFromRows(ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     freezeOrb: spriteFromRows(FREEZE_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     dashOrb: spriteFromRows(DASH_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
+    zapOrb: spriteFromRows(ZAP_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     cloud: spriteFromRows(CLOUD_ROWS, { w: "#ffffff", b: "#d6eefc" }),
   };
 }

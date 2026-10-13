@@ -102,6 +102,14 @@ class Level {
     return { links, ball: { x, y }, spin, speed: Math.abs(Math.cos(phase)) };
   }
 
+  // Top of the ground at an x position, or null over a pit. Lightning bolts run along this.
+  groundTop(x) {
+    const col = this.cols[Math.floor(x / TILE)];
+    if (!col) return null;
+    const row = col.indexOf(T_GROUND);
+    return row < 0 ? null : row * TILE;
+  }
+
   // How far left and right of its bolt a mace can reach
   maceReach(m) {
     return Math.sin(m.amplitude) * m.length + MACE_RADIUS + 4;
@@ -301,7 +309,10 @@ const SECTIONS = {
   orb() {
     this.flat(4);
     // Some orbs are freeze orbs in disguise: only the arrows in the middle are flipped
-    const kind = this.rng() < DASH.chance ? "dash" : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
+    const roll = this.rng();
+    const kind = roll < DASH.chance ? "dash"
+      : roll < DASH.chance + ZAP.chance ? "zap"
+      : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
     this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false, kind });
     this.lastOrbCol = this.col;
     this.flat(6);

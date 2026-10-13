@@ -33,8 +33,8 @@
           <p id="game-message" class="game-message">Outrun the fire!</p>
           <p id="score-line" class="score-line" hidden></p>
           <div class="overlay-controls">
-            <span class="red">Red: <kbd>W</kbd> jump · <kbd>A</kbd> <kbd>D</kbd> run</span>
-            <span class="blue">Blue: <kbd>↑</kbd> jump · <kbd>←</kbd> <kbd>→</kbd> run</span>
+            <span class="red">Red: <kbd>W</kbd> jump · <kbd>A</kbd> <kbd>D</kbd> run · <kbd>S</kbd> zap</span>
+            <span class="blue">Blue: <kbd>↑</kbd> jump · <kbd>←</kbd> <kbd>→</kbd> run · <kbd>↓</kbd> zap</span>
           </div>
           <noscript>
             <p class="game-warning">The game can't run here because JavaScript is turned off. Open <code>index.html</code> in a web browser such as Chrome, Edge, Safari or Firefox.</p>
@@ -60,12 +60,12 @@
       <div class="controls-grid">
         <div class="player-card red-card">
           <h3>Red (top screen)</h3>
-          <p><kbd>W</kbd> jump</p>
+          <p><kbd>W</kbd> jump · <kbd>S</kbd> shoot lightning</p>
           <p><kbd>A</kbd> <kbd>D</kbd> run left / right</p>
         </div>
         <div class="player-card blue-card">
           <h3>Blue (bottom screen)</h3>
-          <p><kbd>↑</kbd> jump</p>
+          <p><kbd>↑</kbd> jump · <kbd>↓</kbd> shoot lightning</p>
           <p><kbd>←</kbd> <kbd>→</kbd> run left / right</p>
         </div>
       </div>
@@ -78,6 +78,7 @@
         <li><strong>Swinging maces</strong> — spiked balls swinging on chains from the sky, each at its own speed. Run past while it's swung away, or jump right over it.</li>
         <li><strong>Golden orbs</strong> — floating in the air. Some swap you and the other player's places. Others freeze you for 3 seconds. They look almost the same, so look closely before you jump into one. Each orb only works once.</li>
         <li><strong>Dash orbs</strong> — golden orbs with a » in the middle. Grab one and you hang in the air for a second, then get launched far to the right. Where you land is up to luck.</li>
+        <li><strong>Lightning orbs</strong> — golden orbs with a white zigzag. Grab one to store a lightning shot, then press <kbd>S</kbd> (Red) or <kbd>↓</kbd> (Blue) to fire it along the ground. It flies the way you were facing when you grabbed it, so face left as you grab it to shoot back at a player behind you. It travels to the other player wherever they are. Jump over it, or get zapped back.</li>
       </ul>
       <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause. Press <kbd>F</kbd> or the Fullscreen button to make the game fill the screen.</p>
     </section>
