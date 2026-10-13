@@ -39,6 +39,8 @@ class Level {
     this.portals = [];   // entrances, each with the exit it leads to
     this.exits = [];     // where portals come out (drawn only)
     this.orbs = [];      // swap orbs
+    this.maces = [];     // spiked balls swinging on chains
+    this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
     this.nextId = 1;
@@ -64,6 +66,7 @@ class Level {
 
   // Move the moving platforms. `time` is seconds since the race started.
   update(time) {
+    this.time = time;
     for (const p of this.platforms) {
       if (p.kind !== "move") continue;
       const t = 0.5 - 0.5 * Math.cos(2 * Math.PI * (time / p.period + p.phase));
@@ -71,6 +74,37 @@ class Level {
       p.dx = newX - p.x;
       p.x = newX;
     }
+  }
+
+  // Where a mace's chain links and ball are at a given time. Used both for
+  // drawing and for hitting players, so what you see is exactly what hurts.
+  //
+  // It swings like a pendulum (fast at the bottom, slowing at each end). Each
+  // link further down the chain lags slightly behind the one above it, so the
+  // chain bends like a whip instead of swinging as a stiff stick.
+  macePoints(m, time) {
+    const links = [];
+    const steps = Math.max(4, Math.round(m.length / 5));
+    const seg = m.length / steps;
+    const phase = 2 * Math.PI * (time / m.period + m.phase);
+    let x = m.x;
+    let y = m.y;
+    let angle = 0;
+    for (let i = 1; i <= steps; i++) {
+      const lag = (i / steps) * 0.55;
+      angle = m.amplitude * Math.sin(phase - lag) + 0.05 * Math.sin(2 * (phase - lag)); // small wobble
+      x += Math.sin(angle) * seg;
+      y += Math.cos(angle) * seg;
+      links.push({ x, y });
+    }
+    // Spin follows the swing (like it's rolling through the air) plus a steady twirl
+    const spin = angle * 2.5 + time * m.spin;
+    return { links, ball: { x, y }, spin, speed: Math.abs(Math.cos(phase)) };
+  }
+
+  // How far left and right of its bolt a mace can reach
+  maceReach(m) {
+    return Math.sin(m.amplitude) * m.length + MACE_RADIUS + 4;
   }
 
   // ---- Building blocks ----
@@ -130,7 +164,7 @@ class Level {
   // ---- Sections ----
 
   addSection() {
-    const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1 };
+    const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
     if (this.col > 120 && this.col - this.lastOrbCol > 160) weights.orb = 4;
 
     const type = this.pickWeighted(weights);
@@ -238,6 +272,28 @@ const SECTIONS = {
     entrance.toY = exit.y;
     this.portals.push(entrance);
     this.exits.push(exit);
+  },
+
+  // One or two spiked maces swinging on chains from bolts in the sky. The ball
+  // sweeps through at running height, so time your run (or jump over it).
+  mace(d) {
+    this.flat(6);
+    const count = d > 0.4 && this.rng() < 0.5 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      // These ranges were measured to always leave a gap to run through:
+      // longer chains and faster swings quickly become impossible.
+      const length = this.rand(38, 55);
+      this.maces.push({
+        x: this.col * TILE + TILE / 2,
+        y: this.groundRow * TILE - 9 - length,       // ball passes at body height
+        length,
+        amplitude: (55 + this.rng() * 20) * Math.PI / 180,
+        period: 1.9 + this.rng() * 1.3 - d * 0.1,   // each mace swings at its own speed
+        phase: this.rng(),
+        spin: (this.rng() < 0.5 ? -1 : 1) * (3 + this.rng() * 4),
+      });
+      this.flat(16); // room to stop safely between two maces
+    }
   },
 
   // A floating orb that swaps the two players' positions. You have to jump

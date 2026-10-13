@@ -94,7 +94,7 @@ class Player {
     if (this.dead) return;
     this.checkPortals(level);
 
-    if (this.onGround && !this.standingOn) this.rememberSafeSpot();
+    if (this.onGround && !this.standingOn) this.rememberSafeSpot(level);
     this.animDist += Math.abs(this.vx * dt);
   }
 
@@ -206,6 +206,16 @@ class Player {
         }
       }
     }
+
+    // Swinging maces: hit if the ball touches the body
+    const cx = this.x + HITBOX_W / 2;
+    for (const m of level.maces) {
+      if (Math.abs(m.x - cx) > m.length + 10) continue;
+      const ball = level.macePoints(m, level.time).ball;
+      const nearX = clamp(ball.x, this.x, this.x + HITBOX_W);
+      const nearY = clamp(ball.y, this.y, this.y + HITBOX_H);
+      if ((ball.x - nearX) ** 2 + (ball.y - nearY) ** 2 < MACE_RADIUS ** 2) return this.die();
+    }
   }
 
   checkPortals(level) {
@@ -225,9 +235,11 @@ class Player {
 
   // ---- Dying and respawning ----
 
-  rememberSafeSpot() {
+  rememberSafeSpot(level) {
     const last = this.safeSpots[this.safeSpots.length - 1];
     if (Math.abs(last.x - this.x) < 4) return;
+    // Never respawn somewhere a mace can swing through
+    for (const m of level.maces) if (Math.abs(m.x - this.x) < level.maceReach(m)) return;
     this.safeSpots.push({ x: this.x, y: this.y });
     if (this.safeSpots.length > 300) this.safeSpots.shift();
   }

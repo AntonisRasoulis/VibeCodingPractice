@@ -62,6 +62,7 @@ const Renderer = (() => {
     if (!player.dead && !player.caught && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
       drawRunner(player, camX);
     }
+    drawMaces(world.level, camX, world.time);
     drawParticles(player, camX);
     drawFire(world.fire, player, camX, world.time);
   }
@@ -217,6 +218,81 @@ const Renderer = (() => {
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
       b.drawImage(sprites.orb, sx, o.y + bob);
+    }
+  }
+
+  // ---- Swinging maces ----
+
+  function drawMaces(level, camX, time) {
+    for (const m of level.maces) {
+      const sx = m.x - camX;
+      if (sx < -m.length - 10 || sx > VIEW_W + m.length + 10) continue;
+      const now = level.macePoints(m, time);
+
+      // Bolt in the sky the chain hangs from
+      b.fillStyle = "#3a3d44";
+      b.fillRect(Math.round(sx) - 3, m.y - 5, 7, 5);
+      b.fillStyle = "#8a8f99";
+      b.fillRect(Math.round(sx) - 2, m.y - 4, 5, 3);
+      b.fillStyle = "#cfd4dc";
+      b.fillRect(Math.round(sx) - 1, m.y - 4, 2, 1);
+
+      // Chain: alternating light and dark links
+      now.links.slice(0, -1).forEach((p, i) => {
+        b.fillStyle = i % 2 ? "#5c616b" : "#9aa0aa";
+        b.fillRect(Math.round(p.x - camX) - 1, Math.round(p.y) - 1, 2, 2);
+      });
+
+      // Faint after-images when it's swinging fast, so the swing reads as motion
+      if (now.speed > 0.5) {
+        for (const [delay, alpha] of [[0.06, 0.18], [0.03, 0.3]]) {
+          const ghost = level.macePoints(m, time - delay);
+          b.globalAlpha = alpha * now.speed;
+          drawMaceBall(ghost.ball.x - camX, ghost.ball.y, ghost.spin);
+        }
+        b.globalAlpha = 1;
+      }
+      drawMaceBall(now.ball.x - camX, now.ball.y, now.spin);
+    }
+  }
+
+  // A grey ball covered in spikes, rotated by `spin`
+  function drawMaceBall(cx, cy, spin) {
+    const x0 = Math.round(cx);
+    const y0 = Math.round(cy);
+
+    // Spikes all the way around, drawn first so the ball sits on top of their bases
+    for (let k = 0; k < 8; k++) {
+      const a = spin + (k * Math.PI * 2) / 8;
+      const dx = Math.cos(a);
+      const dy = Math.sin(a);
+      // Wide dark base, narrowing to a bright point
+      b.fillStyle = "#3a3d44";
+      b.fillRect(Math.round(x0 + dx * 4.5 - 1), Math.round(y0 + dy * 4.5 - 1), 2, 2);
+      b.fillStyle = "#5c616b";
+      b.fillRect(Math.round(x0 + dx * 5.6), Math.round(y0 + dy * 5.6), 1, 1);
+      b.fillRect(Math.round(x0 + dx * 6.4), Math.round(y0 + dy * 6.4), 1, 1);
+      b.fillStyle = "#b8bdc6";
+      b.fillRect(Math.round(x0 + dx * 7.3), Math.round(y0 + dy * 7.3), 1, 1);
+    }
+
+    // The ball: outline, body, light from the top-left, shadow bottom-right
+    for (let y = -4; y <= 4; y++) {
+      for (let x = -4; x <= 4; x++) {
+        const d = x * x + y * y;
+        if (d > 19) continue;
+        if (d > 13) b.fillStyle = "#3a3d44";
+        else if (x + y <= -3) b.fillStyle = "#cfd4dc";
+        else if (x + y >= 3) b.fillStyle = "#6b707a";
+        else b.fillStyle = "#9aa0aa";
+        b.fillRect(x0 + x, y0 + y, 1, 1);
+      }
+    }
+    // Studs on the ball's face that turn with the spin, so you can see it rotating
+    b.fillStyle = "#e8ebef";
+    for (let k = 0; k < 3; k++) {
+      const a = spin * 1.0 + (k * Math.PI * 2) / 3;
+      b.fillRect(Math.round(x0 + Math.cos(a) * 2), Math.round(y0 + Math.sin(a) * 2), 1, 1);
     }
   }
 

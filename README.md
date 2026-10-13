@@ -40,7 +40,7 @@ js/game/game.js       The game loop: keyboard, fire, swap orbs, who wins
 ## How the endless level works
 
 - **One level, two cameras.** There's only one level in memory. Each half of the screen follows one player through it, which is why both courses are always identical.
-- **Built in sections.** The level is stitched together from hand-designed pieces: flat ground, steps, spikes, pits, floating platforms, moving platforms, crumbling platforms, a portal shortcut and swap orbs. Each piece is designed so it can always be cleared, and the pieces get harder further along.
+- **Built in sections.** The level is stitched together from hand-designed pieces: flat ground, steps, spikes, pits, floating platforms, moving platforms, crumbling platforms, swinging maces, a portal shortcut and swap orbs. Each piece is designed so it can always be cleared, and the pieces get harder further along.
 - **Built just ahead of the leader.** New sections are added on the right whenever the player in front gets close to the end, so the course never runs out.
 - **Per-player crumbling platforms.** Each player has their own copy of the crumbling platforms. If one falls under Red, it's still there when Blue arrives.
 - **Swap orbs work once.** When anyone touches one, the players trade places, including everything about where they are, and the orb disappears for both.

@@ -32,6 +32,8 @@ const DEATH = {
   respawnBehind: 40, // how far behind the death spot you come back (5 tiles)
 };
 
+const MACE_RADIUS = 5;   // how close a mace's ball can get before it hits you
+
 const FALLING = {
   shakeTime: 0.5,    // seconds a crumbling platform shakes before it drops
   gravity: 600,
