@@ -100,6 +100,15 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
+          if (orb.kind === "dash") {
+            p.dashHold = DASH.hold;
+            p.x = orb.x + 1;
+            p.y = orb.y + 4 - HITBOX_H / 2;
+            p.vx = 0;
+            p.vy = 0;
+            p.jumpBuffer = 0;
+            return;
+          }
           if (orb.kind === "freeze") {
             p.frozen = FREEZE_TIME;
             p.vx = 0;

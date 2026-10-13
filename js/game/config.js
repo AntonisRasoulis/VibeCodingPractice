@@ -35,6 +35,13 @@ const DEATH = {
 const FREEZE_TIME = 3;   // seconds a freeze orb holds you in place
 const FREEZE_CHANCE = 0.5; // share of orbs that freeze instead of swap
 
+const DASH = {
+  chance: 0.3,  // share of orbs that are dash orbs (the rest are swap or freeze)
+  hold: 1.0,    // seconds you hang in the air before launching
+  speed: 420,   // launch speed (normal running is 96)
+  time: 0.6,    // seconds the launch lasts: about 250px, plus your fall afterwards
+};
+
 const MACE_RADIUS = 5;   // how close a mace's ball can get before it hits you
 
 const FALLING = {

@@ -60,6 +60,7 @@ const Renderer = (() => {
       b.globalAlpha = 1;
     }
     if (!player.dead && !player.caught && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
+      drawDashEffects(player, camX, world.time);
       drawRunner(player, camX);
       if (player.frozen > 0) drawIce(player, camX);
     }
@@ -218,7 +219,35 @@ const Renderer = (() => {
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      b.drawImage(o.kind === "freeze" ? sprites.freezeOrb : sprites.orb, sx, o.y + bob);
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb }[o.kind] || sprites.orb;
+      b.drawImage(sprite, sx, o.y + bob);
+    }
+  }
+
+  // Charging glow while hanging before a dash, and after-images + speed lines during it
+  function drawDashEffects(p, camX, time) {
+    const x = Math.round(p.x - camX);
+    const y = Math.round(p.y);
+    if (p.dashHold > 0) {
+      // A ring that shrinks in as the launch gets closer
+      const r = 3 + Math.round(10 * (p.dashHold / DASH.hold));
+      b.fillStyle = "rgba(255, 210, 63, 0.8)";
+      for (let k = 0; k < 8; k++) {
+        const a = time * 6 + (k * Math.PI) / 4;
+        b.fillRect(Math.round(x + 3 + Math.cos(a) * r), Math.round(y + 5 + Math.sin(a) * r), 1, 1);
+      }
+    } else if (p.dashTime > 0) {
+      const frame = sprites.runners[p.palette.name].jump;
+      for (let k = 3; k >= 1; k--) {
+        b.globalAlpha = 0.12 * (4 - k);
+        b.drawImage(frame, x - 1 - k * 7, y - 1);
+      }
+      b.globalAlpha = 1;
+      b.fillStyle = "rgba(255, 255, 255, 0.8)";
+      for (let k = 0; k < 4; k++) {
+        const ly = y + 1 + ((k * 3 + Math.floor(time * 30)) % 10);
+        b.fillRect(x - 30 + ((k * 11) % 12), ly, 10, 1);
+      }
     }
   }
 
@@ -324,7 +353,8 @@ const Renderer = (() => {
     if (!p.onGround) frame = frames.jump;
     else if (Math.abs(p.vx) > 10) frame = [frames.run1, frames.idle, frames.run2, frames.idle][Math.floor(p.animDist / 6) % 4];
 
-    const x = Math.round(p.x - camX) - 1;
+    const shake = p.dashHold > 0 ? Math.round(Math.sin(p.dashHold * 90)) : 0; // trembling before a dash
+    const x = Math.round(p.x - camX) - 1 + shake;
     const y = Math.round(p.y) - 1;
     if (p.facing < 0) {
       b.save();
@@ -407,6 +437,7 @@ const Renderer = (() => {
       const mid = top + viewH / 2;
       if (p.caught) text(ctx, "CAUGHT!", W / 2, mid, "#ff4d3d", 24, "center");
       else if (p.frozen > FREEZE_TIME - 0.8) text(ctx, "FROZEN!", W / 2, mid, "#a6e1ff", 24, "center");
+      else if (p.dashHold > 0 || p.dashTime > 0) text(ctx, "DASH!", W / 2, mid, "#ffd23f", 24, "center");
       else if (world.swapFlash > 0) text(ctx, "SWAP!", W / 2, mid, "#ffd23f", 24, "center");
     });
 

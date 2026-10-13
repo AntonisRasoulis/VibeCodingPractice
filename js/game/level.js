@@ -301,7 +301,7 @@ const SECTIONS = {
   orb() {
     this.flat(4);
     // Some orbs are freeze orbs in disguise: only the arrows in the middle are flipped
-    const kind = this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
+    const kind = this.rng() < DASH.chance ? "dash" : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
     this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false, kind });
     this.lastOrbCol = this.col;
     this.flat(6);

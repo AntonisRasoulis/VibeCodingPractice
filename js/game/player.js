@@ -31,6 +31,8 @@ class Player {
     this.caught = false;     // caught by the fire: game over for this player
     this.blink = 0;
     this.frozen = 0;         // seconds left frozen by a freeze orb
+    this.dashHold = 0;       // seconds left hanging in the air before a dash
+    this.dashTime = 0;       // seconds left in a dash
     this.respawnX = x;
     this.respawnY = y;
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
@@ -56,6 +58,34 @@ class Player {
       return;
     }
     this.portalCooldown -= dt;
+
+    // Dash orb, part 1: hang in the air, charging up. No control, no gravity.
+    if (this.dashHold > 0) {
+      this.dashHold -= dt;
+      this.vx = 0;
+      this.vy = 0;
+      if (Math.random() < dt * 12) this.sparkle("#ffd23f");
+      if (this.dashHold <= 0) {
+        this.dashTime = DASH.time;
+        this.facing = 1;
+      }
+      return;
+    }
+
+    // Dash orb, part 2: shoot straight right, ready or not
+    if (this.dashTime > 0) {
+      this.dashTime -= dt;
+      this.vx = DASH.speed;
+      this.vy = 0;
+      this.onGround = false;
+      this.standingOn = null;
+      this.moveX(this.vx * dt, level);
+      if (this.vx === 0) this.dashTime = 0;        // hit a wall
+      if (this.dashTime <= 0) this.vx = PHYSICS.runSpeed;
+      this.checkHazards(level);
+      if (!this.dead) this.checkPortals(level);
+      return;
+    }
 
     // Frozen by a freeze orb: no running or jumping, but gravity still works
     if (this.frozen > 0) {
@@ -254,6 +284,8 @@ class Player {
 
   die() {
     if (this.dead) return;
+    this.dashHold = 0;
+    this.dashTime = 0;
     this.dead = true;
     this.deadTimer = DEATH.respawnDelay;
     this.burst();
