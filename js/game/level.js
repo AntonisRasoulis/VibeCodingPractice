@@ -230,7 +230,7 @@ class Level {
 
   addSection() {
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
-    if (this.col > 60) weights.shooter = 3;
+    if (this.col > 60) weights.shooter = 4;
     if (this.col > 120 && this.col - this.lastOrbCol > 160) weights.orb = 4;
 
     const type = this.pickWeighted(weights);
