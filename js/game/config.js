@@ -50,6 +50,12 @@ const ZAP = {
   range: 2400,  // how far a bolt travels before fizzling out
 };
 
+const SHOOTER = {
+  speed: 80,    // how fast its spikes fly
+  range: 160,   // how far a spike flies before it's gone
+  warn: 0.45,   // seconds the shooter glows and shakes before each volley
+};
+
 const MACE_RADIUS = 5;   // how close a mace's ball can get before it hits you
 
 const FALLING = {

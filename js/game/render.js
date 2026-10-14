@@ -65,6 +65,7 @@ const Renderer = (() => {
       if (player.frozen > 0) drawIce(player, camX);
     }
     drawMaces(world.level, camX, world.time);
+    drawShooters(world.level, camX, world.time);
     if (player.hasZap && !player.dead) drawCrackle(player, camX, world.time);
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
@@ -252,6 +253,56 @@ const Renderer = (() => {
         b.fillRect(x - 30 + ((k * 11) % 12), ly, 10, 1);
       }
     }
+  }
+
+  // ---- Spike shooters ----
+
+  function drawShooters(level, camX, time) {
+    for (const s of level.shooters) {
+      const sx = s.x - camX;
+      if (sx < -SHOOTER.range - 8 || sx > VIEW_W + SHOOTER.range + 8) continue;
+      for (const spike of level.shooterSpikes(s, time)) drawFlyingSpike(spike.x - camX, spike.y, spike.dx, spike.dy);
+      drawShooterBlock(s, Math.round(sx), level.shooterCharge(s, time), time);
+    }
+  }
+
+  // A stone block with a nozzle on each corner and a core that glows red before it fires
+  function drawShooterBlock(s, cx, charge, time) {
+    const shake = charge > 0.3 ? (Math.floor(time * 50) % 2 ? 1 : -1) : 0;
+    const x = cx - 4 + shake;
+    const y = s.row * TILE;
+    b.fillStyle = "#3a3d44";
+    b.fillRect(x, y, 8, 8);
+    b.fillStyle = "#6b707a";
+    b.fillRect(x + 1, y + 1, 6, 6);
+    b.fillStyle = "#8a8f99";
+    b.fillRect(x + 1, y + 1, 6, 1);
+    b.fillRect(x + 1, y + 1, 1, 6);
+    // nozzles poking out of each corner
+    b.fillStyle = "#cfd4dc";
+    for (const [dx, dy] of SHOOTER_DIRS) b.fillRect(x + (dx > 0 ? 7 : 0) + dx, y + (dy > 0 ? 7 : 0) + dy, 1, 1);
+    // core: dark red at rest, glowing orange-red while charging
+    const glow = Math.round(80 + 175 * charge);
+    b.fillStyle = `rgb(${glow}, ${Math.round(30 + 90 * charge)}, 30)`;
+    b.fillRect(x + 3, y + 3, 2, 2);
+    if (charge > 0) {
+      b.fillStyle = `rgba(255, 120, 40, ${0.35 * charge})`;
+      b.fillRect(x - 2, y - 2, 12, 12);
+    }
+  }
+
+  // A metal spike flying diagonally: a 2-pixel-thick shaft with a dark edge and a bright point
+  function drawFlyingSpike(x, y, dx, dy) {
+    const tx = Math.round(x);
+    const ty = Math.round(y);
+    for (let k = 5; k >= 1; k--) {
+      b.fillStyle = "#3a3d44"; // dark edge so it shows against the sky and the grass
+      b.fillRect(tx - k * dx, ty - (k - 1) * dy, 1, 1);
+      b.fillStyle = k > 3 ? "#7d828c" : "#b8bdc6";
+      b.fillRect(tx - k * dx, ty - k * dy, 1, 1);
+    }
+    b.fillStyle = "#ffffff";
+    b.fillRect(tx, ty, 1, 1);
   }
 
   // ---- Lightning ----

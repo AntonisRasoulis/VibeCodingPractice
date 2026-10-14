@@ -259,6 +259,14 @@ class Player {
       const nearY = clamp(ball.y, this.y, this.y + HITBOX_H);
       if ((ball.x - nearX) ** 2 + (ball.y - nearY) ** 2 < MACE_RADIUS ** 2) return this.die();
     }
+
+    // Flying spikes from shooters
+    for (const s of level.shooters) {
+      if (Math.abs(s.x - cx) > SHOOTER.range + 16) continue;
+      for (const spike of level.shooterSpikes(s, level.time)) {
+        if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, spike.x - 1.5, spike.y - 1.5, 3, 3)) return this.die();
+      }
+    }
   }
 
   checkPortals(level) {
@@ -283,6 +291,8 @@ class Player {
     if (Math.abs(last.x - this.x) < 4) return;
     // Never respawn somewhere a mace can swing through
     for (const m of level.maces) if (Math.abs(m.x - this.x) < level.maceReach(m)) return;
+    // ...or where a shooter's spikes can reach
+    for (const s of level.shooters) if (Math.abs(s.x - this.x) < SHOOTER.range * Math.SQRT1_2 + 12) return;
     this.safeSpots.push({ x: this.x, y: this.y });
     if (this.safeSpots.length > 300) this.safeSpots.shift();
   }

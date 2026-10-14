@@ -12,6 +12,10 @@
 const T_EMPTY = 0;
 const T_GROUND = 1;
 const T_SPIKE = 2;
+const T_SHOOTER = 3; // a solid block that fires spikes diagonally
+
+// The four diagonal directions a shooter fires in
+const SHOOTER_DIRS = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
 
 const MIN_GROUND_ROW = 8;  // highest the ground surface can go
 const MAX_GROUND_ROW = 12; // lowest the ground surface can go
@@ -40,6 +44,7 @@ class Level {
     this.exits = [];     // where portals come out (drawn only)
     this.orbs = [];      // swap orbs
     this.maces = [];     // spiked balls swinging on chains
+    this.shooters = [];  // blocks that fire spikes diagonally
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -56,7 +61,8 @@ class Level {
   }
 
   isSolid(col, row) {
-    return this.tile(col, row) === T_GROUND;
+    const t = this.tile(col, row);
+    return t === T_GROUND || t === T_SHOOTER;
   }
 
   // Make sure the level is generated at least up to this x position.
@@ -108,6 +114,57 @@ class Level {
     if (!col) return null;
     const row = col.indexOf(T_GROUND);
     return row < 0 ? null : row * TILE;
+  }
+
+  // ---- Spike shooters ----
+  //
+  // Spikes aren't stored anywhere. A shooter fires a volley every `period`
+  // seconds, so where every spike is can be worked out from the clock alone.
+  // That keeps them cheap, and both halves of the screen always agree.
+
+  // How far each of the 4 spikes can fly before hitting the ground (worked out once)
+  shooterReach(s) {
+    if (s.dist) return s.dist;
+    const dist = SHOOTER_DIRS.map(([dx, dy]) => {
+      for (let d = 0; d < SHOOTER.range; d++) {
+        const x = s.x + dx * (4 + d * Math.SQRT1_2);
+        const y = s.y + dy * (4 + d * Math.SQRT1_2);
+        if (y < -8 || y > VIEW_H) return d;
+        const col = Math.floor(x / TILE);
+        const row = Math.floor(y / TILE);
+        if (col === s.col && row === s.row) continue; // its own block
+        if (this.isSolid(col, row)) return d;
+      }
+      return SHOOTER.range;
+    });
+    // Only remember it once the ground it flies over has been built
+    if (Math.floor((s.x + SHOOTER.range) / TILE) < this.cols.length) s.dist = dist;
+    return dist;
+  }
+
+  // Every spike in the air from this shooter right now: [{x, y, dx, dy}]
+  shooterSpikes(s, time) {
+    const out = [];
+    const dist = this.shooterReach(s);
+    const life = SHOOTER.range / SHOOTER.speed;
+    let k = Math.floor(time / s.period - s.phase);
+    for (; ; k--) {
+      const age = time - (k + s.phase) * s.period;
+      if (age > life) break;
+      const d = age * SHOOTER.speed;
+      SHOOTER_DIRS.forEach(([dx, dy], i) => {
+        if (d >= dist[i]) return;
+        const step = 4 + d * Math.SQRT1_2;
+        out.push({ x: s.x + dx * step, y: s.y + dy * step, dx, dy });
+      });
+    }
+    return out;
+  }
+
+  // 0..1 as a shooter gets ready to fire (1 = about to fire)
+  shooterCharge(s, time) {
+    const untilNext = s.period - (((time / s.period - s.phase) % 1 + 1) % 1) * s.period;
+    return untilNext < SHOOTER.warn ? 1 - untilNext / SHOOTER.warn : 0;
   }
 
   // How far left and right of its bolt a mace can reach
@@ -173,6 +230,7 @@ class Level {
 
   addSection() {
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
+    if (this.col > 60) weights.shooter = 3;
     if (this.col > 120 && this.col - this.lastOrbCol > 160) weights.orb = 4;
 
     const type = this.pickWeighted(weights);
@@ -284,6 +342,25 @@ const SECTIONS = {
 
   // One or two spiked maces swinging on chains from bolts in the sky. The ball
   // sweeps through at running height, so time your run (or jump over it).
+  // A block that fires spikes in 4 diagonal directions. It can sit on the
+  // ground, float at head height (jump over it) or hang higher up (run under it).
+  shooter(d) {
+    this.flat(6);
+    const height = this.pickFrom([1, 1, 2, 3, 4, 5, 6]); // tiles above the ground
+    const row = this.groundRow - height;
+    const col = this.col;
+    this.column(this.groundRow)[row] = T_SHOOTER;
+    this.shooters.push({
+      col,
+      row,
+      x: col * TILE + TILE / 2,
+      y: row * TILE + TILE / 2,
+      period: 2.1 + this.rng() * 0.7 - d * 0.4, // each shooter fires at its own pace
+      phase: this.rng(),
+    });
+    this.flat(9);
+  },
+
   mace(d) {
     this.flat(6);
     const count = d > 0.4 && this.rng() < 0.5 ? 2 : 1;
