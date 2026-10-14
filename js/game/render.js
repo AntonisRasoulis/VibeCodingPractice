@@ -65,7 +65,7 @@ const Renderer = (() => {
       if (player.frozen > 0) drawIce(player, camX);
     }
     drawMaces(world.level, camX, world.time);
-    if (player.zapDir && !player.dead) drawCrackle(player, camX, world.time);
+    if (player.hasZap && !player.dead) drawCrackle(player, camX, world.time);
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
     drawParticles(player, camX);
@@ -534,9 +534,9 @@ const Renderer = (() => {
       const gapColor = gap < 10 ? "#ff4d3d" : gap < 25 ? "#ffb347" : "#ffffff";
       text(ctx, `${p.name} ${meters}m`, 12, top + 16, p.palette.c, 12);
       text(ctx, `FIRE ${gap}m`, W - 12, top + 16, gapColor, 12, "right");
-      if (p.zapDir) {
+      if (p.hasZap) {
         const key = i === 0 ? "S" : "DOWN";
-        const arrow = p.zapDir > 0 ? ">>" : "<<";
+        const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
         text(ctx, `ZAP ${arrow} press ${key}`, 12, top + 36, "#fff27a", 10);
       }
       if (p.flash > 0) {

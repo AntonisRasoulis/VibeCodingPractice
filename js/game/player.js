@@ -33,7 +33,7 @@ class Player {
     this.frozen = 0;         // seconds left frozen by a freeze orb
     this.dashHold = 0;       // seconds left hanging in the air before a dash
     this.dashTime = 0;       // seconds left in a dash
-    this.zapDir = 0;         // holding a lightning shot: -1 left, 1 right, 0 none
+    this.hasZap = false;     // holding a lightning shot
     this.flash = 0;          // white flash on this player's half of the screen
     this.zappedText = 0;     // how long to show "ZAPPED!"
     this.respawnX = x;

@@ -110,7 +110,7 @@ const Game = (() => {
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
           if (orb.kind === "zap") {
-            p.zapDir = p.facing; // shoots whichever way you faced when you grabbed it
+            p.hasZap = true;
             p.sparkle("#bff4ff");
             return;
           }
@@ -143,18 +143,19 @@ const Game = (() => {
   // ---- Lightning bolts ----
 
   function fireBolt(p, owner) {
-    if (!p.zapDir || p.dead || p.caught || p.frozen > 0 || p.dashHold > 0) return;
+    if (!p.hasZap || p.dead || p.caught || p.frozen > 0 || p.dashHold > 0) return;
+    const dir = p.facing; // fires whichever way you're facing right now
     const ground = world.level.groundTop(p.x + HITBOX_W / 2);
     world.bolts.push({
       id: nextBoltId++,
       owner,
-      dir: p.zapDir,
-      x: p.zapDir > 0 ? p.x + HITBOX_W : p.x, // the bolt's head
+      dir,
+      x: dir > 0 ? p.x + HITBOX_W : p.x, // the bolt's head
       y: (ground ?? p.y + HITBOX_H) - ZAP.height,
       traveled: 0,
       born: world.time,
     });
-    p.zapDir = 0;
+    p.hasZap = false;
     p.flash = 0.35;
     p.sparkle("#ffffff");
     p.sparkle("#bff4ff");
