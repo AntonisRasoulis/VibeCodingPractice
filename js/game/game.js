@@ -43,7 +43,7 @@ const Game = (() => {
       bolts: [], // lightning bolts flying along the course
       hands: [], // mystic hands flying, grabbing or swatting
       missiles: [], // missiles zooming in, locking on, flying or exploding
-      nextMissile: null, // when the next missile comes (set once someone passes 200m)
+      nextMissile: null, // when the next missile comes (set once someone passes 300m)
       winner: null,
     };
     for (const p of world.players) p.onGround = true;
@@ -309,10 +309,10 @@ const Game = (() => {
 
   // ---- Missiles ----
   //
-  // After 200m, a missile comes every so often (randomly). It zooms in from far
+  // After 300m, a missile comes every so often (randomly). It zooms in from far
   // away in the background on the left or right of a player, locks on to the
   // closest player for a moment, then fires in a straight line. The black one
-  // aims where you are; the red-striped one (after 300m) aims where you'll be.
+  // aims where you are; the red-striped one (after 400m) aims where you'll be.
 
   const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -374,7 +374,7 @@ const Game = (() => {
 
   function updateMissiles(dt) {
     const { players, level } = world;
-    // Start the random timer once anyone passes 200m
+    // Start the random timer once anyone passes 300m
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
     if (leaderMeters > MISSILE.startAt) {
       if (world.nextMissile === null) world.nextMissile = world.time + rand(2, MISSILE.every[1]);

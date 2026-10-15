@@ -67,8 +67,8 @@ const HAND = {
 };
 
 const MISSILE = {
-  startAt: 200,    // meters before the first black missile can come
-  stripedAt: 300,  // meters before red-striped missiles can come too
+  startAt: 300,    // meters before the first black missile can come
+  stripedAt: 400,  // meters before red-striped missiles can come too
   every: [10, 20], // random seconds between missiles (the rarest danger)
   approach: 1.4,   // seconds zooming in from far away in the background
   lock: 0.6,       // seconds aiming (red target + aim line) before it fires
