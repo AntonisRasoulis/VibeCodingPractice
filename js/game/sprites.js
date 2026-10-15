@@ -102,6 +102,71 @@ const ZAP_ORB_ROWS = [
   "..oooo..",
 ];
 
+// ---- Mystic hand (purple) ----
+
+// Open hand flying right, reaching to grab (wispy glowing wrist on the left)
+const HAND_OPEN_ROWS = [
+  ".........oo.......",
+  "........oplo......",
+  ".......opplo......",
+  "..ooooopplooooo...",
+  ".opppppppllllllo..",
+  "owppppppoooooooo..",
+  ".oppwpppplllllllo.",
+  "owppppppoooooooo..",
+  ".opppppplllllllo..",
+  "owppppppooooooo...",
+  ".oppppplllllo.....",
+  "..oppppooooo......",
+  "...oooo...........",
+];
+
+// Back of the hand flying left, for the backhand swat (knuckle marks in light purple)
+const HAND_BACK_ROWS = [
+  ".......oo.........",
+  "......odpo........",
+  "......odppo.......",
+  "...ooooodppooooo..",
+  "..oddddddkppppppo.",
+  "..oooooooopppppppo",
+  ".odddddddkppppppo.",
+  "..oooooooopppppppo",
+  "..oddddddkppppppo.",
+  "...ooooooopppppppo",
+  ".....oddddkpppppo.",
+  "......oooooppppo..",
+  "...........oooo...",
+];
+
+// Fist closed around the other player, knuckles to the right
+const HAND_FIST_ROWS = [
+  "...oooooo...",
+  "..opppllloo.",
+  ".oppwppllllo",
+  "oppppoooooo.",
+  "oppppllllllo",
+  "oppppoooooo.",
+  "oppppllllllo",
+  "oppppoooooo.",
+  "oppppllllllo",
+  ".oppppppppo.",
+  "..oooooooo..",
+];
+
+// The hand orb: gold coin with a purple raised hand and a light-purple highlight
+const HAND_ORB_ROWS = [
+  "..gggg..",
+  ".gvyvyg.",
+  "gyvyvyvg",
+  "gyvlvvyg",
+  "gvvvvvyg",
+  "gyvvvvyg",
+  ".gyvvyg.",
+  "..gggg..",
+];
+
+const HAND_PALETTE = { o: "#3b1f5e", p: "#9b5de5", l: "#c9a3ff", w: "#f5e8ff", d: "#6a3fb0", k: "#c9a3ff" };
+
 const CLOUD_ROWS = [
   "....wwww......",
   "..wwwwwwww.ww.",
@@ -184,6 +249,10 @@ function buildSprites() {
     freezeOrb: spriteFromRows(FREEZE_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     dashOrb: spriteFromRows(DASH_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     zapOrb: spriteFromRows(ZAP_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
+    handOrb: spriteFromRows(HAND_ORB_ROWS, { g: "#b8860b", y: "#ffd23f", v: "#9b5de5", l: "#c9a3ff" }),
+    handOpen: spriteFromRows(HAND_OPEN_ROWS, HAND_PALETTE),
+    handBack: spriteFromRows(HAND_BACK_ROWS, HAND_PALETTE),
+    handFist: spriteFromRows(HAND_FIST_ROWS, HAND_PALETTE),
     cloud: spriteFromRows(CLOUD_ROWS, { w: "#ffffff", b: "#d6eefc" }),
   };
 }

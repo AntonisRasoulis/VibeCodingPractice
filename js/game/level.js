@@ -389,6 +389,7 @@ const SECTIONS = {
     const roll = this.rng();
     const kind = roll < DASH.chance ? "dash"
       : roll < DASH.chance + ZAP.chance ? "zap"
+      : roll < DASH.chance + ZAP.chance + HAND.chance ? "hand"
       : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
     this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false, kind });
     this.lastOrbCol = this.col;

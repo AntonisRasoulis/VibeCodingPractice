@@ -12,6 +12,7 @@ const Renderer = (() => {
     sprites = buildSprites();
     buffer = makeCanvas(VIEW_W, BUFFER_H);
     b = buffer.getContext("2d");
+    b.imageSmoothingEnabled = false; // keep rotated sprites (the hand) pixel-sharp
   }
 
   function resetCameras(x) {
@@ -66,7 +67,8 @@ const Renderer = (() => {
     }
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
-    if (player.hasZap && !player.dead) drawCrackle(player, camX, world.time);
+    if (player.power && !player.dead) drawCrackle(player, camX, world.time);
+    for (const h of world.hands) drawHand(h, world, camX);
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
     drawParticles(player, camX);
@@ -223,7 +225,7 @@ const Renderer = (() => {
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb }[o.kind] || sprites.orb;
       b.drawImage(sprite, sx, o.y + bob);
     }
   }
@@ -398,9 +400,117 @@ const Renderer = (() => {
     for (let k = 0; k < 4; k++) {
       const a = hash(k, tick) * Math.PI * 2;
       const r = 6 + hash(k + 9, tick) * 3;
-      b.fillStyle = ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"][k];
+      b.fillStyle = (p.power === "hand" ? ["#ffffff", "#c9a3ff", "#9b5de5", "#c9a3ff"] : ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"])[k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }
+  }
+
+  // ---- Mystic hand ----
+
+  // Draw a sprite rotated around one of its own pixels (the pivot)
+  function drawRotated(img, x, y, angle, pivotX, pivotY, alpha = 1) {
+    b.save();
+    b.globalAlpha = alpha;
+    b.translate(Math.round(x), Math.round(y));
+    b.rotate(angle);
+    b.drawImage(img, -pivotX, -pivotY);
+    b.restore();
+  }
+
+  // Purple sparkles drifting off the hand
+  function handSparkles(x, y, behind, seed, time, count = 6) {
+    const tick = Math.floor(time * 18);
+    const colors = ["#c9a3ff", "#9b5de5", "#f5e8ff"];
+    for (let k = 0; k < count; k++) {
+      const sx = x + behind * (6 + hash(seed + k, tick) * 16);
+      const sy = y + (hash(seed + k * 3, tick + 1) - 0.5) * 12;
+      b.fillStyle = colors[k % 3];
+      b.fillRect(Math.round(sx), Math.round(sy), k % 4 === 0 ? 2 : 1, k % 4 === 0 ? 2 : 1);
+    }
+  }
+
+  function drawHand(h, world, camX, time = world.time) {
+    const target = world.players[1 - h.owner];
+    const open = sprites.handOpen;
+    const back = sprites.handBack;
+    const fist = sprites.handFist;
+    const seed = h.owner * 97 + Math.round(h.tx || 0);
+
+    if (h.state === "fly") {
+      const x = h.x - camX;
+      if (x < -20 || x > VIEW_W + 20) return;
+      const bob = Math.round(Math.sin(time * 18) * 0.7);
+      const img = h.dir > 0 ? open : back;
+      b.drawImage(img, Math.round(x - img.width / 2), Math.round(h.y - img.height / 2) + bob);
+      handSparkles(x, h.y, -h.dir, seed, time);
+      return;
+    }
+
+    const cx = target.x + HITBOX_W / 2 - camX;
+    const cy = target.y + HITBOX_H / 2;
+
+    if (h.state === "grab") {
+      // Fist closes on them, then swings up and back over the top
+      drawRotated(fist, cx, cy, h.angle || 0, fist.width / 2, fist.height / 2);
+      handSparkles(cx, cy, 1, seed, time, 4);
+      // a purple swoosh tracing the arc behind them
+      if (h.angle) {
+        b.fillStyle = "rgba(201, 163, 255, 0.8)";
+        const r = HAND.suplexRadius;
+        const ox = h.tx + HITBOX_W / 2 - r - camX;
+        const oy = h.ty + HITBOX_H / 2;
+        for (let a = 0; a < -h.angle; a += 0.25) b.fillRect(Math.round(ox + (r + 7) * Math.cos(a)), Math.round(oy - (r + 7) * Math.sin(a)), 1, 1);
+      }
+      return;
+    }
+
+    if (h.state === "swat") {
+      // Backhand: wind up (fingers swing up), then whip down through them
+      const wind = 0.1;
+      const t = h.t;
+      let angle;
+      if (t < wind) angle = (t / wind) * 1.15;
+      else angle = 1.15 - ((t - wind) / (HAND.swatTime - wind)) * 1.75;
+      const wristX = cx + 14;
+      const wristY = cy - 1;
+      drawRotated(back, wristX, wristY, angle, back.width - 3, back.height / 2);
+      if (t >= wind) { // white and purple swoosh along the swing
+        for (let a = -0.6; a < angle + 0.2 && a < 1.2; a += 0.12) {
+          const px = wristX - 14 * Math.cos(a);
+          const py = wristY - 14 * Math.sin(a);
+          b.fillStyle = "#ffffff";
+          b.fillRect(Math.round(px - 2), Math.round(py), 1, 1);
+          b.fillStyle = "#c9a3ff";
+          b.fillRect(Math.round(px - 1), Math.round(py), 1, 1);
+        }
+      }
+      return;
+    }
+
+    // fade: the hand dissolves into sparkles
+    const alpha = Math.max(0, 1 - h.t / 0.3);
+    if (h.swatted) {
+      // SMACK burst where the backhand landed
+      const sx = h.smackX - camX;
+      const sy = h.smackY;
+      const r1 = 2 + h.t * 20;
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        b.fillStyle = k % 2 ? "#ffd23f" : "#ffffff";
+        b.globalAlpha = alpha;
+        b.fillRect(Math.round(sx + Math.cos(a) * r1), Math.round(sy + Math.sin(a) * r1), 2, 2);
+      }
+      b.globalAlpha = 1;
+      drawRotated(back, sx + 14, sy - 1, -0.6, back.width - 3, back.height / 2, alpha * 0.7);
+    } else if (h.tx !== undefined) {
+      drawRotated(fist, h.tx + HITBOX_W / 2 - 2 * HAND.suplexRadius - camX, h.ty + HITBOX_H / 2 - 4, -Math.PI, fist.width / 2, fist.height / 2, alpha);
+    } else {
+      const img = h.dir > 0 ? open : back;
+      b.globalAlpha = alpha;
+      b.drawImage(img, Math.round(h.x - camX - img.width / 2), Math.round(h.y - img.height / 2));
+      b.globalAlpha = 1;
+    }
+    handSparkles(h.x - camX, h.y, -h.dir, seed, time, Math.round(6 * alpha));
   }
 
   // A block of ice around a frozen runner, with a bar showing how long is left
@@ -508,7 +618,16 @@ const Renderer = (() => {
     const shake = p.dashHold > 0 ? Math.round(Math.sin(p.dashHold * 90)) : 0; // trembling before a dash
     const x = Math.round(p.x - camX) - 1 + shake;
     const y = Math.round(p.y) - 1;
-    if (p.facing < 0) {
+    // Swung by a hand, or tumbling backwards after being thrown
+    const spin = p.held ? p.spin : p.stun > 0 && !p.onGround ? -(HAND.stun - p.stun) * 14 : 0;
+    if (spin) {
+      b.save();
+      b.translate(x + 4, y + 6);
+      b.rotate(spin);
+      if (p.facing < 0) b.scale(-1, 1);
+      b.drawImage(frame, -4, -6);
+      b.restore();
+    } else if (p.facing < 0) {
       b.save();
       b.translate(x + 8, y);
       b.scale(-1, 1);
@@ -585,10 +704,11 @@ const Renderer = (() => {
       const gapColor = gap < 10 ? "#ff4d3d" : gap < 25 ? "#ffb347" : "#ffffff";
       text(ctx, `${p.name} ${meters}m`, 12, top + 16, p.palette.c, 12);
       text(ctx, `FIRE ${gap}m`, W - 12, top + 16, gapColor, 12, "right");
-      if (p.hasZap) {
+      if (p.power) {
         const key = i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
-        text(ctx, `ZAP ${arrow} press ${key}`, 12, top + 36, "#fff27a", 10);
+        const label = p.power === "zap" ? "ZAP" : "HAND";
+        text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, p.power === "zap" ? "#fff27a" : "#c9a3ff", 10);
       }
       if (p.flash > 0) {
         ctx.fillStyle = `rgba(220, 245, 255, ${Math.min(1, p.flash) * 0.45})`;
@@ -597,7 +717,7 @@ const Renderer = (() => {
 
       const mid = top + viewH / 2;
       if (p.caught) text(ctx, "CAUGHT!", W / 2, mid, "#ff4d3d", 24, "center");
-      else if (p.zappedText > 0) text(ctx, "ZAPPED!", W / 2, mid, "#bff4ff", 24, "center");
+      else if (p.hitTextTime > 0) text(ctx, p.hitText, W / 2, mid, p.hitColor, 24, "center");
       else if (p.frozen > FREEZE_TIME - 0.8) text(ctx, "FROZEN!", W / 2, mid, "#a6e1ff", 24, "center");
       else if (p.dashHold > 0 || p.dashTime > 0) text(ctx, "DASH!", W / 2, mid, "#ffd23f", 24, "center");
       else if (world.swapFlash > 0) text(ctx, "SWAP!", W / 2, mid, "#ffd23f", 24, "center");

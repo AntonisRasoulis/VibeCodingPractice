@@ -33,9 +33,14 @@ class Player {
     this.frozen = 0;         // seconds left frozen by a freeze orb
     this.dashHold = 0;       // seconds left hanging in the air before a dash
     this.dashTime = 0;       // seconds left in a dash
-    this.hasZap = false;     // holding a lightning shot
+    this.power = null;       // stored power for S / Down: "zap" or "hand" (newest replaces old)
+    this.held = false;       // caught by a mystic hand: the hand moves us, not physics
+    this.spin = 0;           // how far the runner is turned while being swung or thrown
+    this.stun = 0;           // seconds of no control after being thrown
+    this.hitText = "";       // "ZAPPED!", "GRABBED!" or "SMACKED!" on this player's screen
+    this.hitColor = "#ffffff";
+    this.hitTextTime = 0;
     this.flash = 0;          // white flash on this player's half of the screen
-    this.zappedText = 0;     // how long to show "ZAPPED!"
     this.respawnX = x;
     this.respawnY = y;
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
@@ -54,8 +59,9 @@ class Player {
     this.updateFallingPlatforms(dt);
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
-    if (this.zappedText > 0) this.zappedText -= dt;
+    if (this.hitTextTime > 0) this.hitTextTime -= dt;
     if (this.caught) return;
+    if (this.held) return; // being carried by a hand
 
     if (this.dead) {
       this.deadTimer -= dt;
@@ -90,6 +96,13 @@ class Player {
       this.checkHazards(level);
       if (!this.dead) this.checkPortals(level);
       return;
+    }
+
+    // Thrown by a hand: no control until we recover (gravity and momentum still work)
+    if (this.stun > 0) {
+      this.stun -= dt;
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+      this.jumpBuffer = 0;
     }
 
     // Frozen by a freeze orb: no running or jumping, but gravity still works
@@ -299,6 +312,9 @@ class Player {
 
   die() {
     if (this.dead) return;
+    this.held = false;
+    this.stun = 0;
+    this.spin = 0;
     this.dashHold = 0;
     this.dashTime = 0;
     this.dead = true;
@@ -334,8 +350,14 @@ class Player {
     this.sparkle("#bff4ff");
     this.sparkle("#c792ff");
     this.flash = 0.8;
-    this.zappedText = 1;
+    this.showHit("ZAPPED!", "#bff4ff");
     this.die();
+  }
+
+  showHit(text, color) {
+    this.hitText = text;
+    this.hitColor = color;
+    this.hitTextTime = 1;
   }
 
   burnUp() {

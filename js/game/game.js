@@ -41,6 +41,7 @@ const Game = (() => {
       time: 0,
       swapFlash: 0,
       bolts: [], // lightning bolts flying along the course
+      hands: [], // mystic hands flying, grabbing or swatting
       winner: null,
     };
     for (const p of world.players) p.onGround = true;
@@ -94,8 +95,9 @@ const Game = (() => {
 
     const inputs = [readInput(0), readInput(1)];
     players.forEach((p, i) => p.update(dt, inputs[i], level));
-    players.forEach((p, i) => { if (inputs[i].firePressed) fireBolt(p, i); });
+    players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
     updateBolts(dt);
+    updateHands(dt);
     checkOrbs();
     checkFire();
   }
@@ -109,9 +111,9 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
-          if (orb.kind === "zap") {
-            p.hasZap = true;
-            p.sparkle("#bff4ff");
+          if (orb.kind === "zap" || orb.kind === "hand") {
+            p.power = orb.kind; // holding one power at a time: the newest replaces the old
+            p.sparkle(orb.kind === "zap" ? "#bff4ff" : "#c9a3ff");
             return;
           }
           if (orb.kind === "dash") {
@@ -142,8 +144,15 @@ const Game = (() => {
 
   // ---- Lightning bolts ----
 
+  // S (Red) or Down (Blue): use whatever power you're holding
+  function usePower(p, owner) {
+    if (!p.power || p.dead || p.caught || p.held || p.frozen > 0 || p.dashHold > 0) return;
+    if (p.power === "zap") fireBolt(p, owner);
+    else if (p.power === "hand") throwHand(p, owner);
+    p.power = null;
+  }
+
   function fireBolt(p, owner) {
-    if (!p.hasZap || p.dead || p.caught || p.frozen > 0 || p.dashHold > 0) return;
     const dir = p.facing; // fires whichever way you're facing right now
     const ground = world.level.groundTop(p.x + HITBOX_W / 2);
     world.bolts.push({
@@ -155,7 +164,6 @@ const Game = (() => {
       traveled: 0,
       born: world.time,
     });
-    p.hasZap = false;
     p.flash = 0.35;
     p.sparkle("#ffffff");
     p.sparkle("#bff4ff");
@@ -185,6 +193,115 @@ const Game = (() => {
       }
     }
     world.bolts = world.bolts.filter((b) => !b.done && b.traveled < ZAP.range);
+  }
+
+  // ---- Mystic hands ----
+
+  function throwHand(p, owner) {
+    const dir = p.facing;
+    world.hands.push({
+      owner,
+      dir,
+      x: p.x + HITBOX_W / 2 + dir * 6, // centre of the hand
+      y: p.y + HITBOX_H / 2,           // flies straight at the height it was thrown from
+      traveled: 0,
+      state: "fly",                    // fly, then grab or swat if it catches someone, then fade
+      t: 0,
+    });
+    p.sparkle("#c9a3ff");
+  }
+
+  // Does a runner standing at (x, y) overlap the ground?
+  function bodyInWall(x, y) {
+    const lv = world.level;
+    return lv.isSolid(Math.floor(x / TILE), Math.floor(y / TILE)) ||
+      lv.isSolid(Math.floor((x + HITBOX_W - 0.01) / TILE), Math.floor(y / TILE)) ||
+      lv.isSolid(Math.floor(x / TILE), Math.floor((y + HITBOX_H - 0.01) / TILE)) ||
+      lv.isSolid(Math.floor((x + HITBOX_W - 0.01) / TILE), Math.floor((y + HITBOX_H - 0.01) / TILE));
+  }
+
+  // Let go of a caught player and fling them backwards (always to the left)
+  function throwPlayer(target) {
+    target.held = false;
+    target.spin = 0;
+    target.vx = -HAND.throwX;
+    target.vy = -HAND.throwUp;
+    target.onGround = false;
+    target.standingOn = null;
+    target.stun = HAND.stun;
+  }
+
+  function updateHands(dt) {
+    const { level, players } = world;
+    for (const h of world.hands) {
+      h.t += dt;
+      const target = players[1 - h.owner];
+
+      if (h.state === "fly") {
+        const move = HAND.speed * dt;
+        h.x += h.dir * move;
+        h.traveled += move;
+        if (h.traveled >= HAND.range || level.isSolid(Math.floor(h.x / TILE), Math.floor(h.y / TILE))) {
+          h.state = "fade";
+          h.t = 0;
+          continue;
+        }
+        const half = HAND.size / 2;
+        if (!target.dead && !target.caught && !target.held &&
+            overlaps(target.x, target.y, HITBOX_W, HITBOX_H, h.x - half, h.y - half, HAND.size, HAND.size)) {
+          // Caught! Facing right it's a grab-and-suplex, facing left it's a backhand
+          h.state = h.dir > 0 ? "grab" : "swat";
+          h.t = 0;
+          h.tx = target.x;
+          h.ty = target.y;
+          target.held = true;
+          target.vx = target.vy = 0;
+          target.dashHold = target.dashTime = 0;
+          target.standingOn = null;
+          target.flash = 0.3;
+          target.showHit(h.dir > 0 ? "GRABBED!" : "SMACKED!", "#c9a3ff");
+        }
+      } else if (h.state === "grab") {
+        // The fist closes, then swings them up and back over the top, like a suplex
+        const close = 0.1;
+        if (h.t > close) {
+          const a = Math.min(1, (h.t - close) / (HAND.grabTime - close)) * Math.PI;
+          const r = HAND.suplexRadius;
+          const nx = h.tx - r + r * Math.cos(a);
+          const ny = h.ty - r * Math.sin(a);
+          if (!bodyInWall(nx, ny)) {
+            target.x = nx;
+            target.y = ny;
+          }
+          target.spin = -a;
+          h.angle = -a;
+        }
+        if (h.t >= HAND.grabTime) {
+          throwPlayer(target);
+          target.sparkle("#c9a3ff");
+          h.state = "fade";
+          h.t = 0;
+        }
+      } else if (h.state === "swat") {
+        if (h.t >= HAND.swatTime) {
+          throwPlayer(target);
+          target.sparkle("#ffffff");
+          target.sparkle("#ffd23f");
+          h.smackX = target.x + HITBOX_W / 2;
+          h.smackY = target.y + HITBOX_H / 2;
+          h.state = "fade";
+          h.swatted = true;
+          h.t = 0;
+        }
+      } else if (h.t > 0.3) {
+        h.done = true;
+      }
+    }
+    // If the caught player dies or is caught by the fire, let the hand go
+    for (const h of world.hands) {
+      if ((h.state === "grab" || h.state === "swat") && !players[1 - h.owner].held) { h.state = "fade"; h.t = 0; }
+    }
+    world.hands = world.hands.filter((h) => !h.done);
   }
 
   function checkFire() {

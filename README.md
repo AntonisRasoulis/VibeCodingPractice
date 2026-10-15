@@ -6,7 +6,7 @@ Built with plain HTML, CSS and JavaScript. No frameworks or build tools are need
 
 ## Controls
 
-| | Jump | Run | Shoot lightning |
+| | Jump | Run | Use lightning / hand |
 |---|---|---|---|
 | **Red** (top) | `W` | `A` / `D` | `S` |
 | **Blue** (bottom) | `↑` | `←` / `→` | `↓` |
@@ -43,4 +43,4 @@ js/game/game.js       The game loop: keyboard, fire, swap orbs, who wins
 - **Built in sections.** The level is stitched together from hand-designed pieces: flat ground, steps, spikes, pits, floating platforms, moving platforms, crumbling platforms, swinging maces, spike shooters, a portal shortcut and swap orbs. Each piece is designed so it can always be cleared, and the pieces get harder further along.
 - **Built just ahead of the leader.** New sections are added on the right whenever the player in front gets close to the end, so the course never runs out.
 - **Per-player crumbling platforms.** Each player has their own copy of the crumbling platforms. If one falls under Red, it's still there when Blue arrives.
-- **Orbs work once.** When anyone touches a swap orb, the players trade places, including everything about where they are. About half the orbs are freeze orbs in disguise (the arrows in the middle are flipped): they hold whoever touches them still for 3 seconds. Either way the orb disappears for both players. Dash orbs (marked with a ») hold you in the air for a second, then launch you far to the right, wherever that lands you. Lightning orbs (a white zigzag) give you one shot: press S (Red) or Down (Blue) to fire a bolt along the ground in the direction you're facing when you shoot. It travels the shared course until it reaches the other player, who has to jump over it.
+- **Orbs work once.** When anyone touches a swap orb, the players trade places, including everything about where they are. About half the orbs are freeze orbs in disguise (the arrows in the middle are flipped): they hold whoever touches them still for 3 seconds. Either way the orb disappears for both players. Dash orbs (marked with a ») hold you in the air for a second, then launch you far to the right, wherever that lands you. Lightning orbs (a white zigzag) give you one shot: press S (Red) or Down (Blue) to fire a bolt along the ground in the direction you're facing when you shoot. It travels the shared course until it reaches the other player, who has to jump over it. Hand orbs (a purple hand) give you a short-range mystic hand on the same key: facing right it grabs the other player and suplexes them backwards, facing left it backhands them further back. You hold one power at a time; a new one replaces the old.
