@@ -56,7 +56,7 @@ const ZAP = {
 const HAND = {
   chance: 0.2,      // share of orbs that are hand orbs
   speed: 200,       // how fast the hand flies (normal running is 96)
-  range: 64,        // how far it flies before fading out (8 tiles)
+  range: 128,       // how far it flies before fading out (16 tiles)
   size: 10,         // the part of the hand that catches someone (pixels)
   throwX: 250,      // throw speed backwards: about 15-18 tiles in total
   throwUp: 165,     // how high the throw goes: about 2 tiles at the top
