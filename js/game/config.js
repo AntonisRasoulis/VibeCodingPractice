@@ -55,11 +55,11 @@ const ZAP = {
 
 const HAND = {
   chance: 0.2,      // share of orbs that are hand orbs
-  speed: 200,       // how fast the hand flies (normal running is 96)
+  speed: 300,       // how fast the hand flies (normal running is 96)
   range: 128,       // how far it flies before fading out (16 tiles)
   size: 10,         // the part of the hand that catches someone (pixels)
-  throwX: 250,      // throw speed backwards: about 15-18 tiles in total
-  throwUp: 165,     // how high the throw goes: about 2 tiles at the top
+  throwX: 400,      // throw speed backwards: about 27 tiles (30 with the suplex swing)
+  throwUp: 250,     // how high the throw goes: about 4 tiles at the top
   stun: 0.5,        // seconds the thrown player can't control themselves
   suplexRadius: 10, // how wide the grab swings the player up and over
   grabTime: 0.45,   // grab: close the fist, then swing up and over
