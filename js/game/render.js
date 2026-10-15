@@ -419,15 +419,9 @@ const Renderer = (() => {
     let alpha = 1;
 
     if (m.state === "approach") {
-      // Zooming in from far away: tiny and faded at first, growing faster as it gets close
-      const e = (m.t / MISSILE.approach) ** 2;
-      const sx = m.ax + m.side * 45;
-      const sy = m.ay - 22;
-      x = sx + (m.ax - sx) * e - camX;
-      y = sy + (m.ay - sy) * e;
-      angle = Math.atan2(m.ay - sy, m.ax - sx);
-      scale = 0.15 + 0.85 * e;
-      alpha = 0.35 + 0.65 * e;
+      // Zooming in from far away: tiny and faded at first, growing as it gets close
+      scale = m.scale;
+      alpha = 0.35 + 0.65 * ((m.scale - 0.15) / 0.85);
     }
     if (x < -40 || x > VIEW_W + 40) return;
 
@@ -853,5 +847,5 @@ const Renderer = (() => {
     }
   }
 
-  return { init, render, resetCameras, swapCameras };
+  return { init, render, resetCameras, swapCameras, camera: (i) => cams[i] };
 })();

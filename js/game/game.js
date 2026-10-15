@@ -324,18 +324,32 @@ const Game = (() => {
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
     const striped = leaderMeters > MISSILE.stripedAt && Math.random() < 0.5;
     const side = Math.random() < 0.5 ? -1 : 1; // comes in on the left or the right of the player
-    const ax = near.x + side * rand(70, 140);
-    const ay = rand(14, 44);
-    world.missiles.push({
+    world.missiles.push(makeMissile(near, striped, side));
+  }
+
+  // While it zooms in, a missile is positioned relative to the player it came for,
+  // so the whole entrance stays on their screen even while they run. It starts small
+  // near the middle of their sky (far away) and grows out to where it arrives.
+  // The player sits 35% across their view, so the view runs from 140px behind them
+  // to 260px ahead; every point here stays well inside that.
+  function makeMissile(near, striped, side) {
+    const ox = side < 0 ? -rand(55, 95) : rand(70, 190); // arrival spot, left or right of the player
+    const oy = rand(22, 46);
+    const centre = VIEW_W * 0.5 - VIEW_W * 0.35;            // middle of their screen, relative to them
+    return {
       striped,
       side,
       state: "approach",
       t: 0,
-      ax, ay,                            // where it arrives on the course
-      x: ax, y: ay,
-      angle: side > 0 ? Math.PI : 0,     // facing back towards the player while it zooms in
+      anchor: near,
+      ox, oy,
+      sx: centre + (ox - centre) * 0.25,                   // start: far away, near the middle of the sky
+      sy: Math.max(18, oy - 18),                          // (below the distance counters at the top)
+      x: near.x + ox, y: oy,
+      scale: 0.15,
+      angle: 0,
       trail: [],
-    });
+    };
   }
 
   function missileAim(m, target) {
@@ -372,6 +386,11 @@ const Game = (() => {
     for (const m of world.missiles) {
       m.t += dt;
       if (m.state === "approach") {
+        const e = Math.min(1, m.t / MISSILE.approach) ** 2; // slow at first, rushing in at the end
+        m.x = m.anchor.x + m.sx + (m.ox - m.sx) * e;
+        m.y = m.sy + (m.oy - m.sy) * e;
+        m.scale = 0.15 + 0.85 * e;
+        m.angle = Math.atan2(m.oy - m.sy, m.ox - m.sx);
         if (m.t >= MISSILE.approach) {
           m.state = "lock";
           m.t = 0;
