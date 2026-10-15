@@ -423,6 +423,42 @@ const Renderer = (() => {
       scale = m.scale;
       alpha = 0.35 + 0.65 * ((m.scale - 0.15) / 0.85);
     }
+    // Smoke trail from the zoom-in: thin far away, thicker as the missile gets closer
+    if (m.smoke && m.smoke.length) {
+      const baseX = m.state === "approach" ? m.anchor.x : m.smokeAnchorX;
+      for (const puff of m.smoke) {
+        const age = time - puff.t;
+        const fade = Math.max(0, 1 - age / 1.6);
+        if (fade <= 0) continue;
+        const px = baseX + puff.rx - Math.cos(m.state === "approach" ? angle : Math.atan2(m.oy - m.sy, m.ox - m.sx)) * 9 * puff.s - camX;
+        const py = puff.y - Math.sin(m.state === "approach" ? angle : Math.atan2(m.oy - m.sy, m.ox - m.sx)) * 9 * puff.s;
+        const size = Math.max(1, Math.round(1 + puff.s * 2.5 + age * 2)); // grows with the missile, and spreads as it drifts
+        b.fillStyle = `rgba(${age < 0.15 ? "255, 244, 214" : "235, 238, 245"}, ${0.75 * fade})`;
+        b.fillRect(Math.round(px - size / 2), Math.round(py - size / 2 - age * 3), size, size);
+      }
+    }
+
+    // A glint where it first appears, like sunlight catching it far away
+    if (m.state === "approach" && m.t < 0.45) {
+      const k = Math.sin((Math.PI * m.t) / 0.45);
+      const gx = Math.round(m.anchor.x + m.sx - camX);
+      const gy = Math.round(m.sy);
+      const arm = Math.round(2 + 7 * k);
+      const diag = Math.round(1 + 3 * k);
+      b.fillStyle = `rgba(255, 250, 200, ${0.35 * k})`;
+      b.fillRect(gx - 3, gy - 3, 7, 7);
+      b.fillStyle = "#ffd23f";
+      b.fillRect(gx - arm, gy, arm * 2 + 1, 1);
+      b.fillRect(gx, gy - arm, 1, arm * 2 + 1);
+      b.fillStyle = "#fff6c8";
+      for (let d = 1; d <= diag; d++) {
+        b.fillRect(gx + d, gy + d, 1, 1); b.fillRect(gx - d, gy - d, 1, 1);
+        b.fillRect(gx + d, gy - d, 1, 1); b.fillRect(gx - d, gy + d, 1, 1);
+      }
+      b.fillStyle = "#ffffff";
+      b.fillRect(gx - 1, gy - 1, 3, 3);
+    }
+
     if (x < -40 || x > VIEW_W + 40) return;
 
     if (m.state === "boom") return drawExplosion(x, y, m.t);

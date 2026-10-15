@@ -349,6 +349,7 @@ const Game = (() => {
       scale: 0.15,
       angle: 0,
       trail: [],
+      smoke: [],     // smoke left behind while it zooms in (kept relative to the player, like the missile)
     };
   }
 
@@ -391,7 +392,13 @@ const Game = (() => {
         m.y = m.sy + (m.oy - m.sy) * e;
         m.scale = 0.15 + 0.85 * e;
         m.angle = Math.atan2(m.oy - m.sy, m.ox - m.sx);
+        // drop a puff of smoke every few frames; it's thicker the closer (bigger) the missile is
+        if ((m.smokeTimer = (m.smokeTimer || 0) + dt) > 0.025) {
+          m.smokeTimer = 0;
+          m.smoke.push({ rx: m.x - m.anchor.x, y: m.y, s: m.scale, t: world.time });
+        }
         if (m.t >= MISSILE.approach) {
+          m.smokeAnchorX = m.anchor.x; // from here the trail stays put in the world
           m.state = "lock";
           m.t = 0;
           // Lock on to whoever is closest right now
