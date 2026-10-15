@@ -132,7 +132,8 @@ class Player {
       this.coyote = 0;
     }
     const minRise = -PHYSICS.jumpSpeed * PHYSICS.jumpCut;
-    if (!input.jump && this.vy < minRise) this.vy = minRise;
+    // (a thrown player isn't holding jump, so don't cut their throw short)
+    if (!input.jump && this.vy < minRise && this.stun <= 0) this.vy = minRise;
 
     // Ride moving platforms
     if (this.standingOn && this.vy >= 0) this.moveX(this.standingOn.dx, level);
