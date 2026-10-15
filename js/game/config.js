@@ -66,6 +66,19 @@ const HAND = {
   swatTime: 0.24,   // backhand: wind up, then swat
 };
 
+const MISSILE = {
+  startAt: 200,    // meters before the first black missile can come
+  stripedAt: 300,  // meters before red-striped missiles can come too
+  every: [10, 20], // random seconds between missiles (the rarest danger)
+  approach: 1.4,   // seconds zooming in from far away in the background
+  lock: 0.6,       // seconds aiming (red target + aim line) before it fires
+  speed: 340,      // how fast it flies once fired (normal running is 96)
+  blast: 9,        // explosion radius: about a tile around the hit
+  blastTime: 0.3,  // how long the explosion shows
+  lethalTime: 0.15, // the explosion can kill during this first part
+  range: 700,      // how far it flies before giving up
+};
+
 const SHOOTER = {
   speed: 80,    // how fast its spikes fly
   range: 160,   // how far a spike flies before it's gone

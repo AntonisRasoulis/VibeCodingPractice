@@ -42,6 +42,8 @@ const Game = (() => {
       swapFlash: 0,
       bolts: [], // lightning bolts flying along the course
       hands: [], // mystic hands flying, grabbing or swatting
+      missiles: [], // missiles zooming in, locking on, flying or exploding
+      nextMissile: null, // when the next missile comes (set once someone passes 200m)
       winner: null,
     };
     for (const p of world.players) p.onGround = true;
@@ -98,6 +100,7 @@ const Game = (() => {
     players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
     updateBolts(dt);
     updateHands(dt);
+    updateMissiles(dt);
     checkOrbs();
     checkFire();
   }
@@ -302,6 +305,123 @@ const Game = (() => {
       if ((h.state === "grab" || h.state === "swat") && !players[1 - h.owner].held) { h.state = "fade"; h.t = 0; }
     }
     world.hands = world.hands.filter((h) => !h.done);
+  }
+
+  // ---- Missiles ----
+  //
+  // After 200m, a missile comes every so often (randomly). It zooms in from far
+  // away in the background on the left or right of a player, locks on to the
+  // closest player for a moment, then fires in a straight line. The black one
+  // aims where you are; the red-striped one (after 300m) aims where you'll be.
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function spawnMissile() {
+    const { players } = world;
+    const alive = players.filter((p) => !p.dead && !p.caught);
+    if (!alive.length) return;
+    const near = alive[Math.floor(Math.random() * alive.length)];
+    const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
+    const striped = leaderMeters > MISSILE.stripedAt && Math.random() < 0.5;
+    const side = Math.random() < 0.5 ? -1 : 1; // comes in on the left or the right of the player
+    const ax = near.x + side * rand(70, 140);
+    const ay = rand(14, 44);
+    world.missiles.push({
+      striped,
+      side,
+      state: "approach",
+      t: 0,
+      ax, ay,                            // where it arrives on the course
+      x: ax, y: ay,
+      angle: side > 0 ? Math.PI : 0,     // facing back towards the player while it zooms in
+      trail: [],
+    });
+  }
+
+  function missileAim(m, target) {
+    const tx = target.x + HITBOX_W / 2;
+    const ty = target.y + HITBOX_H / 2;
+    if (!m.striped) return { x: tx, y: ty };
+    // Lead the target: where will they be by the time the missile gets there?
+    let px = tx, py = ty;
+    for (let i = 0; i < 3; i++) {
+      const time = Math.hypot(px - m.x, py - m.y) / MISSILE.speed;
+      px = tx + target.vx * time;
+      py = ty + (target.onGround ? 0 : target.vy * time);
+    }
+    return { x: px, y: Math.min(py, VIEW_H) };
+  }
+
+  function explodeMissile(m) {
+    m.state = "boom";
+    m.t = 0;
+  }
+
+  function updateMissiles(dt) {
+    const { players, level } = world;
+    // Start the random timer once anyone passes 200m
+    const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
+    if (leaderMeters > MISSILE.startAt) {
+      if (world.nextMissile === null) world.nextMissile = world.time + rand(2, MISSILE.every[1]);
+      if (world.time >= world.nextMissile) {
+        spawnMissile();
+        world.nextMissile = world.time + rand(MISSILE.every[0], MISSILE.every[1]);
+      }
+    }
+
+    for (const m of world.missiles) {
+      m.t += dt;
+      if (m.state === "approach") {
+        if (m.t >= MISSILE.approach) {
+          m.state = "lock";
+          m.t = 0;
+          // Lock on to whoever is closest right now
+          const alive = players.filter((p) => !p.dead && !p.caught);
+          if (!alive.length) { m.done = true; continue; }
+          m.target = alive.reduce((best, p) =>
+            Math.hypot(p.x - m.x, p.y - m.y) < Math.hypot(best.x - m.x, best.y - m.y) ? p : best);
+        }
+      } else if (m.state === "lock") {
+        m.aim = missileAim(m, m.target);
+        m.angle = Math.atan2(m.aim.y - m.y, m.aim.x - m.x);
+        if (m.t >= MISSILE.lock) {
+          // Fire! From here on it flies in a straight line and never turns
+          m.state = "fly";
+          m.t = 0;
+          m.vx = Math.cos(m.angle) * MISSILE.speed;
+          m.vy = Math.sin(m.angle) * MISSILE.speed;
+          m.traveled = 0;
+        }
+      } else if (m.state === "fly") {
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        m.traveled += MISSILE.speed * dt;
+        m.trail.push({ x: m.x, y: m.y, t: world.time });
+        if (m.trail.length > 14) m.trail.shift();
+        // the nose is a few pixels ahead of the middle
+        const nx = m.x + Math.cos(m.angle) * 8;
+        const ny = m.y + Math.sin(m.angle) * 8;
+        if (level.isSolid(Math.floor(nx / TILE), Math.floor(ny / TILE))) explodeMissile(m);
+        else if (players.some((p) => !p.dead && !p.caught && overlaps(p.x, p.y, HITBOX_W, HITBOX_H, nx - 2, ny - 2, 4, 4))) explodeMissile(m);
+        else if (m.traveled > MISSILE.range || ny > VIEW_H + 20) m.done = true;
+        if (m.state === "boom") { m.x = nx; m.y = ny; }
+      } else if (m.state === "boom") {
+        // The blast can catch anyone close by, for a moment
+        if (m.t < MISSILE.lethalTime) {
+          for (const p of players) {
+            if (p.dead || p.caught) continue;
+            const cx = clamp(m.x, p.x, p.x + HITBOX_W);
+            const cy = clamp(m.y, p.y, p.y + HITBOX_H);
+            if ((m.x - cx) ** 2 + (m.y - cy) ** 2 < MISSILE.blast ** 2) {
+              p.showHit("BOOM!", "#f77f00");
+              p.die();
+            }
+          }
+        }
+        if (m.t >= MISSILE.blastTime) m.done = true;
+      }
+    }
+    world.missiles = world.missiles.filter((m) => !m.done);
   }
 
   function checkFire() {

@@ -167,6 +167,32 @@ const HAND_ORB_ROWS = [
 
 const HAND_PALETTE = { o: "#3b1f5e", p: "#9b5de5", l: "#c9a3ff", w: "#f5e8ff", d: "#6a3fb0", k: "#c9a3ff" };
 
+// ---- Missiles (pointing right; rotated to aim when drawn) ----
+
+// Black missile: fires straight at where you are
+const MISSILE_ROWS = [
+  "..kk..............",
+  "..kkk.............",
+  "oykkkkkkkkkkkkkkh.",
+  "yykhhhhhhhhhhhhhhk",
+  "oykgggggggggggggk.",
+  "..kkk.............",
+  "..kk..............",
+];
+
+// Red-striped missile: aims at where you're going to be
+const MISSILE_STRIPED_ROWS = [
+  "..rr..............",
+  "..kkk.............",
+  "oykkkkkkkkkrrkkkh.",
+  "yykhhhhhhhhrrhhhhk",
+  "oykggggggggRRgggk.",
+  "..kkk.............",
+  "..rr..............",
+];
+
+const MISSILE_PALETTE = { k: "#1b1b22", g: "#3a3d44", h: "#6b707a", r: "#e43b44", R: "#a22633", y: "#ffd23f", o: "#f77f00" };
+
 const CLOUD_ROWS = [
   "....wwww......",
   "..wwwwwwww.ww.",
@@ -253,6 +279,8 @@ function buildSprites() {
     handOpen: spriteFromRows(HAND_OPEN_ROWS, HAND_PALETTE),
     handBack: spriteFromRows(HAND_BACK_ROWS, HAND_PALETTE),
     handFist: spriteFromRows(HAND_FIST_ROWS, HAND_PALETTE),
+    missile: spriteFromRows(MISSILE_ROWS, MISSILE_PALETTE),
+    missileStriped: spriteFromRows(MISSILE_STRIPED_ROWS, MISSILE_PALETTE),
     cloud: spriteFromRows(CLOUD_ROWS, { w: "#ffffff", b: "#d6eefc" }),
   };
 }

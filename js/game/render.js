@@ -50,6 +50,7 @@ const Renderer = (() => {
 
   function drawView(world, player, other, camX) {
     drawBackground(camX);
+    for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
     drawTiles(world.level, camX);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
@@ -69,6 +70,7 @@ const Renderer = (() => {
     drawShooters(world.level, camX, world.time);
     if (player.power && !player.dead) drawCrackle(player, camX, world.time);
     for (const h of world.hands) drawHand(h, world, camX);
+    for (const m of world.missiles) if (m.state !== "approach") drawMissile(m, world, camX);
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
     drawParticles(player, camX);
@@ -402,6 +404,117 @@ const Renderer = (() => {
       const r = 6 + hash(k + 9, tick) * 3;
       b.fillStyle = (p.power === "hand" ? ["#ffffff", "#c9a3ff", "#9b5de5", "#c9a3ff"] : ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"])[k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
+    }
+  }
+
+  // ---- Missiles ----
+
+  function drawMissile(m, world, camX) {
+    const time = world.time;
+    const img = m.striped ? sprites.missileStriped : sprites.missile;
+    let x = m.x - camX;
+    let y = m.y;
+    let angle = m.angle;
+    let scale = 1;
+    let alpha = 1;
+
+    if (m.state === "approach") {
+      // Zooming in from far away: tiny and faded at first, growing faster as it gets close
+      const e = (m.t / MISSILE.approach) ** 2;
+      const sx = m.ax + m.side * 45;
+      const sy = m.ay - 22;
+      x = sx + (m.ax - sx) * e - camX;
+      y = sy + (m.ay - sy) * e;
+      angle = Math.atan2(m.ay - sy, m.ax - sx);
+      scale = 0.15 + 0.85 * e;
+      alpha = 0.35 + 0.65 * e;
+    }
+    if (x < -40 || x > VIEW_W + 40) return;
+
+    if (m.state === "boom") return drawExplosion(x, y, m.t);
+
+    // Smoke trail behind it while it flies
+    if (m.state === "fly") {
+      for (const p of m.trail) {
+        const age = time - p.t;
+        const fade = Math.max(0, 1 - age * 4);
+        if (fade <= 0) continue;
+        b.fillStyle = `rgba(150, 150, 160, ${0.6 * fade})`;
+        const s = age < 0.08 ? 1 : 2;
+        b.fillRect(Math.round(p.x - Math.cos(angle) * 9 - camX), Math.round(p.y - Math.sin(angle) * 9), s, s);
+      }
+    }
+
+    // Lock-on: a bold flashing red target on the player and a dotted line showing where it'll fly
+    if (m.state === "lock" && m.target && m.aim) {
+      const on = Math.floor(time * 12) % 2 === 0;
+      const tx = Math.round(m.target.x + HITBOX_W / 2 - camX);
+      const ty = Math.round(m.target.y + HITBOX_H / 2);
+      const red = on ? "#ff2a35" : "#b8131d";
+      // aim line: always shown, pulsing
+      const ax = m.aim.x - camX;
+      const len = Math.hypot(ax - x, m.aim.y - y);
+      for (let d = 10; d < len; d += 4) {
+        b.fillStyle = (Math.floor(d / 4 + time * 20) % 2) ? red : "#ffffff";
+        b.fillRect(Math.round(x + ((ax - x) * d) / len), Math.round(y + ((m.aim.y - y) * d) / len), 2, 2);
+      }
+      // target: shrinking corner brackets + a rotating ring of dots
+      const r = Math.round(12 - 4 * Math.min(1, m.t / MISSILE.lock));
+      b.fillStyle = red;
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        b.fillRect(tx + sx * r - (sx > 0 ? 2 : 0), ty + sy * r - (sy > 0 ? 0 : 0), 3, 1);
+        b.fillRect(tx + sx * r - (sx > 0 ? 0 : 0), ty + sy * r - (sy > 0 ? 2 : 0), 1, 3);
+      }
+      for (let k = 0; k < 8; k++) {
+        const a = time * 4 + (k * Math.PI) / 4;
+        b.fillRect(Math.round(tx + Math.cos(a) * (r - 3)), Math.round(ty + Math.sin(a) * (r - 3)), 2, 2);
+      }
+      b.fillRect(tx, ty, 1, 1);
+    }
+
+    b.save();
+    b.globalAlpha = alpha;
+    b.translate(Math.round(x), Math.round(y));
+    b.rotate(angle);
+    b.scale(scale, scale);
+    b.drawImage(img, -9, -3);
+    // flickering flame out the back
+    const flick = Math.floor(time * 30) % 2;
+    b.fillStyle = flick ? "#ffd23f" : "#f77f00";
+    b.fillRect(-12 - flick, -1, 3 + flick, 3);
+    b.fillStyle = "#f77f00";
+    b.fillRect(-14 - flick * 2, 0, 2, 1);
+    b.restore();
+  }
+
+  // A small pixel explosion: white flash, fireball, burst with sparks, then smoke
+  function drawExplosion(x, y, t) {
+    const f = t / MISSILE.blastTime;
+    const ring = (r, color) => {
+      b.fillStyle = color;
+      for (let yy = -r; yy <= r; yy++) {
+        const w = Math.round(Math.sqrt(r * r - yy * yy));
+        b.fillRect(Math.round(x - w), Math.round(y + yy), w * 2 + 1, 1);
+      }
+    };
+    if (f < 0.15) ring(3, "#ffffff");
+    else if (f < 0.35) { ring(7, "#f77f00"); ring(5, "#ffd23f"); ring(2, "#ffffff"); }
+    else if (f < 0.55) {
+      ring(MISSILE.blast + 1, "#d1361e"); ring(MISSILE.blast - 1, "#f77f00"); ring(4, "#ffd23f");
+      b.fillStyle = "#ffd23f";
+      for (let k = 0; k < 10; k++) {
+        const a = hash(k, Math.round(x)) * Math.PI * 2;
+        const r = MISSILE.blast + 2 + hash(k + 5, Math.round(y)) * 3;
+        b.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r), 1, 1);
+      }
+    } else {
+      const fade = 1 - (f - 0.55) / 0.45;
+      for (let k = 0; k < 8; k++) {
+        const a = hash(k, Math.round(x) + 3) * Math.PI * 2;
+        const r = 3 + hash(k + 2, Math.round(y)) * 6 + (f - 0.55) * 8;
+        b.fillStyle = k % 3 === 0 && f < 0.75 ? `rgba(209, 54, 30, ${fade})` : `rgba(130, 130, 140, ${fade})`;
+        b.fillRect(Math.round(x + Math.cos(a) * r - 2), Math.round(y + Math.sin(a) * r - 2 - (f - 0.55) * 6), 4, 4);
+      }
     }
   }
 
