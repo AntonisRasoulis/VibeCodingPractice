@@ -288,7 +288,11 @@ const SECTIONS = {
     this.flat(2);
     const clusters = this.rand(1, 2);
     for (let i = 0; i < clusters; i++) {
-      this.spikes(this.rand(1, 2 + Math.round(d * 2)));
+      // Ice spikes come in longer rows: anywhere from 1 to 5 tiles, so you never know what's next
+      const n = this.biome === "snow"
+        ? this.pickWeighted({ 1: 1, 2: 2, 3: 4, 4: 4, 5: 2 + d * 2 }) | 0
+        : this.rand(1, 2 + Math.round(d * 2));
+      this.spikes(n);
       this.flat(this.rand(7 - Math.round(d * 2), 8)); // room to land a full jump (less later on)
     }
   },
@@ -421,7 +425,7 @@ const SECTIONS = {
     this.flat(2);
     this.flat(this.rand(5, 9), true);
     if (d > 0.3 && this.rng() < 0.6) {
-      for (let i = this.rand(1, 2); i > 0; i--) this.column(this.groundRow, true)[this.groundRow - 1] = T_SPIKE;
+      for (let i = this.rand(1, 3); i > 0; i--) this.column(this.groundRow, true)[this.groundRow - 1] = T_SPIKE;
       this.flat(this.rand(7, 9), true); // room to land and slide
     }
     this.flat(2);
