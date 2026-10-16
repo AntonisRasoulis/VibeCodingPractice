@@ -538,8 +538,12 @@ const Game = (() => {
         if (spot.used || leader.x / TILE < spot.col) continue;
         spot.used = true;
         if (level.biomeAt(Math.floor(leader.x / TILE)) !== "snow") continue;
-        const kind = BEAR[spot.kind];
-        const bear = { kind: spot.kind, target: leader, x: leader.x - BEAR.startBehind, y: leader.y + HITBOX_H,
+        const meters = leader.x / TILE;
+        if (meters < THREATS.baseAt) continue; // no bears this early
+        let kindName = spot.kind;
+        if (kindName === "polar" && meters < THREATS.specialAt) kindName = Math.random() < 0.5 ? "brown" : "black"; // polar bears come later
+        const kind = BEAR[kindName];
+        const bear = { kind: kindName, target: leader, x: leader.x - BEAR.startBehind, y: leader.y + HITBOX_H,
           state: "chase", t: 0, speed: kind.speed, chase: kind.chase, anim: 0, stepTimer: 0, lift: 0, trampled: new Set() };
         // Never pop into view on the other player's screen: if they're close enough behind to see
         // the spot, start just off the left of THEIR screen and charge through to the leader first.
@@ -632,8 +636,9 @@ const Game = (() => {
 
   function spawnVultures(leader) {
     const n = Number(pickWeighted(VULTURE.groupSizes));
+    const blackAllowed = leader.x / TILE >= THREATS.specialAt; // black vultures come later
     for (let i = 0; i < n; i++) {
-      const kind = Math.random() < 0.5 ? "brown" : "black";
+      const kind = blackAllowed && Math.random() < 0.5 ? "black" : "brown";
       world.vultures.push({ kind, target: leader, state: "wait", t: -i * VULTURE.stagger, x: leader.x + 270, y: -12, angle: Math.random() * 6.28, facing: -1 });
     }
   }
@@ -657,7 +662,7 @@ const Game = (() => {
     if (runners.length) {
       const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
       const meters = leader.x / TILE;
-      if (level.biomeAt(Math.floor(meters)) === "desert") {
+      if (level.biomeAt(Math.floor(meters)) === "desert" && meters >= THREATS.baseAt) {
         if (world.nextVulture === null) world.nextVulture = meters + rand(20, VULTURE.every[1]);
         if (meters >= world.nextVulture) {
           spawnVultures(leader);

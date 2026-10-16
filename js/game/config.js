@@ -72,9 +72,16 @@ const HAND = {
   swatTime: 0.24,   // backhand: wind up, then swat
 };
 
+// When each biome's special dangers can start showing up (meters run by the leader).
+// Base: black missile, brown & black bear, brown vulture. Special: red-striped missile, polar bear, black vulture.
+const THREATS = {
+  baseAt: 400,
+  specialAt: 500,
+};
+
 const MISSILE = {
-  startAt: 300,    // meters before the first black missile can come
-  stripedAt: 400,  // meters before red-striped missiles can come too
+  startAt: THREATS.baseAt,      // meters before the first black missile can come
+  stripedAt: THREATS.specialAt, // meters before red-striped missiles can come too
   every: [160, 240], // random meters run (by the leader) between missiles: about 1 per 200m
   approach: 1.4,   // seconds zooming in from far away in the background
   lock: 0.6,       // seconds aiming (red target + aim line) before it fires
