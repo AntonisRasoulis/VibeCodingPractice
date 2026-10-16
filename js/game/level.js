@@ -224,7 +224,7 @@ class Level {
     return c;
   }
 
-  flat(n, icy = false) {
+  flat(n, icy = this.iceBias) {
     for (let i = 0; i < n; i++) this.column(this.groundRow, icy);
   }
 
@@ -233,7 +233,7 @@ class Level {
   }
 
   spikes(n) {
-    for (let i = 0; i < n; i++) this.column(this.groundRow)[this.groundRow - 1] = T_SPIKE;
+    for (let i = 0; i < n; i++) this.column(this.groundRow, this.iceBias)[this.groundRow - 1] = T_SPIKE;
   }
 
   addPlatform(kind, col, row, widthTiles, extra = {}) {
@@ -251,6 +251,8 @@ class Level {
 
   addSection() {
     if (this.col >= this.biomeEnd) return this.newBiome();
+    // In the snow, many sections are built on ice: the run-up, the ground under the danger and the landing
+    this.iceBias = this.biome === "snow" && this.rng() < SNOW.iceSections;
 
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
     if (this.col > 60) weights.shooter = 4;
@@ -259,11 +261,12 @@ class Level {
 
     const type = this.pickWeighted(weights);
     SECTIONS[type].call(this, this.difficulty());
-    this.flat(this.rand(2, 4)); // breathing room between sections
+    this.flat(this.rand(2, 4), false); // breathing room between sections (never icy)
   }
 
   // A calm stretch, then a sign, and from there on a different biome
   newBiome() {
+    this.iceBias = false;
     this.flat(4);
     this.biome = this.pickFrom(BIOMES.filter((b) => b !== this.biome));
     this.signs.push({ x: this.col * TILE + 2, biome: this.biome });
@@ -274,7 +277,7 @@ class Level {
 
 const SECTIONS = {
   flat() {
-    this.flat(this.rand(4, 8), this.biome === "snow" && this.rng() < 0.4);
+    this.flat(this.rand(4, 8));
   },
 
   // The ground steps up or down.
@@ -293,7 +296,7 @@ const SECTIONS = {
         ? this.pickWeighted({ 1: 1, 2: 2, 3: 4, 4: 4, 5: 2 + d * 2 }) | 0
         : this.rand(1, 2 + Math.round(d * 2));
       this.spikes(n);
-      this.flat(this.rand(7 - Math.round(d * 2), 8)); // room to land a full jump (less later on)
+      this.flat(this.rand(7 - Math.round(d * 2), 8), false); // room to land a full jump (less later on), never icy
     }
   },
 
@@ -304,7 +307,7 @@ const SECTIONS = {
     if (this.rng() < 0.4) {
       this.groundRow = clamp(this.groundRow + this.pickFrom([-1, 1]), MIN_GROUND_ROW, MAX_GROUND_ROW);
     }
-    this.flat(3);
+    this.flat(3, false); // a landing you can stop on
   },
 
   // A wide pit with floating platforms to hop across.
@@ -318,7 +321,7 @@ const SECTIONS = {
       this.empty(w);
     }
     this.empty(this.rand(2, 3));
-    this.flat(3);
+    this.flat(3, false); // a landing you can stop on
   },
 
   // A wide pit with a platform sliding back and forth across it.
@@ -334,7 +337,7 @@ const SECTIONS = {
       period: 3.2 - d,
       phase: this.rng(),
     });
-    this.flat(3);
+    this.flat(3, false); // a landing you can stop on
   },
 
   // Platforms that crumble a moment after you land on them.
@@ -347,12 +350,13 @@ const SECTIONS = {
       this.empty(4);
     }
     this.empty(2);
-    this.flat(3);
+    this.flat(3, false); // a landing you can stop on
   },
 
   // Two routes: the low road is a long spiky stretch. A portal on a high
   // ledge at the start skips straight to the end of it.
   portal(d) {
+    this.iceBias = false; // its low road needs tight hops: never on ice
     this.flat(3);
     const start = this.col;
     const ledgeRow = this.groundRow - 4;
@@ -423,10 +427,10 @@ const SECTIONS = {
   // A slippery stretch of ice. Later on there may be spikes in the middle of it.
   ice(d) {
     this.flat(2);
-    this.flat(this.rand(5, 9), true);
+    this.flat(this.rand(9, 15), true);
     if (d > 0.3 && this.rng() < 0.6) {
       for (let i = this.rand(1, 3); i > 0; i--) this.column(this.groundRow, true)[this.groundRow - 1] = T_SPIKE;
-      this.flat(this.rand(7, 9), true); // room to land and slide
+      this.flat(this.rand(9, 13), true); // room to land and slide
     }
     this.flat(2);
   },
@@ -437,7 +441,7 @@ const SECTIONS = {
     const ledgeRow = this.groundRow - 5; // its underside is 4 tiles up: you can walk under the icicles
     const width = this.rand(4, 7);
     for (let i = 0; i < width; i++) {
-      this.column(this.groundRow)[ledgeRow] = T_GROUND;
+      this.column(this.groundRow, this.iceBias)[ledgeRow] = T_GROUND;
       if (i % 2 === 1 || (i === 0 && this.rng() < 0.5)) {
         this.icicles.push({ id: this.nextId++, x: (this.col - 1) * TILE + 1, y: (ledgeRow + 1) * TILE, len: this.rand(10, 13) });
       }

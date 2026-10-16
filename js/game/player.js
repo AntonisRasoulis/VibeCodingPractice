@@ -143,7 +143,7 @@ class Player {
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     if (dir !== 0) {
       let accel = this.onGround ? (this.onIce ? SNOW.iceAccel : PHYSICS.groundAccel) : PHYSICS.airAccel;
-      if (Math.sign(this.vx) === -dir) accel *= 2; // turn around quickly
+      if (Math.sign(this.vx) === -dir && !(this.onGround && this.onIce)) accel *= 2; // turn around quickly (not on ice)
       this.vx = clamp(this.vx + dir * accel * dt, -PHYSICS.runSpeed, PHYSICS.runSpeed);
       this.facing = dir;
     } else if (this.onGround) {
