@@ -134,15 +134,15 @@ const Sound = (() => {
     },
 
     // Running and jumping
-    jump: () => tone({ f: 280, to: 560, dur: 0.1, vol: 0.06 }),
-    land: () => noise({ f: 400, dur: 0.06, vol: 0.12 }),
+    jump: () => tone({ f: 280, to: 560, dur: 0.1, vol: 0.08 }),
+    land: () => noise({ f: 400, dur: 0.07, vol: 0.4 }),
     die: () => { // spikes, maces, shooter spikes, pits
       tone({ f: 500, to: 70, dur: 0.35, vol: 0.14 });
       noise({ f: 2000, to: 300, dur: 0.15, vol: 0.2 });
     },
     respawn: () => notes([392, 523, 659], { gap: 0.05, dur: 0.08, type: "triangle", vol: 0.15 }),
     portal: () => { tone({ f: 200, to: 1400, dur: 0.35, type: "sine", vol: 0.15, vibrato: 40 }); noise({ filter: "bandpass", f: 800, to: 3000, dur: 0.3, vol: 0.08 }); },
-    crumble: () => { noise({ f: 250, dur: 0.45, vol: 0.18 }); noise({ filter: "bandpass", f: 900, q: 2, dur: 0.12, vol: 0.08, at: 0.1 }); },
+    crumble: () => { noise({ f: 250, dur: 0.45, vol: 0.6 }); noise({ filter: "bandpass", f: 900, q: 2, dur: 0.12, vol: 0.3, at: 0.1 }); },
 
     // Orbs
     swap: () => { tone({ f: 400, to: 1200, dur: 0.18, type: "sine", vol: 0.18 }); tone({ f: 1200, to: 400, dur: 0.18, type: "sine", vol: 0.18, at: 0.16 }); },
@@ -151,11 +151,11 @@ const Sound = (() => {
       noise({ filter: "highpass", f: 5000, dur: 0.4, vol: 0.12 });
     },
     thaw: () => noise({ filter: "highpass", f: 3000, dur: 0.18, vol: 0.15 }), // the ice cracks off
-    dashCharge: () => tone({ f: 150, to: 900, dur: DASH.hold, type: "sawtooth", vol: 0.07, attack: 0.1, vibrato: 15 }),
+    dashCharge: () => tone({ f: 150, to: 900, dur: DASH.hold, type: "sawtooth", vol: 0.1, attack: 0.1, vibrato: 15 }),
     dashLaunch: () => { noise({ filter: "bandpass", f: 400, to: 3000, q: 1.5, dur: 0.5, vol: 0.4 }); tone({ f: 200, to: 90, dur: 0.3, type: "sine", vol: 0.2 }); },
     gotZap: () => { tone({ f: 110, dur: 0.18, type: "sawtooth", vol: 0.1 }); noise({ filter: "highpass", f: 4000, dur: 0.15, vol: 0.12 }); tone({ f: 1760, dur: 0.12, type: "sine", vol: 0.1, at: 0.08 }); },
     gotHand: () => [523, 659, 784].forEach((f) => tone({ f, dur: 0.45, type: "sine", vol: 0.08, attack: 0.05, vibrato: 8 })),
-    gotWind: () => { noise({ filter: "bandpass", f: 800, to: 2500, q: 2, dur: 0.3, vol: 0.18, attack: 0.05 }); tone({ f: 1319, dur: 0.15, type: "sine", vol: 0.08, at: 0.1 }); },
+    gotWind: () => { noise({ filter: "bandpass", f: 800, to: 2500, q: 2, dur: 0.3, vol: 0.4, attack: 0.05 }); tone({ f: 1319, dur: 0.15, type: "sine", vol: 0.12, at: 0.1 }); },
 
     // Abilities
     zapFire: () => { tone({ f: 1200, to: 150, dur: 0.3, type: "sawtooth", vol: 0.12 }); noise({ filter: "highpass", f: 3000, dur: 0.25, vol: 0.18 }); },
@@ -163,20 +163,20 @@ const Sound = (() => {
     handThrow: () => { tone({ f: 300, to: 750, dur: 0.3, type: "sine", vol: 0.12, vibrato: 20 }); noise({ filter: "bandpass", f: 600, to: 1500, q: 2, dur: 0.25, vol: 0.1 }); },
     grab: () => tone({ f: 180, to: 70, dur: 0.15, type: "sine", vol: 0.3 }),
     slam: () => { tone({ f: 140, to: 40, dur: 0.35, type: "sine", vol: 0.4 }); noise({ f: 800, to: 100, dur: 0.3, vol: 0.35 }); },
-    windUp: () => noise({ filter: "bandpass", f: 300, to: 1200, q: 2, dur: 0.22, vol: 0.12, attack: 0.15 }),
+    windUp: () => noise({ filter: "bandpass", f: 300, to: 1200, q: 2, dur: 0.22, vol: 0.45, attack: 0.15 }),
     smack: () => { noise({ filter: "highpass", f: 1500, dur: 0.1, vol: 0.5 }); tone({ f: 320, to: 120, dur: 0.1, vol: 0.2 }); },
     windDash: () => { noise({ filter: "bandpass", f: 700, to: 3500, q: 1.2, dur: 0.28, vol: 0.4 }); noise({ filter: "highpass", f: 4000, dur: 0.2, vol: 0.08, at: 0.05 }); },
 
     // Missiles
     glint: () => { tone({ f: 2637, dur: 0.25, type: "sine", vol: 0.1 }); tone({ f: 3951, dur: 0.2, type: "sine", vol: 0.05, at: 0.05 }); },
-    incoming: () => tone({ f: 500, to: 1400, dur: MISSILE.approach, type: "sine", vol: 0.05, attack: 0.3 }),
+    incoming: () => tone({ f: 500, to: 1400, dur: MISSILE.approach, type: "sine", vol: 0.08, attack: 0.3 }),
     lockOn: () => notes([1000, 1000, 1000, 1000], { gap: 0.14, dur: 0.07, vol: 0.09 }),
     launch: () => { noise({ filter: "bandpass", f: 300, to: 1500, q: 1, dur: 0.45, vol: 0.35 }); tone({ f: 120, to: 60, dur: 0.3, type: "sawtooth", vol: 0.08 }); },
     boom: () => { noise({ f: 1200, to: 80, dur: 0.8, vol: 0.7 }); tone({ f: 120, to: 35, dur: 0.6, type: "sine", vol: 0.5 }); },
 
     // Level dangers
-    shooterFire: () => tone({ f: 800, to: 250, dur: 0.12, vol: 0.06 }),
-    maceSwoosh: () => noise({ filter: "bandpass", f: 400, to: 900, q: 3, dur: 0.25, vol: 0.12, attack: 0.1 }),
+    shooterFire: () => tone({ f: 800, to: 250, dur: 0.12, vol: 0.09 }),
+    maceSwoosh: () => noise({ filter: "bandpass", f: 400, to: 900, q: 2, dur: 0.28, vol: 0.4, attack: 0.1 }),
   };
 
   // Don't play the same sound twice in a row too quickly (e.g. both players at once)
