@@ -53,6 +53,7 @@ class Player {
     this.onIce = false;
     this.biome = null;            // the biome we're in, to notice when it changes
     this.biomeBanner = 0;         // seconds left showing the new biome's name
+    this.honey = 0;               // seconds left slowed down by a black bear's honey
     this.particles = [];
   }
 
@@ -67,6 +68,7 @@ class Player {
     this.updateFallingPlatforms(dt);
     this.updateSnow(dt, level);
     if (this.biomeBanner > 0) this.biomeBanner -= dt;
+    if (this.honey > 0) this.honey -= dt;
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
@@ -144,7 +146,8 @@ class Player {
     if (dir !== 0) {
       let accel = this.onGround ? (this.onIce ? SNOW.iceAccel : PHYSICS.groundAccel) : PHYSICS.airAccel;
       if (Math.sign(this.vx) === -dir && !(this.onGround && this.onIce)) accel *= 2; // turn around quickly (not on ice)
-      this.vx = clamp(this.vx + dir * accel * dt, -PHYSICS.runSpeed, PHYSICS.runSpeed);
+      const top = PHYSICS.runSpeed * (this.honey > 0 ? BEAR.honeySpeed : 1); // sticky honey slows you down
+      this.vx = clamp(this.vx + dir * accel * dt, -top, top);
       this.facing = dir;
     } else if (this.onGround) {
       this.vx = approach(this.vx, 0, (this.onIce ? SNOW.iceFriction : PHYSICS.friction) * dt); // ice: you keep sliding
@@ -483,6 +486,7 @@ class Player {
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
     this.icicleState.clear(); // ...and so do icicles
+    this.honey = 0;
     this.snowballs = [];
     this.snowballStarted.clear();
     Sound.play("respawn");

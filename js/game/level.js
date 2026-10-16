@@ -44,6 +44,7 @@ class Level {
     this.signs = [];          // wooden signs where a new biome starts
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
+    this.bearSpots = [];      // once per snow biome: when the leader gets here, a bear charges in
     this.cols = [];      // cols[x][row] = tile type
     this.platforms = []; // { kind: "static" | "move" | "fall", x, y, w }
     this.portals = [];   // entrances, each with the exit it leads to
@@ -56,6 +57,7 @@ class Level {
     this.lastOrbCol = 0;
     this.nextId = 1;
     this.biomeEnd = this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
+    this.addBiomeEvents(this.biomeEnd);
     this.flat(30); // calm start
   }
 
@@ -271,7 +273,16 @@ class Level {
     this.biome = this.pickFrom(BIOMES.filter((b) => b !== this.biome));
     this.signs.push({ x: this.col * TILE + 2, biome: this.biome });
     this.flat(8);
-    this.biomeEnd = this.col + this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
+    const length = this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
+    this.biomeEnd = this.col + length;
+    this.addBiomeEvents(length);
+  }
+
+  // Each biome's special danger. Snow: one bear, somewhere in the biome.
+  addBiomeEvents(length) {
+    if (this.biome !== "snow") return;
+    const col = this.col + this.rand(40, Math.max(41, length - 140));
+    this.bearSpots.push({ col, kind: this.pickFrom(["polar", "brown", "black"]), used: false });
   }
 }
 

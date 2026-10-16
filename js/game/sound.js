@@ -182,6 +182,20 @@ const Sound = (() => {
     snowball: () => noise({ f: 300, to: 600, dur: 0.5, vol: 0.25, attack: 0.15 }),
     snowballBreak: () => { noise({ f: 1500, to: 300, dur: 0.25, vol: 0.45 }); tone({ f: 160, to: 80, dur: 0.12, type: "sine", vol: 0.15 }); },
 
+    // Bears
+    roar: () => {
+      tone({ f: 110, to: 70, dur: 1.1, type: "sawtooth", vol: 0.22, attack: 0.08, vibrato: 18 });
+      tone({ f: 165, to: 95, dur: 1.0, type: "sawtooth", vol: 0.12, attack: 0.1, vibrato: 24 });
+      noise({ f: 900, to: 250, dur: 1.1, vol: 0.35, attack: 0.1 });
+    },
+    bearStep: () => { tone({ f: 70, to: 40, dur: 0.12, type: "sine", vol: 0.25 }); noise({ f: 300, dur: 0.08, vol: 0.15 }); },
+    maul: () => {
+      noise({ filter: "highpass", f: 1200, dur: 0.18, vol: 0.5 });
+      tone({ f: 140, to: 60, dur: 0.5, type: "sawtooth", vol: 0.2, vibrato: 20 });
+    },
+    honey: () => { noise({ f: 700, to: 200, dur: 0.3, vol: 0.4 }); tone({ f: 330, to: 180, dur: 0.35, type: "sine", vol: 0.15, vibrato: 10 }); },
+    grumble: () => tone({ f: 90, to: 60, dur: 0.7, type: "sawtooth", vol: 0.12, attack: 0.1, vibrato: 12 }),
+
     // Level dangers
     shooterFire: () => tone({ f: 800, to: 250, dur: 0.12, vol: 0.09 }),
     maceSwoosh: () => noise({ filter: "bandpass", f: 400, to: 900, q: 2, dur: 0.28, vol: 0.4, attack: 0.1 }),

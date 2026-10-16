@@ -61,6 +61,7 @@ const Renderer = (() => {
     drawSigns(world.level, camX);
     drawIcicles(world.level, player, camX, world.time);
     drawSnowballs(player, camX);
+    for (const bear of world.bears) drawBear(bear, camX, world.time);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
@@ -74,6 +75,7 @@ const Renderer = (() => {
       drawDashEffects(player, camX, world.time);
       drawRunner(player, camX);
       if (player.frozen > 0) drawIce(player, camX);
+      if (player.honey > 0) drawHoney(player, camX, world.time);
     }
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
@@ -137,6 +139,47 @@ const Renderer = (() => {
       const wx = k * 32 + Math.floor(hash(k, 43) * 20);
       const hill = 84 - 7 * (Math.sin(wx * 0.03) * 0.6 + Math.sin(wx * 0.069 + 1) * 0.4);
       b.drawImage(tree, Math.round(wx - near), Math.round(hill - tree.height + 3));
+    }
+  }
+
+  // A bear galloping (facing the way it runs), or rearing up to swipe
+  function drawBear(bear, camX, time) {
+    const frames = sprites.bears[bear.kind];
+    const nose = Math.round(bear.x - camX);
+    if (nose < -BEAR_W - 4 || nose > VIEW_W + BEAR_W) return;
+    const frame = bear.state === "swipe" ? frames[3] : frames[Math.floor(bear.anim / 9) % 3];
+    const y = Math.round(bear.y - (BEAR_H - 1) - bear.lift);
+    if (bear.state === "leave") {
+      b.save();
+      b.translate(nose + BEAR_W - 1, y);
+      b.scale(-1, 1); // heading back to the left
+      b.drawImage(frame, 0, 0);
+      b.restore();
+    } else {
+      b.drawImage(frame, nose - (BEAR_W - 1), y);
+    }
+    if (bear.state === "swipe" && bear.kind !== "black") {
+      // claw marks slashing through the air
+      b.fillStyle = "#ffffff";
+      const t = Math.min(1, bear.t / 0.15);
+      for (let k = 0; k < 3; k++) {
+        for (let i = 0; i < 8 * t; i++) b.fillRect(nose - 4 + i, y + 2 + k * 3 + Math.round(i * 0.6), 1, 1);
+      }
+    }
+  }
+
+  // Honey dripping off a player who got caught by a black bear
+  function drawHoney(p, camX, time) {
+    const x = Math.round(p.x - camX);
+    const y = Math.round(p.y);
+    b.fillStyle = "#ffb627";
+    b.fillRect(x - 1, y - 1, 3, 2);
+    b.fillRect(x + 3, y + 3, 3, 2);
+    b.fillRect(x, y + 7, 2, 2);
+    b.fillStyle = "#e08a00";
+    for (let k = 0; k < 3; k++) {
+      const drop = ((time * 18 + k * 5) % 10);
+      b.fillRect(x + 1 + k * 2, y + 4 + Math.round(drop), 1, 2);
     }
   }
 

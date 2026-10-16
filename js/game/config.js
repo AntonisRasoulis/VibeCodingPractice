@@ -104,6 +104,18 @@ const SNOW = {
   snowballAhead: 230,  // a snowball starts rolling when you're this far from where it starts
 };
 
+// The snow biome's special danger: once per snow biome a bear comes charging in from
+// the left after the player in the lead. Keep running right and you stay just ahead.
+const BEAR = {
+  startBehind: 150, // how far behind the player its nose starts (just off the left of their screen)
+  polar: { speed: 124, chase: 5 },  // deadliest: slow down at all and it gets you
+  brown: { speed: 102, chase: 10 }, // you can afford a short stop now and then
+  black: { speed: 100, chase: 15 }, // slowest: it doesn't kill, it covers you in honey
+  honeyTime: 4,     // seconds a honey-covered player is slowed down
+  honeySpeed: 0.5,  // how fast you can run while covered in honey (compared to normal)
+  swipeTime: 0.35,  // the swipe when it catches you
+};
+
 const SHOOTER = {
   speed: 80,    // how fast its spikes fly
   range: 160,   // how far a spike flies before it's gone

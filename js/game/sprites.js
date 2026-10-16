@@ -418,6 +418,82 @@ function makePine(h, variant) {
   return c;
 }
 
+// ---- The bear (snow biome) ----
+// Built on a grid of color letters, then outlined. Facing right.
+// Frames 0-2: galloping. Frame 3: rearing up to swipe.
+const BEAR_W = 34;
+const BEAR_H = 22;
+const BEAR_PALETTES = (() => {
+  const base = { o: "#120c0c", r: "#a3202a", t: "#fffdf2", e: "#ff3b2f", k: "#e8e2d0" };
+  return {
+    brown: { ...base, m: "#7a4a2e", d: "#56321e", l: "#a46c44", s: "#3a2418", e: "#5dff8a" },
+    polar: { ...base, m: "#e6ecf2", d: "#b8c6d6", l: "#ffffff", s: "#28232a", o: "#3a4252" },
+    black: { ...base, m: "#2e2b36", d: "#1d1b22", l: "#4b4757", s: "#b58b62", e: "#ffd23f" },
+  };
+})();
+
+function makeBear(pal, frame) {
+  const W = BEAR_W, H = BEAR_H;
+  const g = Array.from({ length: H }, () => Array(W).fill("."));
+  const set = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < W && y < H) g[y][x] = c; };
+  const ell = (cx, cy, rx, ry, c) => {
+    for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+      if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) set(x, y, c);
+    }
+  };
+  const limb = (x0, y0, x1, y1, w, c) => {
+    for (let i = 0; i <= 12; i++) for (let k = 0; k < w; k++) set(x0 + ((x1 - x0) * i) / 12 + k, y0 + ((y1 - y0) * i) / 12, c);
+  };
+  const claws = (x, y, dir = 1) => { set(x + dir, y, "k"); set(x + dir * 2, y, "k"); set(x + dir * 3, y - 1, "k"); };
+  if (frame === 3) {
+    // Rearing up, roaring, claws raised
+    limb(9, 15, 8, 20, 3, "d"); limb(13, 15, 14, 20, 3, "m"); claws(8, 21, -1); claws(15, 21);
+    ell(12, 11, 6, 7, "m"); ell(12, 14, 5, 3, "d");
+    for (let y = 5; y < 17; y += 2) set(5, y, "m");
+    limb(15, 8, 22, 2, 3, "m"); set(23, 1, "k"); set(25, 1, "k"); set(25, 3, "k"); set(24, 0, "k");
+    limb(9, 9, 6, 4, 3, "d"); set(5, 3, "k"); set(6, 2, "k"); set(8, 2, "k");
+    ell(16, 5, 4, 3.5, "m"); set(13, 2, "m"); set(14, 1, "d");
+    for (let x = 17; x <= 21; x++) set(x, 4, "m");
+    for (let x = 17; x <= 20; x++) { set(x, 5, "r"); set(x, 6, "r"); }
+    for (let x = 16; x <= 20; x++) set(x, 7, "m");
+    set(18, 5, "t"); set(20, 5, "t"); set(19, 6, "t"); set(21, 4, "s"); set(21, 3, "o");
+    set(16, 3, "e"); set(15, 2, "o"); set(16, 2, "o");
+  } else {
+    const bob = frame === 1 ? -1 : 0;
+    const legs = [
+      [[5, 12, 1, 18], [7, 12, 4, 19], [19, 13, 24, 18], [21, 13, 27, 19]],
+      [[6, 12, 8, 19], [8, 12, 10, 19], [18, 13, 15, 19], [20, 13, 17, 19]],
+      [[5, 12, 0, 17], [7, 12, 2, 18], [19, 13, 22, 19], [21, 13, 24, 19]],
+    ][frame];
+    legs.forEach(([a, b, c, d], i) => { limb(a, b + bob, c, d, 3, i % 2 ? "m" : "d"); claws(c + 2, d); });
+    ell(12, 9 + bob, 10, 5, "m");   // body
+    ell(15, 6 + bob, 6, 4, "m");    // shoulder hump
+    ell(12, 12 + bob, 9, 2, "d");   // dark belly
+    for (let x = 4; x <= 19; x += 2) set(x, (x > 10 ? 2 : 4) + bob + (x > 13 && x < 18 ? 0 : 1), "m"); // shaggy back
+    set(1, 8 + bob, "m"); set(2, 7 + bob, "m");
+    const hy = 10 + bob; // head lowered and pushed forward, jaws open
+    ell(25, hy - 1, 4, 3.5, "m"); set(22, hy - 5, "m"); set(23, hy - 5, "d");
+    for (let x = 26; x <= 32; x++) set(x, hy - 1, "m");
+    for (let x = 27; x <= 32; x++) set(x, hy - 2, x > 30 ? "s" : "m");
+    set(32, hy - 3, "o");
+    for (let x = 26; x <= 31; x++) { set(x, hy, "r"); if (x < 30) set(x, hy + 1, "r"); }
+    for (let x = 25; x <= 30; x++) set(x, hy + 2, "m");
+    [27, 29, 31].forEach((x) => set(x, hy, "t"));
+    [28, 30].forEach((x) => set(x, hy + 1, "t"));
+    set(26, hy - 3, "e"); set(25, hy - 4, "o"); set(26, hy - 4, "o"); set(27, hy - 3, "o"); // glowing eye, angry brow
+  }
+  // Dark outline, then light fur along the top of the back
+  const out = g.map((r) => r.slice());
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (g[y][x] !== ".") continue;
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const n = g[y + dy] && g[y + dy][x + dx]; return n && n !== "." && n !== "k"; })) out[y][x] = "o";
+  }
+  for (let x = 0; x < W; x++) for (let y = 1; y < H; y++) {
+    if (out[y][x] === "m") { if (out[y - 1][x] === "o" && x % 3) out[y][x] = "l"; break; }
+  }
+  return spriteFromRows(out.map((r) => r.join("")), pal);
+}
+
 function buildSprites() {
   const runners = {};
   for (const [name, palette] of Object.entries(PALETTES)) {
@@ -453,5 +529,6 @@ function buildSprites() {
     snowballs: [2, 3, 4, 5, 6, 7, 8, 9].map(makeSnowball),
     signs: { snow: makeSign("snow"), prairie: makeSign("prairie") },
     pines: [12, 14, 16, 18].map((h, i) => makePine(h, i)),
+    bears: Object.fromEntries(Object.entries(BEAR_PALETTES).map(([kind, pal]) => [kind, [0, 1, 2, 3].map((f) => makeBear(pal, f))])),
   };
 }

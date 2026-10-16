@@ -44,6 +44,7 @@ const Game = (() => {
       bolts: [], // lightning bolts flying along the course
       hands: [], // mystic hands flying, grabbing or swatting
       missiles: [], // missiles zooming in, locking on, flying or exploding
+      bears: [],    // bears chasing a player (snow only)
       nextMissile: null, // the leader's distance (meters) when the next missile comes (set once someone passes 300m)
       winner: null,
     };
@@ -109,6 +110,7 @@ const Game = (() => {
     updateBolts(dt);
     updateHands(dt);
     updateMissiles(dt);
+    updateBears(dt);
     checkOrbs();
     levelSounds();
     checkFire();
@@ -502,6 +504,91 @@ const Game = (() => {
       }
     }
     world.missiles = world.missiles.filter((m) => !m.done);
+  }
+
+  // ---- Bears (snow biome) ----
+
+  // Where the bear's feet go: the highest ground under its body. Over a pit it
+  // keeps its height (it leaps across), and it bounds over spikes.
+  function bearGround(bear) {
+    const { level } = world;
+    let top = null;
+    let leaping = false;
+    for (let x = bear.x - BEAR_W + 4; x <= bear.x; x += 6) {
+      let g = level.groundTop(x);
+      if (g === null) { leaping = true; continue; }
+      if (level.tile(Math.floor(x / TILE), g / TILE - 1) === T_SPIKE) { g -= TILE + 2; leaping = true; }
+      if (top === null || g < top) top = g;
+    }
+    return { top, leaping };
+  }
+
+  function updateBears(dt) {
+    const { level, players } = world;
+    // Once per snow biome, when the leader reaches the bear's spot, it charges in from the left
+    const runners = players.filter((p) => !p.dead && !p.caught);
+    if (runners.length) {
+      const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
+      for (const spot of level.bearSpots) {
+        if (spot.used || leader.x / TILE < spot.col) continue;
+        spot.used = true;
+        if (level.biomeAt(Math.floor(leader.x / TILE)) !== "snow") continue;
+        const kind = BEAR[spot.kind];
+        const bear = { kind: spot.kind, target: leader, x: leader.x - BEAR.startBehind, y: leader.y + HITBOX_H,
+          state: "chase", t: 0, speed: kind.speed, chase: kind.chase, anim: 0, stepTimer: 0, lift: 0 };
+        const g = bearGround(bear).top;
+        if (g !== null) bear.y = g;
+        world.bears.push(bear);
+        Sound.play("roar");
+      }
+    }
+
+    for (const bear of world.bears) {
+      bear.t += dt;
+      const p = bear.target;
+      const dir = bear.state === "leave" ? -1 : 1;
+      if (bear.state === "chase" || bear.state === "leave") {
+        const speed = bear.state === "leave" ? bear.speed * 0.7 : bear.speed;
+        bear.x += dir * speed * dt;
+        bear.anim += speed * dt;
+        const { top, leaping } = bearGround(bear);
+        if (top !== null) bear.y += (top - bear.y) * Math.min(1, dt * 12);
+        bear.lift = leaping ? Math.min(6, bear.lift + dt * 40) : Math.max(0, bear.lift - dt * 40);
+        // heavy footsteps when someone is close enough to hear
+        if ((bear.stepTimer -= dt) <= 0) {
+          bear.stepTimer = 0.24;
+          if (players.some((q) => Math.abs(q.x - bear.x) < VIEW_W * 0.6)) Sound.play("bearStep");
+        }
+      }
+      if (bear.state === "chase") {
+        if (p.dead || p.caught) {
+          bear.state = "leave";
+          bear.t = 0;
+        } else if (bear.x >= p.x + 2 && p.y + HITBOX_H > bear.y - 34) {
+          // Caught!
+          bear.state = "swipe";
+          bear.t = 0;
+          if (bear.kind === "black") {
+            p.honey = BEAR.honeyTime;
+            p.showHit("HONEY!", "#ffb627");
+            Sound.play("honey");
+          } else {
+            p.showHit("MAULED!", "#ff4d3d");
+            Sound.play("maul");
+            p.die();
+          }
+        } else if (bear.t >= bear.chase) {
+          bear.state = "leave"; // gives up and heads back
+          bear.t = 0;
+          Sound.play("grumble");
+        }
+      } else if (bear.state === "swipe") {
+        if (bear.t >= BEAR.swipeTime) { bear.state = "leave"; bear.t = 0; }
+      } else if (bear.t > 4) {
+        bear.done = true;
+      }
+    }
+    world.bears = world.bears.filter((b) => !b.done);
   }
 
   function checkFire() {
