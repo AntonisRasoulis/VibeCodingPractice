@@ -36,25 +36,31 @@ const FREEZE_TIME = 3;   // seconds a freeze orb holds you in place
 const FREEZE_CHANCE = 0.5; // share of orbs that freeze instead of swap
 
 const DASH = {
-  chance: 0.24, // share of orbs that are dash orbs
+  chance: 0.2,  // share of orbs that are dash orbs
   hold: 1.0,    // seconds you hang in the air before launching
   speed: 480,   // launch speed (normal running is 96)
   time: 0.65,   // seconds the launch lasts: about 310px, plus your fall afterwards
 };
 
 const ZAP = {
-  chance: 0.2,  // share of orbs that are lightning orbs
+  chance: 0.16, // share of orbs that are lightning orbs
   speed: 320,   // how fast a bolt travels (normal running is 96)
   length: 48,   // bolt length: 6 tiles, short enough to jump over
   height: 5,    // how high above the ground the bolt runs
   range: 2400,  // how far a bolt travels before fizzling out
 };
 
-// Orb shares: dash 24%, lightning 20%, hand 20%, and the rest (36%) split
-// between swap and freeze by FREEZE_CHANCE (18% each).
+// Orb shares: wind 26%, dash 20%, lightning 16%, hand 16%, and the rest (22%)
+// split between swap and freeze by FREEZE_CHANCE (11% each).
+
+const WIND = {
+  chance: 0.26, // share of orbs that are wind dash orbs (the most common)
+  speed: 420,   // dash speed (normal running is 96)
+  time: 0.23,   // seconds the dash lasts: about 12 tiles
+};
 
 const HAND = {
-  chance: 0.2,      // share of orbs that are hand orbs
+  chance: 0.16,     // share of orbs that are hand orbs
   speed: 300,       // how fast the hand flies (normal running is 96)
   range: 128,       // how far it flies before fading out (16 tiles)
   size: 10,         // the part of the hand that catches someone (pixels)

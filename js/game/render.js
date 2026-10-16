@@ -227,15 +227,59 @@ const Renderer = (() => {
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb }[o.kind] || sprites.orb;
+      if (o.kind === "wind") drawOrbWisps(sx, o.y + bob, time + o.x);
       b.drawImage(sprite, sx, o.y + bob);
     }
+  }
+
+  // White wind wisps that keep blowing off the back of a wind dash orb
+  function drawOrbWisps(sx, y, time) {
+    b.fillStyle = "#ffffff";
+    for (let k = 0; k < 3; k++) {
+      const t = (time * 1.6 + k / 3) % 1;          // each wisp drifts left and fades
+      const len = 2 + Math.round(3 * (1 - t));
+      b.globalAlpha = 0.85 * (1 - t);
+      b.fillRect(Math.round(sx - 1 - t * 9 - len), y + 2 + ((k * 2) % 5), len, 1);
+    }
+    b.globalAlpha = 1;
   }
 
   // Charging glow while hanging before a dash, and after-images + speed lines during it
   function drawDashEffects(p, camX, time) {
     const x = Math.round(p.x - camX);
     const y = Math.round(p.y);
+    if (p.windTime > 0) {
+      // Wind dash: a faint white after-image and quick gusts streaming off behind you
+      const d = p.windDir;
+      const back = d > 0 ? x - 1 : x + HITBOX_W + 1;   // the side the wind trails from
+      const frame = sprites.runners[p.palette.name].jump;
+      b.globalAlpha = 0.25;
+      if (d > 0) b.drawImage(frame, x - 1 - 6, y - 1);
+      else {
+        b.save();
+        b.translate(x + 7 + 6, y - 1);
+        b.scale(-1, 1);
+        b.drawImage(frame, 0, 0);
+        b.restore();
+      }
+      b.fillStyle = "#ffffff";
+      for (let k = 0; k < 5; k++) {
+        const t = hash(k, Math.floor(time * 40));
+        const len = 6 + Math.round(t * 10);
+        b.globalAlpha = 0.5 + 0.4 * t;
+        const ly = y + 1 + ((k * 7 + Math.floor(time * 60)) % 11);
+        b.fillRect(d > 0 ? back - len - Math.round(t * 4) : back + Math.round(t * 4), ly, len, 1);
+      }
+      // little curls at the tips of the gust
+      b.globalAlpha = 0.7;
+      const cx = d > 0 ? back - 14 : back + 14;
+      b.fillRect(cx, y + 3, 2, 1);
+      b.fillRect(cx - d, y + 4, 1, 1);
+      b.fillRect(cx, y + 5, 2, 1);
+      b.globalAlpha = 1;
+      return;
+    }
     if (p.dashHold > 0) {
       // A ring that shrinks in as the launch gets closer
       const r = 3 + Math.round(10 * (p.dashHold / DASH.hold));
@@ -402,7 +446,11 @@ const Renderer = (() => {
     for (let k = 0; k < 4; k++) {
       const a = hash(k, tick) * Math.PI * 2;
       const r = 6 + hash(k + 9, tick) * 3;
-      b.fillStyle = (p.power === "hand" ? ["#ffffff", "#c9a3ff", "#9b5de5", "#c9a3ff"] : ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"])[k];
+      b.fillStyle = {
+        hand: ["#ffffff", "#c9a3ff", "#9b5de5", "#c9a3ff"],
+        wind: ["#ffffff", "#e8f4ff", "#ffffff", "#cfe3f5"],
+        zap: ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"],
+      }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }
   }
@@ -850,8 +898,9 @@ const Renderer = (() => {
       if (p.power) {
         const key = i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
-        const label = p.power === "zap" ? "ZAP" : "HAND";
-        text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, p.power === "zap" ? "#fff27a" : "#c9a3ff", 10);
+        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH" }[p.power];
+        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff" }[p.power];
+        text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, color, 10);
       }
       if (p.flash > 0) {
         ctx.fillStyle = `rgba(220, 245, 255, ${Math.min(1, p.flash) * 0.45})`;

@@ -102,6 +102,19 @@ const ZAP_ORB_ROWS = [
   "..oooo..",
 ];
 
+// The wind dash orb has one bold white arrow (the big dash orb has a »).
+// Its white wind wisps are drawn separately so they can blow off it.
+const WIND_ORB_ROWS = [
+  "..oooo..",
+  ".oyyyyo.",
+  "oyyyywyo",
+  "oywwwwwo",
+  "oywwwwwo",
+  "oyyyywyo",
+  ".oyyyyo.",
+  "..oooo..",
+];
+
 // ---- Mystic hand (purple) ----
 
 // Open hand flying right, reaching to grab (wispy glowing wrist on the left)
@@ -275,6 +288,7 @@ function buildSprites() {
     freezeOrb: spriteFromRows(FREEZE_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     dashOrb: spriteFromRows(DASH_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     zapOrb: spriteFromRows(ZAP_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
+    windOrb: spriteFromRows(WIND_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     handOrb: spriteFromRows(HAND_ORB_ROWS, { g: "#b8860b", y: "#ffd23f", v: "#9b5de5", l: "#c9a3ff" }),
     handOpen: spriteFromRows(HAND_OPEN_ROWS, HAND_PALETTE),
     handBack: spriteFromRows(HAND_BACK_ROWS, HAND_PALETTE),

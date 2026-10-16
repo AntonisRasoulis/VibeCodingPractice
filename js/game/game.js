@@ -114,9 +114,9 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
-          if (orb.kind === "zap" || orb.kind === "hand") {
+          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind") {
             p.power = orb.kind; // holding one power at a time: the newest replaces the old
-            p.sparkle(orb.kind === "zap" ? "#bff4ff" : "#c9a3ff");
+            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff" }[orb.kind]);
             return;
           }
           if (orb.kind === "dash") {
@@ -150,8 +150,10 @@ const Game = (() => {
   // S (Red) or Down (Blue): use whatever power you're holding
   function usePower(p, owner) {
     if (!p.power || p.dead || p.caught || p.held || p.frozen > 0 || p.dashHold > 0) return;
+    if (p.power === "wind" && p.stun > 0) return; // can't dash out of a hand's throw
     if (p.power === "zap") fireBolt(p, owner);
     else if (p.power === "hand") throwHand(p, owner);
+    else if (p.power === "wind") p.windDash();
     p.power = null;
   }
 
@@ -259,7 +261,7 @@ const Game = (() => {
           h.ty = target.y;
           target.held = true;
           target.vx = target.vy = 0;
-          target.dashHold = target.dashTime = 0;
+          target.dashHold = target.dashTime = target.windTime = 0;
           target.standingOn = null;
           target.flash = 0.3;
           target.showHit(h.dir > 0 ? "GRABBED!" : "SMACKED!", "#c9a3ff");

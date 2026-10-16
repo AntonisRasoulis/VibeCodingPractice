@@ -33,6 +33,8 @@ class Player {
     this.frozen = 0;         // seconds left frozen by a freeze orb
     this.dashHold = 0;       // seconds left hanging in the air before a dash
     this.dashTime = 0;       // seconds left in a dash
+    this.windTime = 0;       // seconds left in a wind dash
+    this.windDir = 1;        // which way the wind dash goes
     this.power = null;       // stored power for S / Down: "zap" or "hand" (newest replaces old)
     this.held = false;       // caught by a mystic hand: the hand moves us, not physics
     this.spin = 0;           // how far the runner is turned while being swung or thrown
@@ -93,6 +95,21 @@ class Player {
       this.moveX(this.vx * dt, level);
       if (this.vx === 0) this.dashTime = 0;        // hit a wall
       if (this.dashTime <= 0) this.vx = PHYSICS.runSpeed;
+      this.checkHazards(level);
+      if (!this.dead) this.checkPortals(level);
+      return;
+    }
+
+    // Wind dash: a quick straight burst the way you were facing
+    if (this.windTime > 0) {
+      this.windTime -= dt;
+      this.vx = this.windDir * WIND.speed;
+      this.vy = 0;
+      this.onGround = false;
+      this.standingOn = null;
+      this.moveX(this.vx * dt, level);
+      if (this.vx === 0) this.windTime = 0;        // hit a wall
+      if (this.windTime <= 0) this.vx = this.windDir * PHYSICS.runSpeed;
       this.checkHazards(level);
       if (!this.dead) this.checkPortals(level);
       return;
@@ -318,6 +335,7 @@ class Player {
     this.spin = 0;
     this.dashHold = 0;
     this.dashTime = 0;
+    this.windTime = 0;
     this.dead = true;
     this.deadTimer = DEATH.respawnDelay;
     this.burst();
@@ -381,6 +399,14 @@ class Player {
         color: colors[i % colors.length],
       });
     }
+  }
+
+  // Use a wind dash orb's power: whoosh the way you're facing
+  windDash() {
+    this.windDir = this.facing;
+    this.windTime = WIND.time;
+    this.jumpBuffer = 0;
+    this.sparkle("#ffffff");
   }
 
   sparkle(color) {
