@@ -107,7 +107,7 @@ const SNOW = {
   icicleGravity: 400,  // how fast it falls
   snowballSpeed: 80,   // how fast snowballs roll towards you
   snowballGrow: 18,    // a snowball gets 1 pixel bigger (radius) every this many pixels it rolls
-  snowballMaxR: 7,     // biggest a snowball gets (15 pixels across: always jumpable, even from standing still)
+  snowballMaxR: 8,     // biggest a snowball gets (17 pixels across: always jumpable, even from standing still)
   snowballAhead: 230,  // a snowball starts rolling when you're this far from where it starts
 };
 
