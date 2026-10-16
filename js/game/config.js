@@ -88,7 +88,7 @@ const MISSILE = {
 // Biomes: the course changes scenery (and some rules) as you go.
 // The first race after opening the website always starts in the prairie;
 // after that a race can start in any biome.
-const BIOMES = ["prairie", "snow"];
+const BIOMES = ["prairie", "snow", "desert"];
 const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
 
 const SNOW = {
@@ -102,6 +102,18 @@ const SNOW = {
   snowballGrow: 18,    // a snowball gets 1 pixel bigger (radius) every this many pixels it rolls
   snowballMaxR: 7,     // biggest a snowball gets (15 pixels across: always jumpable, even from standing still)
   snowballAhead: 230,  // a snowball starts rolling when you're this far from where it starts
+};
+
+const DESERT = {
+  sinkTime: 3,        // seconds to sink all the way into quicksand if you do nothing
+  jumpsToEscape: 6,   // this many jump presses pull you out (each one also lifts you up a little)
+  struggleFade: 2.4,  // presses "wear off" this fast (per second), so you have to press quickly
+  wadeSpeed: 6,       // how slowly you can push through quicksand (normal running is 96)
+  cactusHeights: [14, 16, 18], // cactuses are the tallest spikes (prairie 5, ice 8)
+  tumbleSpeed: 90,    // tumbleweeds roll towards you (snowballs: 80)
+  tumbleR: 5,         // 11 pixels across (the biggest snowball is 15)
+  tumbleBounce: [7, 15], // how high each tumbleweed bounces (random for each one)
+  tumbleAhead: 240,   // a tumbleweed starts rolling when you're this far from where it starts
 };
 
 // The snow biome's special danger: once per snow biome a bear comes charging in from

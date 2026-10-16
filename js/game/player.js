@@ -54,6 +54,12 @@ class Player {
     this.biome = null;            // the biome we're in, to notice when it changes
     this.biomeBanner = 0;         // seconds left showing the new biome's name
     this.honey = 0;               // seconds left slowed down by a black bear's honey
+    this.inQuick = false;         // stuck in quicksand
+    this.sink = 0;                // how deep (pixels) we've sunk into it
+    this.quickSurface = 0;        // the quicksand's surface (y)
+    this.noCut = 0;               // a jump out of quicksand isn't cut short when you let go
+    this.tumbleweeds = [];        // tumbleweeds bouncing at this player
+    this.tumbleStarted = new Set();
     this.particles = [];
   }
 
@@ -126,6 +132,9 @@ class Player {
       return;
     }
 
+    // Stuck in quicksand: sinking, unless you keep pressing jump
+    if (this.inQuick) return this.updateQuicksand(dt, input, level);
+
     // Thrown by a hand: no control until we recover (gravity and momentum still work)
     if (this.stun > 0) {
       this.stun -= dt;
@@ -164,7 +173,8 @@ class Player {
     }
     const minRise = -PHYSICS.jumpSpeed * PHYSICS.jumpCut;
     // (a thrown player isn't holding jump, so don't cut their throw short)
-    if (!input.jump && this.vy < minRise && this.stun <= 0) this.vy = minRise;
+    if (this.noCut > 0) this.noCut -= dt;
+    if (!input.jump && this.vy < minRise && this.stun <= 0 && this.noCut <= 0) this.vy = minRise;
 
     // Ride moving platforms
     if (this.standingOn && this.vy >= 0) this.moveX(this.standingOn.dx, level);
@@ -180,6 +190,16 @@ class Player {
     this.moveY(this.vy * dt, level);
     if (this.vy >= 0) this.landOnPlatforms(level, prevBottom);
     this.onIce = this.onGround && !this.standingOn && level.isIce(Math.floor((this.x + HITBOX_W / 2) / TILE));
+    // Stepped into quicksand
+    if (this.onGround && !this.standingOn && level.isQuick(Math.floor((this.x + HITBOX_W / 2) / TILE))) {
+      this.inQuick = true;
+      this.sink = 1;
+      this.struggle = 0;
+      this.quickSurface = this.y + HITBOX_H;
+      this.onGround = false; // (so we never respawn here)
+      this.vx = 0;
+      Sound.play("sandSink");
+    }
     if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
 
     this.checkHazards(level);
@@ -198,6 +218,57 @@ class Player {
       }
       this.biome = biome;
     }
+  }
+
+  // ---- Desert: quicksand ----
+
+  updateQuicksand(dt, input, level) {
+    if (this.stun > 0) this.stun -= dt;
+    if (this.frozen > 0) {
+      this.frozen -= dt;
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+    }
+    const full = HITBOX_H;
+    this.sink += (full / DESERT.sinkTime) * dt;
+    this.struggle = Math.max(0, this.struggle - DESERT.struggleFade * dt); // slow pressing doesn't add up
+    if (input.jumpPressed) {
+      this.struggle++;                                    // each press gets you closer to breaking free
+      this.sink = Math.max(0.5, this.sink - full / 18);   // ...and pulls you up a bit
+      Sound.play("sandPull");
+      this.sparkle("#e3b673");
+    }
+    // You can push through it, very slowly
+    const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    if (dir) this.facing = dir;
+    this.vx = dir * DESERT.wadeSpeed;
+    this.vy = 0;
+    this.x += this.vx * dt;
+    this.y = this.quickSurface - HITBOX_H + Math.max(0, this.sink);
+    this.animDist += Math.abs(this.vx * dt);
+
+    if (this.struggle >= DESERT.jumpsToEscape) {
+      // Pulled free: a full jump out, carried forward
+      this.inQuick = false;
+      this.y = this.quickSurface - HITBOX_H - 0.5;
+      this.vy = -PHYSICS.jumpSpeed;
+      this.vx = this.facing * PHYSICS.runSpeed * 0.6;
+      this.noCut = 0.3;
+      Sound.play("jump");
+      return;
+    }
+    if (!level.isQuick(Math.floor((this.x + HITBOX_W / 2) / TILE))) {
+      // waded out onto firm ground
+      this.inQuick = false;
+      this.y = this.quickSurface - HITBOX_H;
+      this.onGround = true;
+      return;
+    }
+    if (this.sink >= full) {
+      this.showHit("SUNK!", "#f2d091");
+      this.die();
+      return;
+    }
+    this.checkHazards(level);
   }
 
   // ---- Snow: icicles and snowballs (each player has their own) ----
@@ -263,6 +334,46 @@ class Player {
     }
     this.snowballs = this.snowballs.filter((ball) =>
       (ball.broke ? ball.brokeT < 0.35 : ball.y < VIEW_H + 20) && ball.x > this.x - VIEW_W);
+
+    // Tumbleweeds: like snowballs, but small and bouncing up and down
+    for (const spot of level.tumbleSpots) {
+      if (this.dead || this.caught || this.tumbleStarted.has(spot.id)) continue;
+      if (spot.x > this.x && spot.x - this.x < DESERT.tumbleAhead) {
+        this.tumbleStarted.add(spot.id);
+        const ground = level.groundTop(spot.x);
+        if (ground === null) continue;
+        const [lo, hi] = DESERT.tumbleBounce;
+        this.tumbleweeds.push({ x: spot.x, y: ground - DESERT.tumbleR, base: ground - DESERT.tumbleR, vy: 0,
+          bounce: lo + Math.random() * (hi - lo), period: 0.45 + Math.random() * 0.2, t: Math.random(), spin: 0, broke: false, brokeT: 0 });
+        Sound.play("tumble");
+      }
+    }
+    for (const tw of this.tumbleweeds) {
+      if (tw.broke) { tw.brokeT += dt; continue; }
+      const move = DESERT.tumbleSpeed * dt;
+      tw.x -= move;
+      tw.t += dt;
+      tw.spin -= move / DESERT.tumbleR;
+      const ground = level.groundTop(tw.x);
+      const bottom = tw.base + DESERT.tumbleR;
+      if (ground !== null && ground < bottom - 3) {
+        tw.broke = true; // smashed into a step
+        Sound.play("tumbleBreak");
+        continue;
+      }
+      if (ground === null || ground > bottom + 1) {
+        tw.vy += FALLING.gravity * dt;
+        tw.base += tw.vy * dt;
+        if (ground !== null && tw.base + DESERT.tumbleR >= ground) { tw.base = ground - DESERT.tumbleR; tw.vy = 0; }
+      } else {
+        tw.base = ground - DESERT.tumbleR;
+        tw.vy = 0;
+      }
+      // the bounce: up and down like a ball skipping along
+      tw.y = tw.base - tw.bounce * Math.abs(Math.sin((tw.t / tw.period) * Math.PI));
+    }
+    this.tumbleweeds = this.tumbleweeds.filter((tw) =>
+      (tw.broke ? tw.brokeT < 0.35 : tw.base < VIEW_H + 20) && tw.x > this.x - VIEW_W);
   }
 
   // ---- Collisions ----
@@ -366,13 +477,15 @@ class Player {
     const r0 = Math.floor(this.y / TILE);
     const r1 = Math.floor((this.y + HITBOX_H - 0.01) / TILE);
     for (let c = c0; c <= c1; c++) {
-      for (let r = r0; r <= r1; r++) {
+      for (let r = r0; r <= Math.min(r1 + 2, ROWS - 1); r++) { // (cactuses reach up past their own tile)
         // Spikes only hurt in their pointy part, not the whole tile.
         // Ice spikes (in the snow) are taller and a little thinner.
         if (level.tile(c, r) === T_SPIKE) {
-          const icy = level.biomeAt(c) === "snow";
-          if (icy ? overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1.5, r * TILE + 1, 5, 7)
-                  : overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1, r * TILE + 3, 6, 5)) {
+          const biome = level.biomeAt(c);
+          const h = biome === "desert" ? level.cactusHeight(c) : 0; // a cactus: tall, but only its trunk hurts
+          if (biome === "desert" ? overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 2, (r + 1) * TILE - h + 2, 4, h - 2)
+              : biome === "snow" ? overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1.5, r * TILE + 1, 5, 7)
+              : overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1, r * TILE + 3, 6, 5)) {
             return this.die();
           }
         }
@@ -404,6 +517,18 @@ class Player {
       if (s && s.gone) continue;
       const dy = s ? s.dy : 0;
       if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, ic.x + 1, ic.y + dy, 4, ic.len - 1)) return this.die();
+    }
+
+    // Tumbleweeds
+    for (const tw of this.tumbleweeds) {
+      if (tw.broke) continue;
+      const nearX = clamp(tw.x, this.x, this.x + HITBOX_W);
+      const nearY = clamp(tw.y, this.y, this.y + HITBOX_H);
+      if ((tw.x - nearX) ** 2 + (tw.y - nearY) ** 2 < (DESERT.tumbleR - 1) ** 2) {
+        tw.broke = true;
+        Sound.play("tumbleBreak");
+        return this.die();
+      }
     }
 
     // Snowballs
@@ -458,6 +583,7 @@ class Player {
     this.dashHold = 0;
     this.dashTime = 0;
     this.windTime = 0;
+    this.inQuick = false;
     this.dead = true;
     this.deadTimer = DEATH.respawnDelay;
     this.burst();
@@ -487,6 +613,9 @@ class Player {
     this.fallState.clear(); // crumbled platforms come back
     this.icicleState.clear(); // ...and so do icicles
     this.honey = 0;
+    this.inQuick = false;
+    this.tumbleweeds = [];
+    this.tumbleStarted.clear();
     this.snowballs = [];
     this.snowballStarted.clear();
     Sound.play("respawn");

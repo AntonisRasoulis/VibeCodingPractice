@@ -377,6 +377,12 @@ function makeSign(biome) {
     px(g, "#ffffff", 2, 2, 3, 1);
     px(g, "#ffffff", 13, 2, 4, 1);
     for (const [x, y] of [[10, 3], [10, 4], [10, 5], [10, 6], [10, 7], [8, 5], [9, 5], [11, 5], [12, 5], [8, 3], [12, 3], [8, 7], [12, 7]]) px(g, "#e8f6ff", x, y);
+  } else if (biome === "desert") {
+    // a blazing sun
+    px(g, "#ffcc33", 8, 3, 4, 4);
+    px(g, "#ffcc33", 9, 2, 2, 6);
+    px(g, "#ffcc33", 7, 4, 6, 2);
+    for (const [x, y] of [[6, 2], [13, 2], [6, 7], [13, 7], [10, 0], [10, 9], [5, 5], [14, 5]]) px(g, "#ffe28a", x, y);
   } else {
     // a little green sprout with a flower
     for (const [x, y] of [[10, 4], [10, 5], [10, 6], [10, 7], [9, 6], [11, 5]]) px(g, "#3e8948", x, y);
@@ -415,6 +421,80 @@ function makePine(h, variant) {
   }
   px(g, "#ffffff", mid, 0);
   px(g, "#5a3d2b", mid - 1, h, 2, 3);
+  return c;
+}
+
+// ---- Desert biome ----
+
+function makeSandTile(variant, top) {
+  const c = makeCanvas(TILE, TILE);
+  const g = c.getContext("2d");
+  px(g, "#c98a4b", 0, 0, TILE, TILE);
+  if (top) {
+    for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
+      const n = hash(x + variant * 31, y + variant * 17);
+      if (n < 0.1) px(g, "#a86b36", x, y);
+      else if (n > 0.92) px(g, "#e0a868", x, y);
+    }
+    px(g, "#f2d091", 0, 0, TILE, 2);
+    px(g, "#e3b673", 0, 2, TILE, 1);
+    for (let x = 0; x < TILE; x++) if (hash(x, variant + 2) < 0.3) px(g, "#fbe3b0", x, 0);
+  } else {
+    // layered sandstone
+    px(g, "#b57a3f", 0, 3, TILE, 1);
+    px(g, "#b57a3f", 0, 7, TILE, 1);
+    for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) if (hash(x + variant * 13, y + variant * 7) < 0.07) px(g, "#a86b36", x, y);
+  }
+  return c;
+}
+
+// Quicksand: dark, wet sand with swirls that slowly turn (4 frames)
+function makeQuicksand(frame, variant) {
+  const c = makeCanvas(TILE, TILE);
+  const g = c.getContext("2d");
+  px(g, "#9c6a36", 0, 0, TILE, TILE);
+  px(g, "#7d5226", 0, 5, TILE, 3);
+  px(g, "#b88247", 0, 0, TILE, 1);
+  for (let k = 0; k < 3; k++) {
+    const x = (variant * 3 + k * 3 + frame * 2) % TILE;
+    px(g, "#c9955a", x, 1 + k, 2, 1);           // swirl ripples drifting along
+    px(g, "#6b4420", (x + 4) % TILE, 2 + k * 2, 1, 1);
+  }
+  if ((frame + variant) % 4 === 0) px(g, "#d9a96a", (variant * 5) % 6 + 1, 0, 2, 1); // a bubble popping
+  return c;
+}
+
+// Saguaro cactus, h pixels tall. arms: 0 = left arm, 1 = right arm, 2 = both
+function makeCactus(h, arms) {
+  const c = makeCanvas(12, h);
+  const g = c.getContext("2d");
+  const x0 = 4;
+  const armL = arms !== 1 ? Math.round(h * 0.55) : 0;
+  const armR = arms !== 0 ? Math.round(h * 0.45) : 0;
+  if (armL) { px(g, "#3f8a3a", 1, armL, 3, 2); px(g, "#3f8a3a", 1, armL - 4, 2, 5); px(g, "#5fb357", 1, armL - 4, 1, 5); px(g, "#f6f0d8", 0, armL - 3); }
+  if (armR) { px(g, "#3f8a3a", 8, armR, 3, 2); px(g, "#3f8a3a", 9, armR - 5, 2, 6); px(g, "#2d6a2b", 10, armR - 5, 1, 6); px(g, "#f6f0d8", 11, armR - 4); }
+  px(g, "#3f8a3a", x0, 1, 4, h - 1);
+  px(g, "#2d6a2b", x0 + 3, 1, 1, h - 1);
+  px(g, "#5fb357", x0, 1, 1, h - 1);
+  px(g, "#3f8a3a", x0 + 1, 0, 2, 1);
+  for (let y = 2; y < h - 1; y += 3) { px(g, "#f6f0d8", x0 - 1, y); px(g, "#f6f0d8", x0 + 4, y + 1); } // spines
+  px(g, "#ff6b9a", x0 + 1, 0, 2, 1); // a flower on top
+  return c;
+}
+
+// Tumbleweed: a tangled ball of dry twigs (drawn turning as it rolls)
+function makeTumbleweed() {
+  const d = DESERT.tumbleR * 2 + 1;
+  const c = makeCanvas(d, d);
+  const g = c.getContext("2d");
+  const r = DESERT.tumbleR;
+  for (let k = 0; k < 70; k++) {
+    const a = hash(k, 1) * Math.PI * 2;
+    const rr = (k < 30 ? r - 0.5 : hash(k, 2) * (r - 1));
+    px(g, k % 4 === 0 ? "#5e3d1d" : k % 3 ? "#a3743f" : "#c99a5e", Math.round(r + Math.cos(a) * rr), Math.round(r + Math.sin(a) * rr));
+  }
+  // a few twigs poking out
+  for (const [x, y] of [[0, r - 2], [d - 1, r + 1], [r + 1, 0], [r - 2, d - 1]]) px(g, "#7a5228", x, y);
   return c;
 }
 
@@ -527,8 +607,13 @@ function buildSprites() {
     iceSpikes: ICE_SPIKE_SHARDS.map(makeIceSpike),
     icicles: Object.fromEntries([10, 11, 12, 13].map((len) => [len, makeIcicle(len)])),
     snowballs: [2, 3, 4, 5, 6, 7, 8, 9].map(makeSnowball),
-    signs: { snow: makeSign("snow"), prairie: makeSign("prairie") },
+    signs: { snow: makeSign("snow"), prairie: makeSign("prairie"), desert: makeSign("desert") },
     pines: [12, 14, 16, 18].map((h, i) => makePine(h, i)),
+    sandTop: [0, 1, 2, 3].map((v) => makeSandTile(v, true)),
+    sandstone: [0, 1, 2, 3].map((v) => makeSandTile(v + 4, false)),
+    quicksand: [0, 1, 2, 3].map((f) => [0, 1, 2, 3].map((v) => makeQuicksand(f, v))),
+    cactus: Object.fromEntries(DESERT.cactusHeights.map((h) => [h, [0, 1, 2].map((a) => makeCactus(h, a))])),
+    tumbleweed: makeTumbleweed(),
     bears: Object.fromEntries(Object.entries(BEAR_PALETTES).map(([kind, pal]) => [kind, [0, 1, 2, 3].map((f) => makeBear(pal, f))])),
   };
 }

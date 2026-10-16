@@ -49,18 +49,23 @@ const Renderer = (() => {
   // ---- One player's half of the screen ----
 
   function drawView(world, player, other, camX) {
-    const snow = snowAmount(world.level, camX);
-    if (snow < 1) drawBackground(camX);
-    if (snow > 0) {
-      b.globalAlpha = snow; // fades in and out at the edge of the snow biome
-      drawSnowBackground(camX);
-      b.globalAlpha = 1;
-    }
+    // Each biome's scenery, faded together near a border
+    const mix = biomeMix(world.level, camX);
+    const snow = mix.snow || 0;
+    const shown = Object.entries(mix).filter(([, amount]) => amount > 0).sort((a, c) => c[1] - a[1]);
+    shown.forEach(([biome, amount], i) => {
+      b.globalAlpha = i === 0 ? 1 : amount;
+      if (biome === "snow") drawSnowBackground(camX);
+      else if (biome === "desert") drawDesertBackground(camX, world.time);
+      else drawBackground(camX);
+    });
+    b.globalAlpha = 1;
     for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
     drawTiles(world.level, camX);
     drawSigns(world.level, camX);
     drawIcicles(world.level, player, camX, world.time);
     drawSnowballs(player, camX);
+    drawTumbleweeds(player, camX);
     for (const bear of world.bears) drawBear(bear, camX, world.time);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
@@ -77,6 +82,7 @@ const Renderer = (() => {
       if (player.frozen > 0) drawIce(player, camX);
       if (player.honey > 0) drawHoney(player, camX, world.time);
     }
+    drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
     if (player.power && !player.dead) drawCrackle(player, camX, world.time);
@@ -91,13 +97,103 @@ const Renderer = (() => {
 
   // ---- Snow biome ----
 
-  // How much of this view is in the snow (0 to 1), looking a little either side
+  // How much of this view is in each biome (0 to 1), looking a little either side
   // of the middle of the screen, so the scenery fades smoothly at a border.
-  function snowAmount(level, camX) {
+  function biomeMix(level, camX) {
     const mid = Math.floor((camX + VIEW_W / 2) / TILE);
-    let n = 0;
-    for (let k = -5; k <= 5; k++) if (level.biomeAt(mid + k * 5) === "snow") n++;
-    return n / 11;
+    const mix = {};
+    for (let k = -5; k <= 5; k++) {
+      const biome = level.biomeAt(mid + k * 5);
+      mix[biome] = (mix[biome] || 0) + 1 / 11;
+    }
+    return mix;
+  }
+
+  // ---- Desert biome ----
+
+  function drawDesertBackground(camX, time) {
+    b.fillStyle = "#ffd9a0";
+    b.fillRect(0, 0, VIEW_W, VIEW_H);
+    b.fillStyle = "#ffc27a";
+    b.fillRect(0, 0, VIEW_W, 70);
+    b.fillStyle = "#f7a35c";
+    b.fillRect(0, 0, VIEW_W, 30);
+    b.fillStyle = "#fff3c4";
+    b.fillRect(330, 12, 14, 14); // the sun
+    b.fillStyle = "#ffffff";
+    b.fillRect(333, 15, 8, 8);
+
+    // Red rock mesas, far away
+    const far = camX * 0.2;
+    const first = Math.floor(far / 140) - 1;
+    for (let k = first; k < first + VIEW_W / 140 + 3; k++) {
+      if (hash(k, 51) < 0.25) continue;
+      const w = 40 + Math.floor(hash(k, 52) * 60);
+      const h = 16 + Math.floor(hash(k, 53) * 16);
+      const x = Math.round(k * 140 + hash(k, 54) * 40 - far);
+      b.fillStyle = "#d98e5e";
+      b.fillRect(x, 78 - h, w, h + 50);
+      b.fillStyle = "#e8a575";
+      b.fillRect(x, 78 - h, w, 2);
+      b.fillStyle = "#c27a4e";
+      b.fillRect(x, 78 - h + 6, w, 2);
+    }
+    // Near sand dunes
+    const near = camX * 0.45;
+    b.fillStyle = "#e9b878";
+    for (let x = 0; x < VIEW_W; x += 2) {
+      const wx = x + near;
+      const h = 86 - 8 * (Math.sin(wx * 0.025) * 0.6 + Math.sin(wx * 0.061 + 2) * 0.4);
+      b.fillRect(x, Math.round(h), 2, VIEW_H);
+    }
+    // Heat shimmering in the air (faint)
+    const fade = b.globalAlpha;
+    b.globalAlpha = fade * 0.3;
+    b.fillStyle = "#ffffff";
+    for (let k = 0; k < 7; k++) {
+      const x = ((k * 61 - camX * 0.3 + Math.sin(time * 2 + k) * 4) % VIEW_W + VIEW_W) % VIEW_W;
+      b.fillRect(Math.round(x), 56 + (k % 3) * 7 + Math.round(Math.sin(time * 3 + k) * 1.5), 10, 1);
+    }
+    b.globalAlpha = fade;
+  }
+
+  // Quicksand surfaces, swirling (drawn over anyone stuck in it)
+  function drawQuicksand(level, camX, time) {
+    const firstCol = Math.floor(camX / TILE);
+    const frame = Math.floor(time * 4) % 4;
+    for (let c = firstCol; c <= firstCol + VIEW_W / TILE + 1; c++) {
+      if (!level.isQuick(c)) continue;
+      const top = level.groundTop(c * TILE);
+      if (top === null) continue;
+      const sx = c * TILE - camX;
+      b.drawImage(sprites.quicksand[frame][c % 4], sx, top);
+      b.drawImage(sprites.quicksand[(frame + 2) % 4][(c + 1) % 4], sx, top + TILE);
+    }
+  }
+
+  function drawTumbleweeds(player, camX) {
+    const r = DESERT.tumbleR;
+    for (const tw of player.tumbleweeds) {
+      const sx = tw.x - camX;
+      if (sx < -12 || sx > VIEW_W + 12) continue;
+      if (tw.broke) {
+        b.fillStyle = "#a3743f";
+        const t = tw.brokeT;
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          b.globalAlpha = Math.max(0, 1 - t / 0.35);
+          b.fillRect(Math.round(sx + Math.cos(a) * (r + t * 30)), Math.round(tw.y + Math.sin(a) * (r + t * 30)), 2, 1);
+        }
+        b.globalAlpha = 1;
+        continue;
+      }
+      drawRotated(sprites.tumbleweed, Math.round(sx), Math.round(tw.y), tw.spin, r + 0.5, r + 0.5);
+      // a little dust puff each time it lands
+      if (tw.base - tw.y < 1.5) {
+        b.fillStyle = "#e3b673";
+        b.fillRect(Math.round(sx) + r - 1, Math.round(tw.base + r), 3, 1);
+      }
+    }
   }
 
   function drawSnowBackground(camX) {
@@ -296,9 +392,20 @@ const Renderer = (() => {
       for (let r = 0; r < ROWS; r++) {
         const t = level.tile(c, r);
         const sy = r * TILE;
-        const snowy = level.biomeAt(c) === "snow";
+        const biome = level.biomeAt(c);
+        const snowy = biome === "snow";
         if (t === T_SPIKE) {
-          b.drawImage(snowy ? sprites.iceSpikes[Math.floor(hash(c, 77) * sprites.iceSpikes.length)] : sprites.spike, sx, sy);
+          if (biome === "desert") {
+            const h = level.cactusHeight(c);
+            b.drawImage(sprites.cactus[h][Math.floor(hash(c, 78) * 3)], sx - 2, sy + TILE - h);
+          } else {
+            b.drawImage(snowy ? sprites.iceSpikes[Math.floor(hash(c, 77) * sprites.iceSpikes.length)] : sprites.spike, sx, sy);
+          }
+        } else if (t === T_GROUND && biome === "desert") {
+          const variant = Math.floor(hash(c, r) * 4);
+          const above = level.tile(c, r - 1);
+          b.drawImage(above === T_GROUND ? sprites.sandstone[variant] : sprites.sandTop[variant], sx, sy);
+          if (above === T_EMPTY && !level.isQuick(c)) drawDesertDecoration(c, sx, sy);
         } else if (t === T_GROUND) {
           const variant = Math.floor(hash(c, r) * 4);
           const above = level.tile(c, r - 1);
@@ -314,6 +421,21 @@ const Renderer = (() => {
           }
         }
       }
+    }
+  }
+
+  // Pebbles and dry grass in the desert
+  function drawDesertDecoration(c, sx, sy) {
+    const n = hash(c, 99);
+    if (n < 0.12) {
+      b.fillStyle = "#8a6a3a";
+      const fx = sx + Math.floor(hash(c, 5) * 5);
+      b.fillRect(fx, sy - 2, 1, 2);
+      b.fillRect(fx + 2, sy - 3, 1, 3);
+      b.fillRect(fx + 1, sy - 1, 1, 1);
+    } else if (n < 0.22) {
+      b.fillStyle = "#9c7a5a";
+      b.fillRect(sx + Math.floor(hash(c, 3) * 6), sy - 1, 2, 1);
     }
   }
 
@@ -1111,8 +1233,9 @@ const Renderer = (() => {
       // Entering a new biome: its name, fading out
       if (p.biomeBanner > 0) {
         ctx.globalAlpha = Math.min(1, p.biomeBanner * 2);
-        const name = { snow: "SNOW", prairie: "PRAIRIE" }[p.biome] || p.biome.toUpperCase();
-        text(ctx, name, W / 2, top + 64, p.biome === "snow" ? "#e8f6ff" : "#8be070", 18, "center");
+        const name = p.biome.toUpperCase();
+        const color = { snow: "#e8f6ff", desert: "#ffcc66" }[p.biome] || "#8be070";
+        text(ctx, name, W / 2, top + 64, color, 18, "center");
         ctx.globalAlpha = 1;
       }
 

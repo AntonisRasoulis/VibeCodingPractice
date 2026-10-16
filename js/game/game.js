@@ -12,7 +12,8 @@ const Game = (() => {
   const GAME_KEYS = new Set(CONTROLS.flatMap((c) => Object.values(c)));
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
-    "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome"];
+    "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome",
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -192,7 +193,7 @@ const Game = (() => {
   // S (Red) or Down (Blue): use whatever power you're holding
   function usePower(p, owner) {
     if (!p.power || p.dead || p.caught || p.held || p.frozen > 0 || p.dashHold > 0) return;
-    if (p.power === "wind" && p.stun > 0) return; // can't dash out of a hand's throw
+    if (p.power === "wind" && (p.stun > 0 || p.inQuick)) return; // can't dash out of a hand's throw or quicksand
     if (p.power === "zap") fireBolt(p, owner);
     else if (p.power === "hand") throwHand(p, owner);
     else if (p.power === "wind") p.windDash();
@@ -304,6 +305,7 @@ const Game = (() => {
           h.tx = target.x;
           h.ty = target.y;
           target.held = true;
+          target.inQuick = false;
           target.vx = target.vy = 0;
           target.dashHold = target.dashTime = target.windTime = 0;
           target.standingOn = null;
@@ -580,6 +582,7 @@ const Game = (() => {
           if (q === p || q.dead || q.caught || q.held || bear.trampled.has(q)) continue;
           if (overlaps(q.x, q.y, HITBOX_W, HITBOX_H, bear.x - BEAR_W + 6, bear.y - 16, BEAR_W - 6, 16)) {
             bear.trampled.add(q);
+            q.inQuick = false;
             q.vy = -BEAR.tramplePop;
             q.onGround = false;
             q.standingOn = null;

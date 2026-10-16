@@ -45,6 +45,8 @@ class Level {
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
     this.bearSpots = [];      // once per snow biome: when the leader gets here, a bear charges in
+    this.quick = [];          // quick[x] = true where the ground's surface is quicksand
+    this.tumbleSpots = [];    // where tumbleweeds start rolling from
     this.cols = [];      // cols[x][row] = tile type
     this.platforms = []; // { kind: "static" | "move" | "fall", x, y, w }
     this.portals = [];   // entrances, each with the exit it leads to
@@ -130,6 +132,16 @@ class Level {
   // Which biome a column is in
   biomeAt(col) {
     return this.colBiome[clamp(col, 0, this.colBiome.length - 1)] || this.biome;
+  }
+
+  // Is the ground's surface in this column quicksand?
+  isQuick(col) {
+    return this.quick[col] === true;
+  }
+
+  // How tall the cactus in this column is (cactuses are the desert's spikes)
+  cactusHeight(col) {
+    return DESERT.cactusHeights[Math.floor(hash(col, 77) * DESERT.cactusHeights.length)];
   }
 
   // Is the ground's surface in this column slippery ice?
@@ -222,6 +234,7 @@ class Level {
     if (groundRow !== null) c.fill(T_GROUND, groundRow);
     this.colBiome.push(this.biome);
     this.ice.push(icy && groundRow !== null);
+    this.quick.push(false);
     this.cols.push(c);
     return c;
   }
@@ -260,6 +273,7 @@ class Level {
     if (this.col > 60) weights.shooter = 4;
     if (this.col > 120 && this.col - this.lastOrbCol > 160) weights.orb = 4;
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
+    if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
 
     const type = this.pickWeighted(weights);
     SECTIONS[type].call(this, this.difficulty());
@@ -303,11 +317,12 @@ const SECTIONS = {
     const clusters = this.rand(1, 2);
     for (let i = 0; i < clusters; i++) {
       // Ice spikes come in longer rows: anywhere from 1 to 5 tiles, so you never know what's next
-      const n = this.biome === "snow"
-        ? this.pickWeighted({ 1: 1, 2: 2, 3: 4, 4: 4, 5: 2 + d * 2 }) | 0
+      // Cactuses are much taller, so they only come one or two at a time
+      const n = this.biome === "snow" ? this.pickWeighted({ 1: 1, 2: 2, 3: 4, 4: 4, 5: 2 + d * 2 }) | 0
+        : this.biome === "desert" ? this.pickWeighted({ 1: 3, 2: 2 }) | 0
         : this.rand(1, 2 + Math.round(d * 2));
       this.spikes(n);
-      this.flat(this.rand(7 - Math.round(d * 2), 8), false); // room to land a full jump (less later on), never icy
+      this.flat(this.biome === "desert" ? this.rand(8, 10) : this.rand(7 - Math.round(d * 2), 8), false); // room to land a full jump (less later on), never icy
     }
   },
 
@@ -376,8 +391,13 @@ const SECTIONS = {
 
     this.flat(4);
     for (let i = 0; i < 3; i++) {
-      this.spikes(this.rand(2, 3));
-      this.flat(this.rand(4, 5)); // tight: you need short hops here
+      if (this.biome === "desert") { // one tall cactus at a time, with room to land
+        this.spikes(1);
+        this.flat(this.rand(6, 7));
+      } else {
+        this.spikes(this.rand(2, 3));
+        this.flat(this.rand(4, 5)); // tight: you need short hops here
+      }
       if (i === 1) {
         this.empty(this.rand(3, 3 + Math.round(d)));
         this.flat(2);
@@ -464,6 +484,23 @@ const SECTIONS = {
   snowball() {
     this.flat(this.rand(16, 22));
     this.snowballSpots.push({ id: this.nextId++, x: (this.col - 2) * TILE });
+    this.flat(2);
+  },
+
+  // ---- Desert only ----
+
+  // A pit of quicksand: step in and you sink. Spam jump to pull yourself out (or jump over it).
+  quicksand(d) {
+    this.flat(3);
+    const width = this.rand(3, 5 + Math.round(d));
+    for (let i = 0; i < width; i++) { this.column(this.groundRow); this.quick[this.col - 1] = true; }
+    this.flat(4);
+  },
+
+  // A long open stretch. When you get close, a tumbleweed comes bouncing at you.
+  tumbleweed() {
+    this.flat(this.rand(16, 22));
+    this.tumbleSpots.push({ id: this.nextId++, x: (this.col - 2) * TILE });
     this.flat(2);
   },
 

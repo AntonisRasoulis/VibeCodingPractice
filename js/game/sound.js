@@ -182,6 +182,12 @@ const Sound = (() => {
     snowball: () => noise({ f: 300, to: 600, dur: 0.5, vol: 0.25, attack: 0.15 }),
     snowballBreak: () => { noise({ f: 1500, to: 300, dur: 0.25, vol: 0.45 }); tone({ f: 160, to: 80, dur: 0.12, type: "sine", vol: 0.15 }); },
 
+    // Desert
+    sandSink: () => { noise({ f: 400, to: 150, dur: 0.6, vol: 0.35, attack: 0.05 }); tone({ f: 160, to: 90, dur: 0.5, type: "sine", vol: 0.15 }); },
+    sandPull: () => { noise({ filter: "bandpass", f: 500, to: 1200, q: 1.5, dur: 0.15, vol: 0.3 }); tone({ f: 220, to: 330, dur: 0.1, type: "sine", vol: 0.08 }); },
+    tumble: () => noise({ filter: "bandpass", f: 2500, to: 1500, q: 2, dur: 0.5, vol: 0.18, attack: 0.1 }),
+    tumbleBreak: () => { noise({ filter: "highpass", f: 2000, dur: 0.2, vol: 0.35 }); noise({ f: 600, dur: 0.15, vol: 0.2 }); },
+
     // Bears
     roar: () => {
       tone({ f: 110, to: 70, dur: 1.1, type: "sawtooth", vol: 0.22, attack: 0.08, vibrato: 18 });
