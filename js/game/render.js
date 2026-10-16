@@ -151,8 +151,8 @@ const Renderer = (() => {
     const y = Math.round(bear.y - (BEAR_H - 1) - bear.lift);
     if (bear.state === "leave") {
       b.save();
-      b.translate(nose + BEAR_W - 1, y);
-      b.scale(-1, 1); // heading back to the left
+      b.translate(nose + 1, y);
+      b.scale(-1, 1); // heading back to the left (flipped in place, so it doesn't jump when it turns)
       b.drawImage(frame, 0, 0);
       b.restore();
     } else {

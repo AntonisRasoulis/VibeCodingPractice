@@ -535,7 +535,17 @@ const Game = (() => {
         if (level.biomeAt(Math.floor(leader.x / TILE)) !== "snow") continue;
         const kind = BEAR[spot.kind];
         const bear = { kind: spot.kind, target: leader, x: leader.x - BEAR.startBehind, y: leader.y + HITBOX_H,
-          state: "chase", t: 0, speed: kind.speed, chase: kind.chase, anim: 0, stepTimer: 0, lift: 0 };
+          state: "chase", t: 0, speed: kind.speed, chase: kind.chase, anim: 0, stepTimer: 0, lift: 0, trampled: new Set() };
+        // Never pop into view on the other player's screen: if they're close enough behind to see
+        // the spot, start just off the left of THEIR screen and charge through to the leader first.
+        for (const q of players) {
+          if (q === leader || q.dead || q.caught) continue;
+          const left = q.x - VIEW_W * 0.35;
+          if (bear.x - BEAR_W < left + VIEW_W && bear.x > left - 4) {
+            bear.x = Math.min(bear.x, left - 4);
+            bear.state = "approach";
+          }
+        }
         const g = bearGround(bear).top;
         if (g !== null) bear.y = g;
         world.bears.push(bear);
@@ -547,8 +557,12 @@ const Game = (() => {
       bear.t += dt;
       const p = bear.target;
       const dir = bear.state === "leave" ? -1 : 1;
-      if (bear.state === "chase" || bear.state === "leave") {
-        const speed = bear.state === "leave" ? bear.speed * 0.7 : bear.speed;
+      if (bear.state === "approach" && bear.x >= p.x - BEAR.startBehind) {
+        bear.state = "chase"; // reached the leader's screen: the chase starts now
+        bear.t = 0;
+      }
+      if (bear.state === "chase" || bear.state === "leave" || bear.state === "approach") {
+        const speed = bear.state === "leave" ? bear.speed * 0.7 : bear.state === "approach" ? BEAR.approachSpeed : bear.speed;
         bear.x += dir * speed * dt;
         bear.anim += speed * dt;
         const { top, leaping } = bearGround(bear);
@@ -560,6 +574,23 @@ const Game = (() => {
           if (players.some((q) => Math.abs(q.x - bear.x) < VIEW_W * 0.6)) Sound.play("bearStep");
         }
       }
+      // Running over the player it isn't chasing launches them high into the air
+      if (bear.state === "chase" || bear.state === "approach") {
+        for (const q of players) {
+          if (q === p || q.dead || q.caught || q.held || bear.trampled.has(q)) continue;
+          if (overlaps(q.x, q.y, HITBOX_W, HITBOX_H, bear.x - BEAR_W + 6, bear.y - 16, BEAR_W - 6, 16)) {
+            bear.trampled.add(q);
+            q.vy = -BEAR.tramplePop;
+            q.onGround = false;
+            q.standingOn = null;
+            q.stun = 0.6; // tumbles, no control for a moment
+            q.showHit("TRAMPLED!", "#ffb347");
+            q.sparkle("#ffffff");
+            Sound.play("trample");
+          }
+        }
+      }
+      if (bear.state === "approach" && (p.dead || p.caught)) { bear.state = "leave"; bear.t = 0; }
       if (bear.state === "chase") {
         if (p.dead || p.caught) {
           bear.state = "leave";

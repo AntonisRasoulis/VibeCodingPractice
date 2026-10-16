@@ -114,6 +114,8 @@ const BEAR = {
   honeyTime: 4,     // seconds a honey-covered player is slowed down
   honeySpeed: 0.5,  // how fast you can run while covered in honey (compared to normal)
   swipeTime: 0.35,  // the swipe when it catches you
+  approachSpeed: 170, // charging through the player behind's screen to get to the leader
+  tramplePop: 370,  // how hard it launches a player it runs over (that it isn't chasing) straight up
 };
 
 const SHOOTER = {

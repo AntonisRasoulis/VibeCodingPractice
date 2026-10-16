@@ -194,6 +194,7 @@ const Sound = (() => {
       tone({ f: 140, to: 60, dur: 0.5, type: "sawtooth", vol: 0.2, vibrato: 20 });
     },
     honey: () => { noise({ f: 700, to: 200, dur: 0.3, vol: 0.4 }); tone({ f: 330, to: 180, dur: 0.35, type: "sine", vol: 0.15, vibrato: 10 }); },
+    trample: () => { tone({ f: 150, to: 900, dur: 0.35, type: "square", vol: 0.12 }); noise({ f: 600, dur: 0.12, vol: 0.3 }); },
     grumble: () => tone({ f: 90, to: 60, dur: 0.7, type: "sawtooth", vol: 0.12, attack: 0.1, vibrato: 12 }),
 
     // Level dangers
