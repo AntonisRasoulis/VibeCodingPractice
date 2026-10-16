@@ -43,7 +43,7 @@ const Game = (() => {
       bolts: [], // lightning bolts flying along the course
       hands: [], // mystic hands flying, grabbing or swatting
       missiles: [], // missiles zooming in, locking on, flying or exploding
-      nextMissile: null, // when the next missile comes (set once someone passes 300m)
+      nextMissile: null, // the leader's distance (meters) when the next missile comes (set once someone passes 300m)
       winner: null,
     };
     for (const p of world.players) p.onGround = true;
@@ -378,8 +378,8 @@ const Game = (() => {
   // The player sits 35% across their view, so the view runs from 140px behind them
   // to 260px ahead; every point here stays well inside that.
   function makeMissile(near, striped, side) {
-    const ox = side < 0 ? -rand(55, 95) : rand(70, 190); // arrival spot, left or right of the player
-    const oy = rand(22, 46);
+    const ox = side < 0 ? -rand(75, 110) : rand(90, 195); // arrival spot, left or right of the player
+    const oy = rand(12, 24);                              // high in the sky: 60-75px above a runner on the ground
     const centre = VIEW_W * 0.5 - VIEW_W * 0.35;            // middle of their screen, relative to them
     return {
       striped,
@@ -389,7 +389,7 @@ const Game = (() => {
       anchor: near,
       ox, oy,
       sx: centre + (ox - centre) * 0.25,                   // start: far away, near the middle of the sky
-      sy: Math.max(18, oy - 18),                          // (below the distance counters at the top)
+      sy: Math.max(12, oy - 6),                           // (below the distance counters at the top)
       x: near.x + ox, y: oy,
       scale: 0.15,
       angle: 0,
@@ -420,13 +420,13 @@ const Game = (() => {
 
   function updateMissiles(dt) {
     const { players, level } = world;
-    // Start the random timer once anyone passes 300m
+    // Once anyone passes 300m, a missile comes about every 200m the leader runs
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
     if (leaderMeters > MISSILE.startAt) {
-      if (world.nextMissile === null) world.nextMissile = world.time + rand(2, MISSILE.every[1]);
-      if (world.time >= world.nextMissile) {
+      if (world.nextMissile === null) world.nextMissile = leaderMeters + rand(20, MISSILE.every[1]);
+      if (leaderMeters >= world.nextMissile) {
         spawnMissile();
-        world.nextMissile = world.time + rand(MISSILE.every[0], MISSILE.every[1]);
+        world.nextMissile = leaderMeters + rand(MISSILE.every[0], MISSILE.every[1]);
       }
     }
 

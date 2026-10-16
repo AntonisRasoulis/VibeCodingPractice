@@ -75,7 +75,7 @@ const HAND = {
 const MISSILE = {
   startAt: 300,    // meters before the first black missile can come
   stripedAt: 400,  // meters before red-striped missiles can come too
-  every: [10, 20], // random seconds between missiles (the rarest danger)
+  every: [160, 240], // random meters run (by the leader) between missiles: about 1 per 200m
   approach: 1.4,   // seconds zooming in from far away in the background
   lock: 0.6,       // seconds aiming (red target + aim line) before it fires
   speed: 340,      // how fast it flies once fired (normal running is 96)
