@@ -365,7 +365,9 @@ const Game = (() => {
 
   function spawnMissile() {
     const { players } = world;
-    const alive = players.filter((p) => !p.dead && !p.caught);
+    // Missiles only come for a player who is in the prairie
+    const alive = players.filter((p) => !p.dead && !p.caught &&
+      world.level.biomeAt(Math.floor((p.x + HITBOX_W / 2) / TILE)) === "prairie");
     if (!alive.length) return;
     const near = alive[Math.floor(Math.random() * alive.length)];
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
