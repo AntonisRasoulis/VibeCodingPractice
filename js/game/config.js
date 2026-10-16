@@ -92,8 +92,8 @@ const BIOMES = ["prairie", "snow"];
 const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
 
 const SNOW = {
-  iceAccel: 260,       // how quickly you speed up on ice (normal ground is 900)
-  iceFriction: 140,    // how quickly you stop on ice when you let go (normal ground is 1100)
+  iceAccel: 160,       // how quickly you speed up or turn on ice (normal ground is 900)
+  iceFriction: 70,     // how quickly you stop on ice when you let go (normal ground is 1100): slides about 8 tiles
   icicleTrigger: 60,   // an icicle starts shaking when you're this close (pixels) to running under it
   icicleShake: 0.4,    // seconds it shakes before it drops
   icicleGravity: 400,  // how fast it falls
