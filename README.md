@@ -11,7 +11,7 @@ Built with plain HTML, CSS and JavaScript. No frameworks or build tools are need
 | **Red** (top) | `W` | `A` / `D` | `S` |
 | **Blue** (bottom) | `↑` | `←` / `→` | `↓` |
 
-`P` or `Esc` pauses.
+`P` or `Esc` pauses. `M` (or the Sound button) turns the sound off and on.
 
 ## Run it locally
 
@@ -30,6 +30,7 @@ index.html            The page: header, game area, how-to-play, footer
 css/style.css         Styling for the page
 js/main.js            Connects the page (Start/Pause buttons, win counters) to the game
 js/game/config.js     Numbers you can tweak: speeds, jump height, fire speed, respawn time
+js/game/sound.js      Sound effects, made by the browser's synthesizer (no sound files)
 js/game/level.js      The endless level generator
 js/game/player.js     A runner: running, jumping, collisions, dying and respawning
 js/game/sprites.js    The pixel art (drawn as text, one letter per pixel)

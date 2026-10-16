@@ -81,6 +81,7 @@ class Player {
       if (this.dashHold <= 0) {
         this.dashTime = DASH.time;
         this.facing = 1;
+        Sound.play("dashLaunch");
       }
       return;
     }
@@ -125,6 +126,7 @@ class Player {
     // Frozen by a freeze orb: no running or jumping, but gravity still works
     if (this.frozen > 0) {
       this.frozen -= dt;
+      if (this.frozen <= 0) Sound.play("thaw");
       input = { left: false, right: false, jump: false, jumpPressed: false };
       this.jumpBuffer = 0;
     }
@@ -147,6 +149,7 @@ class Player {
       this.vy = -PHYSICS.jumpSpeed;
       this.jumpBuffer = 0;
       this.coyote = 0;
+      Sound.play("jump");
     }
     const minRise = -PHYSICS.jumpSpeed * PHYSICS.jumpCut;
     // (a thrown player isn't holding jump, so don't cut their throw short)
@@ -159,10 +162,13 @@ class Player {
     this.vy = Math.min(this.vy + PHYSICS.gravity * dt, PHYSICS.maxFall);
     this.moveX(this.vx * dt, level);
     const prevBottom = this.y + HITBOX_H;
+    const wasOnGround = this.onGround;
+    const fallSpeed = this.vy;
     this.onGround = false;
     this.standingOn = null;
     this.moveY(this.vy * dt, level);
     if (this.vy >= 0) this.landOnPlatforms(level, prevBottom);
+    if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play("land");
 
     this.checkHazards(level);
     if (this.dead) return;
@@ -239,6 +245,7 @@ class Player {
         this.standingOn = p;
         if (p.kind === "fall" && !this.fallState.has(p.id)) {
           this.fallState.set(p.id, { t: 0, dy: 0, vy: 0 });
+          Sound.play("crumble");
         }
         return;
       }
@@ -310,6 +317,7 @@ class Player {
         this.vy = 0;
         this.portalCooldown = 0.5;
         this.sparkle("#ff8c1a");
+        Sound.play("portal");
         return;
       }
     }
@@ -339,6 +347,7 @@ class Player {
     this.dead = true;
     this.deadTimer = DEATH.respawnDelay;
     this.burst();
+    Sound.play("die");
 
     // Come back at the most recent safe spot a little behind where we died
     const target = this.x - DEATH.respawnBehind;
@@ -362,6 +371,7 @@ class Player {
     this.jumpBuffer = 0;
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
+    Sound.play("respawn");
   }
 
   // Hit by a lightning bolt
@@ -370,6 +380,7 @@ class Player {
     this.sparkle("#c792ff");
     this.flash = 0.8;
     this.showHit("ZAPPED!", "#bff4ff");
+    Sound.play("zapped");
     this.die();
   }
 
@@ -380,6 +391,7 @@ class Player {
   }
 
   burnUp() {
+    if (!this.caught) Sound.play("caught");
     if (!this.dead) this.burst();
     this.caught = true;
   }
@@ -407,6 +419,7 @@ class Player {
     this.windTime = WIND.time;
     this.jumpBuffer = 0;
     this.sparkle("#ffffff");
+    Sound.play("windDash");
   }
 
   sparkle(color) {

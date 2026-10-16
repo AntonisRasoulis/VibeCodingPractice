@@ -48,6 +48,7 @@
         <span class="red">Red wins: <strong id="red-wins">0</strong></span>
         <span class="blue">Blue wins: <strong id="blue-wins">0</strong></span>
         <div class="hud-buttons">
+          <button id="sound-button" class="button secondary">Sound: on</button>
           <button id="fullscreen-button" class="button secondary" hidden>Fullscreen</button>
           <button id="pause-button" class="button secondary" disabled>Pause</button>
         </div>
@@ -84,7 +85,7 @@
         <li><strong>Lightning orbs</strong> — golden orbs with a white zigzag. Grab one to store a lightning shot, then press <kbd>S</kbd> (Red) or <kbd>↓</kbd> (Blue) to fire it along the ground. It flies the way you're facing when you shoot, so turn around (press left) to shoot back at a player behind you. It travels to the other player wherever they are. Jump over it, or get zapped back.</li>
         <li><strong>Hand orbs</strong> — golden orbs with a purple hand. Grab one, then press <kbd>S</kbd> (Red) or <kbd>↓</kbd> (Blue) to throw a mystic hand a short way in the direction you're facing. Facing right, it grabs the other player and suplexes them backwards. Facing left, it backhands them further back. It flies in a straight line, so jump over it or duck under it. You hold one power at a time: a new wind dash, lightning or hand orb replaces the old one.</li>
       </ul>
-      <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause. Press <kbd>F</kbd> or the Fullscreen button to make the game fill the screen.</p>
+      <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause. Press <kbd>F</kbd> or the Fullscreen button to make the game fill the screen. Press <kbd>M</kbd> or the Sound button to turn the sound off or on.</p>
     </section>
 
     <section id="about">
@@ -98,6 +99,7 @@
   </footer>
 
   <script src="js/game/config.js"></script>
+  <script src="js/game/sound.js"></script>
   <script src="js/game/level.js"></script>
   <script src="js/game/player.js"></script>
   <script src="js/game/sprites.js"></script>

@@ -70,8 +70,12 @@ const Game = (() => {
     if (world.swapFlash > 0) world.swapFlash -= dt * 2;
 
     if (world.state === "countdown") {
+      const before = Math.ceil(world.countdown);
       world.countdown -= dt;
-      if (world.countdown <= 0) world.state = "playing";
+      if (world.countdown <= 0) {
+        world.state = "playing";
+        Sound.play("go");
+      } else if (Math.ceil(world.countdown) < before) Sound.play("beep");
       jumpQueued[0] = jumpQueued[1] = false;
       fireQueued[0] = fireQueued[1] = false;
       return;
@@ -102,7 +106,35 @@ const Game = (() => {
     updateHands(dt);
     updateMissiles(dt);
     checkOrbs();
+    levelSounds();
     checkFire();
+  }
+
+  // Shooters firing and maces swooshing past, if a player is close enough to hear them
+  function levelSounds() {
+    const { level, players } = world;
+    const near = (x) => players.some((p) => !p.dead && !p.caught && Math.abs(x - p.x) < VIEW_W * 0.6);
+    for (const s of level.shooters) {
+      if (!near(s.x)) continue;
+      const volley = Math.floor(level.time / s.period - s.phase);
+      if (s.lastVolley !== undefined && volley !== s.lastVolley) Sound.play("shooterFire");
+      s.lastVolley = volley;
+    }
+    for (const m of level.maces) {
+      if (!near(m.x)) continue;
+      const half = Math.floor(2 * (level.time / m.period + m.phase)); // changes as it swings through the bottom
+      if (m.lastHalf !== undefined && half !== m.lastHalf) Sound.play("maceSwoosh");
+      m.lastHalf = half;
+    }
+  }
+
+  // The fire roars louder the closer it gets to whoever is nearest to it
+  function fireLoudness() {
+    if (world.state !== "playing") return 0;
+    const runners = world.players.filter((p) => !p.caught);
+    if (!runners.length) return 0;
+    const gap = Math.min(...runners.map((p) => (p.trackX - world.fire.x) / TILE));
+    return 0.12 + 0.88 * clamp(1 - gap / 40, 0, 1);
   }
 
   function checkOrbs() {
@@ -117,10 +149,12 @@ const Game = (() => {
           if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind") {
             p.power = orb.kind; // holding one power at a time: the newest replaces the old
             p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff" }[orb.kind]);
+            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind" }[orb.kind]);
             return;
           }
           if (orb.kind === "dash") {
             p.dashHold = DASH.hold;
+            Sound.play("dashCharge");
             p.x = orb.x + 1;
             p.y = orb.y + 4 - HITBOX_H / 2;
             p.vx = 0;
@@ -132,11 +166,13 @@ const Game = (() => {
             p.frozen = FREEZE_TIME;
             p.vx = 0;
             p.sparkle("#a6e1ff");
+            Sound.play("freeze");
             return;
           }
           for (const f of SWAP_FIELDS) [a[f], b[f]] = [b[f], a[f]];
           Renderer.swapCameras();
           world.swapFlash = 1;
+          Sound.play("swap");
           a.sparkle("#ffd23f");
           b.sparkle("#ffd23f");
           return;
@@ -172,6 +208,7 @@ const Game = (() => {
     p.flash = 0.35;
     p.sparkle("#ffffff");
     p.sparkle("#bff4ff");
+    Sound.play("zapFire");
   }
 
   function updateBolts(dt) {
@@ -214,6 +251,7 @@ const Game = (() => {
       t: 0,
     });
     p.sparkle("#c9a3ff");
+    Sound.play("handThrow");
   }
 
   // Does a runner standing at (x, y) overlap the ground?
@@ -265,6 +303,7 @@ const Game = (() => {
           target.standingOn = null;
           target.flash = 0.3;
           target.showHit(h.dir > 0 ? "GRABBED!" : "SMACKED!", "#c9a3ff");
+          Sound.play(h.dir > 0 ? "grab" : "windUp");
         }
       } else if (h.state === "grab") {
         // The fist closes, then swings them up and back over the top, like a suplex
@@ -284,12 +323,14 @@ const Game = (() => {
         if (h.t >= HAND.grabTime) {
           throwPlayer(target);
           target.sparkle("#c9a3ff");
+          Sound.play("slam");
           h.state = "fade";
           h.t = 0;
         }
       } else if (h.state === "swat") {
         if (h.t >= HAND.swatTime) {
           throwPlayer(target);
+          Sound.play("smack");
           target.sparkle("#ffffff");
           target.sparkle("#ffd23f");
           h.smackX = target.x + HITBOX_W / 2;
@@ -327,6 +368,8 @@ const Game = (() => {
     const striped = leaderMeters > MISSILE.stripedAt && Math.random() < 0.5;
     const side = Math.random() < 0.5 ? -1 : 1; // comes in on the left or the right of the player
     world.missiles.push(makeMissile(near, striped, side));
+    Sound.play("glint");
+    Sound.play("incoming");
   }
 
   // While it zooms in, a missile is positioned relative to the player it came for,
@@ -372,6 +415,7 @@ const Game = (() => {
   function explodeMissile(m) {
     m.state = "boom";
     m.t = 0;
+    Sound.play("boom");
   }
 
   function updateMissiles(dt) {
@@ -403,6 +447,7 @@ const Game = (() => {
           m.smokeAnchorX = m.anchor.x; // from here the trail stays put in the world
           m.state = "lock";
           m.t = 0;
+          Sound.play("lockOn");
           // Lock on to whoever is closest right now
           const alive = players.filter((p) => !p.dead && !p.caught);
           if (!alive.length) { m.done = true; continue; }
@@ -416,6 +461,7 @@ const Game = (() => {
           // Fire! From here on it flies in a straight line and never turns
           m.state = "fly";
           m.t = 0;
+          Sound.play("launch");
           m.vx = Math.cos(m.angle) * MISSILE.speed;
           m.vy = Math.sin(m.angle) * MISSILE.speed;
           m.traveled = 0;
@@ -458,6 +504,7 @@ const Game = (() => {
 
     for (const p of caught) p.burnUp();
     world.winner = caught.length === 2 ? null : world.players.find((p) => !p.caught).name;
+    Sound.play(world.winner ? "win" : "draw");
     world.state = "ending";
     world.endTimer = 1.5;
   }
@@ -476,6 +523,7 @@ const Game = (() => {
       }
     }
     if (!isActive()) accumulator = 0;
+    Sound.setFire(fireLoudness(), dt);
     Renderer.render(ctx, world, dt);
     requestAnimationFrame(frame);
   }
@@ -509,6 +557,7 @@ const Game = (() => {
           });
         }
         keys.add(e.code);
+        if (GAME_KEYS.has(e.code)) Sound.unlock();
       });
       window.addEventListener("keyup", (e) => keys.delete(e.code));
       window.addEventListener("blur", () => {
@@ -524,8 +573,10 @@ const Game = (() => {
     },
 
     start() {
+      Sound.unlock(); // the Start click lets the browser play sound
       newWorld();
       world.state = "countdown";
+      Sound.play("beep");
       accumulator = 0;
     },
 

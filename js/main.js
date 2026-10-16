@@ -8,6 +8,7 @@ const canvas = document.getElementById("game-canvas");
 const gameWrapper = document.querySelector(".game-wrapper");
 const fullscreenButton = document.getElementById("fullscreen-button");
 const scoreLine = document.getElementById("score-line");
+const soundButton = document.getElementById("sound-button");
 const wins = { RED: 0, BLUE: 0 };
 let gameLoaded = false;
 
@@ -67,7 +68,26 @@ pauseButton.addEventListener("click", () => {
 
 window.addEventListener("keydown", (e) => {
   if (gameLoaded && (e.code === "KeyP" || e.code === "Escape") && Game.isRunning()) Game.togglePause();
+  if (gameLoaded && e.code === "KeyM") toggleSound();
   if (e.code === "KeyF" && document.fullscreenEnabled) toggleFullscreen();
+});
+
+// ---- Sound ----
+
+function showSoundState() {
+  soundButton.textContent = Sound.muted ? "Sound: off" : "Sound: on";
+}
+
+function toggleSound() {
+  Sound.unlock();
+  Sound.toggleMute();
+  showSoundState();
+}
+
+showSoundState();
+soundButton.addEventListener("click", () => {
+  toggleSound();
+  soundButton.blur(); // so the space bar / Enter don't press it again
 });
 
 // ---- Fullscreen ----
