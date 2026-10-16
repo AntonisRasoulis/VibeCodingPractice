@@ -85,6 +85,24 @@ const MISSILE = {
   range: 700,      // how far it flies before giving up
 };
 
+// Biomes: the course changes scenery (and some rules) as you go.
+// The first race after opening the website always starts in the prairie;
+// after that a race can start in any biome.
+const BIOMES = ["prairie", "snow"];
+const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
+
+const SNOW = {
+  iceAccel: 260,       // how quickly you speed up on ice (normal ground is 900)
+  iceFriction: 140,    // how quickly you stop on ice when you let go (normal ground is 1100)
+  icicleTrigger: 60,   // an icicle starts shaking when you're this close (pixels) to running under it
+  icicleShake: 0.4,    // seconds it shakes before it drops
+  icicleGravity: 400,  // how fast it falls
+  snowballSpeed: 80,   // how fast snowballs roll towards you
+  snowballGrow: 18,    // a snowball gets 1 pixel bigger (radius) every this many pixels it rolls
+  snowballMaxR: 7,     // biggest a snowball gets (15 pixels across: always jumpable, even from standing still)
+  snowballAhead: 230,  // a snowball starts rolling when you're this far from where it starts
+};
+
 const SHOOTER = {
   speed: 80,    // how fast its spikes fly
   range: 160,   // how far a spike flies before it's gone

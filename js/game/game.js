@@ -12,7 +12,7 @@ const Game = (() => {
   const GAME_KEYS = new Set(CONTROLS.flatMap((c) => Object.values(c)));
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
-    "portalCooldown", "safeSpots", "fallState"];
+    "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -22,9 +22,10 @@ const Game = (() => {
   const jumpQueued = [false, false];
   const fireQueued = [false, false];
   let nextBoltId = 1;
+  let racesStarted = 0; // the first race after opening the website always starts in the prairie
 
-  function newWorld() {
-    const level = new Level(Math.floor(Math.random() * 1e9));
+  function newWorld(startBiome = "prairie") {
+    const level = new Level(Math.floor(Math.random() * 1e9), startBiome);
     level.ensure(VIEW_W * 2);
     const startX = 4 * TILE;
     const startY = level.groundRow * TILE - HITBOX_H;
@@ -46,7 +47,10 @@ const Game = (() => {
       nextMissile: null, // the leader's distance (meters) when the next missile comes (set once someone passes 300m)
       winner: null,
     };
-    for (const p of world.players) p.onGround = true;
+    for (const p of world.players) {
+      p.onGround = true;
+      p.biome = startBiome; // no "new biome" banner for the one you start in
+    }
     Renderer.resetCameras(startX);
   }
 
@@ -574,7 +578,7 @@ const Game = (() => {
 
     start() {
       Sound.unlock(); // the Start click lets the browser play sound
-      newWorld();
+      newWorld(racesStarted++ === 0 ? "prairie" : BIOMES[Math.floor(Math.random() * BIOMES.length)]);
       world.state = "countdown";
       Sound.play("beep");
       accumulator = 0;

@@ -47,6 +47,12 @@ class Player {
     this.respawnY = y;
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
     this.fallState = new Map();  // crumbling platforms *this* player has stepped on
+    this.icicleState = new Map(); // icicles *this* player has set off (each player gets their own, like the platforms)
+    this.snowballs = [];          // snowballs rolling at this player
+    this.snowballStarted = new Set();
+    this.onIce = false;
+    this.biome = null;            // the biome we're in, to notice when it changes
+    this.biomeBanner = 0;         // seconds left showing the new biome's name
     this.particles = [];
   }
 
@@ -59,6 +65,8 @@ class Player {
   update(dt, input, level) {
     this.updateParticles(dt);
     this.updateFallingPlatforms(dt);
+    this.updateSnow(dt, level);
+    if (this.biomeBanner > 0) this.biomeBanner -= dt;
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
@@ -134,12 +142,12 @@ class Player {
     // Running
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     if (dir !== 0) {
-      let accel = this.onGround ? PHYSICS.groundAccel : PHYSICS.airAccel;
+      let accel = this.onGround ? (this.onIce ? SNOW.iceAccel : PHYSICS.groundAccel) : PHYSICS.airAccel;
       if (Math.sign(this.vx) === -dir) accel *= 2; // turn around quickly
       this.vx = clamp(this.vx + dir * accel * dt, -PHYSICS.runSpeed, PHYSICS.runSpeed);
       this.facing = dir;
     } else if (this.onGround) {
-      this.vx = approach(this.vx, 0, PHYSICS.friction * dt);
+      this.vx = approach(this.vx, 0, (this.onIce ? SNOW.iceFriction : PHYSICS.friction) * dt); // ice: you keep sliding
     }
 
     // Jumping
@@ -168,7 +176,8 @@ class Player {
     this.standingOn = null;
     this.moveY(this.vy * dt, level);
     if (this.vy >= 0) this.landOnPlatforms(level, prevBottom);
-    if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play("land");
+    this.onIce = this.onGround && !this.standingOn && level.isIce(Math.floor((this.x + HITBOX_W / 2) / TILE));
+    if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
 
     this.checkHazards(level);
     if (this.dead) return;
@@ -176,6 +185,81 @@ class Player {
 
     if (this.onGround && !this.standingOn) this.rememberSafeSpot(level);
     this.animDist += Math.abs(this.vx * dt);
+
+    // Entering a new biome: show its name for a moment
+    const biome = level.biomeAt(Math.floor((this.x + HITBOX_W / 2) / TILE));
+    if (biome !== this.biome) {
+      if (this.biome) {
+        this.biomeBanner = 2;
+        Sound.play("biome");
+      }
+      this.biome = biome;
+    }
+  }
+
+  // ---- Snow: icicles and snowballs (each player has their own) ----
+
+  updateSnow(dt, level) {
+    const cx = this.x + HITBOX_W / 2;
+    for (const ic of level.icicles) {
+      if (Math.abs(ic.x - cx) > VIEW_W) continue;
+      const s = this.icicleState.get(ic.id);
+      if (!s) {
+        // Starts shaking when you get close to running under it
+        const ahead = ic.x + 3 - cx;
+        if (!this.dead && !this.caught && ahead > -6 && ahead < SNOW.icicleTrigger && this.y > ic.y - 6) {
+          this.icicleState.set(ic.id, { t: 0, dy: 0, vy: 0, gone: false, goneT: 0 });
+          Sound.play("icicleShake");
+        }
+        continue;
+      }
+      s.t += dt;
+      if (s.gone) { s.goneT += dt; continue; }
+      if (s.t > SNOW.icicleShake) {
+        s.vy += SNOW.icicleGravity * dt;
+        s.dy += s.vy * dt;
+        const tip = ic.y + s.dy + ic.len;
+        const ground = level.groundTop(ic.x + 3);
+        if ((ground !== null && tip >= ground) || tip > VIEW_H + 20) {
+          s.gone = true;
+          if (ground !== null && Math.abs(ic.x - cx) < VIEW_W * 0.7) Sound.play("icicleShatter");
+        }
+      }
+    }
+
+    for (const spot of level.snowballSpots) {
+      if (this.dead || this.caught || this.snowballStarted.has(spot.id)) continue;
+      if (spot.x > this.x && spot.x - this.x < SNOW.snowballAhead) {
+        this.snowballStarted.add(spot.id);
+        const ground = level.groundTop(spot.x);
+        if (ground === null) continue;
+        this.snowballs.push({ x: spot.x, y: ground - 2.5, r: 2.5, rolled: 0, vy: 0, spin: 0, broke: false, brokeT: 0 });
+        Sound.play("snowball");
+      }
+    }
+    for (const ball of this.snowballs) {
+      if (ball.broke) { ball.brokeT += dt; continue; }
+      const move = SNOW.snowballSpeed * dt;
+      ball.x -= move;
+      ball.rolled += move;
+      ball.spin -= move / ball.r;
+      ball.r = Math.min(SNOW.snowballMaxR, 2.5 + ball.rolled / SNOW.snowballGrow);
+      const ground = level.groundTop(ball.x);
+      const bottom = ball.y + ball.r;
+      if (ground !== null && ground < bottom - 3) {
+        ball.broke = true; // rolled into a step: it bursts
+        Sound.play("snowballBreak");
+      } else if (ground === null || ground > bottom + 1) {
+        ball.vy += FALLING.gravity * dt; // rolling off an edge
+        ball.y += ball.vy * dt;
+        if (ground !== null && ball.y + ball.r >= ground) { ball.y = ground - ball.r; ball.vy = 0; }
+      } else {
+        ball.y = ground - ball.r;
+        ball.vy = 0;
+      }
+    }
+    this.snowballs = this.snowballs.filter((ball) =>
+      (ball.broke ? ball.brokeT < 0.35 : ball.y < VIEW_H + 20) && ball.x > this.x - VIEW_W);
   }
 
   // ---- Collisions ----
@@ -280,10 +364,14 @@ class Player {
     const r1 = Math.floor((this.y + HITBOX_H - 0.01) / TILE);
     for (let c = c0; c <= c1; c++) {
       for (let r = r0; r <= r1; r++) {
-        // Spikes only hurt in their pointy part, not the whole tile
-        if (level.tile(c, r) === T_SPIKE &&
-            overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1, r * TILE + 3, 6, 5)) {
-          return this.die();
+        // Spikes only hurt in their pointy part, not the whole tile.
+        // Ice spikes (in the snow) are taller and a little thinner.
+        if (level.tile(c, r) === T_SPIKE) {
+          const icy = level.biomeAt(c) === "snow";
+          if (icy ? overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1.5, r * TILE + 1, 5, 7)
+                  : overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1, r * TILE + 3, 6, 5)) {
+            return this.die();
+          }
         }
       }
     }
@@ -303,6 +391,27 @@ class Player {
       if (Math.abs(s.x - cx) > SHOOTER.range + 16) continue;
       for (const spike of level.shooterSpikes(s, level.time)) {
         if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, spike.x - 1.5, spike.y - 1.5, 3, 3)) return this.die();
+      }
+    }
+
+    // Icicles: hanging or falling, touching one hurts
+    for (const ic of level.icicles) {
+      if (Math.abs(ic.x - cx) > 16) continue;
+      const s = this.icicleState.get(ic.id);
+      if (s && s.gone) continue;
+      const dy = s ? s.dy : 0;
+      if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, ic.x + 1, ic.y + dy, 4, ic.len - 1)) return this.die();
+    }
+
+    // Snowballs
+    for (const ball of this.snowballs) {
+      if (ball.broke) continue;
+      const nearX = clamp(ball.x, this.x, this.x + HITBOX_W);
+      const nearY = clamp(ball.y, this.y, this.y + HITBOX_H);
+      if ((ball.x - nearX) ** 2 + (ball.y - nearY) ** 2 < (ball.r - 1) ** 2) {
+        ball.broke = true;
+        Sound.play("snowballBreak");
+        return this.die();
       }
     }
   }
@@ -332,6 +441,8 @@ class Player {
     for (const m of level.maces) if (Math.abs(m.x - this.x) < level.maceReach(m)) return;
     // ...or where a shooter's spikes can reach
     for (const s of level.shooters) if (Math.abs(s.x - this.x) < SHOOTER.range * Math.SQRT1_2 + 12) return;
+    // ...or just before icicles (they'd drop the moment you came back)
+    for (const ic of level.icicles) if (ic.x - this.x > -10 && ic.x - this.x < SNOW.icicleTrigger + 16) return;
     this.safeSpots.push({ x: this.x, y: this.y });
     if (this.safeSpots.length > 300) this.safeSpots.shift();
   }
@@ -371,6 +482,9 @@ class Player {
     this.jumpBuffer = 0;
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
+    this.icicleState.clear(); // ...and so do icicles
+    this.snowballs = [];
+    this.snowballStarted.clear();
     Sound.play("respawn");
   }
 

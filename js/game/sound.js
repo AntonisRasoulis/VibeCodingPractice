@@ -174,6 +174,14 @@ const Sound = (() => {
     launch: () => { noise({ filter: "bandpass", f: 300, to: 1500, q: 1, dur: 0.45, vol: 0.35 }); tone({ f: 120, to: 60, dur: 0.3, type: "sawtooth", vol: 0.08 }); },
     boom: () => { noise({ f: 1200, to: 80, dur: 0.8, vol: 0.7 }); tone({ f: 120, to: 35, dur: 0.6, type: "sine", vol: 0.5 }); },
 
+    // Snow
+    biome: () => { noise({ filter: "bandpass", f: 500, to: 1500, q: 1, dur: 0.6, vol: 0.15, attack: 0.2 }); notes([784, 1047, 1319], { gap: 0.1, dur: 0.3, type: "triangle", vol: 0.1, at: 0.15 }); },
+    iceLand: () => { tone({ f: 2400, dur: 0.08, type: "triangle", vol: 0.06 }); noise({ filter: "highpass", f: 4000, dur: 0.06, vol: 0.12 }); },
+    icicleShake: () => notes([2093, 2349, 2093, 2349], { gap: 0.07, dur: 0.06, type: "triangle", vol: 0.06 }),
+    icicleShatter: () => { noise({ filter: "highpass", f: 3000, dur: 0.25, vol: 0.3 }); notes([2637, 3136, 2794], { gap: 0.03, dur: 0.1, type: "triangle", vol: 0.06 }); },
+    snowball: () => noise({ f: 300, to: 600, dur: 0.5, vol: 0.25, attack: 0.15 }),
+    snowballBreak: () => { noise({ f: 1500, to: 300, dur: 0.25, vol: 0.45 }); tone({ f: 160, to: 80, dur: 0.12, type: "sine", vol: 0.15 }); },
+
     // Level dangers
     shooterFire: () => tone({ f: 800, to: 250, dur: 0.12, vol: 0.09 }),
     maceSwoosh: () => noise({ filter: "bandpass", f: 400, to: 900, q: 2, dur: 0.28, vol: 0.4, attack: 0.1 }),

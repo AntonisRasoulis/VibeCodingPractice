@@ -36,8 +36,14 @@ function clamp(value, min, max) {
 }
 
 class Level {
-  constructor(seed) {
+  constructor(seed, startBiome = "prairie") {
     this.rng = makeRng(seed);
+    this.biome = startBiome;  // the biome new columns are built in
+    this.colBiome = [];       // colBiome[x] = which biome each column is in
+    this.ice = [];            // ice[x] = true where the ground's surface is slippery ice
+    this.signs = [];          // wooden signs where a new biome starts
+    this.icicles = [];        // icicles hanging under snowy ledges
+    this.snowballSpots = [];  // where snowballs start rolling from
     this.cols = [];      // cols[x][row] = tile type
     this.platforms = []; // { kind: "static" | "move" | "fall", x, y, w }
     this.portals = [];   // entrances, each with the exit it leads to
@@ -49,6 +55,7 @@ class Level {
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
     this.nextId = 1;
+    this.biomeEnd = this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
     this.flat(30); // calm start
   }
 
@@ -109,11 +116,23 @@ class Level {
   }
 
   // Top of the ground at an x position, or null over a pit. Lightning bolts run along this.
+  // (Searched from the bottom up, so a ledge in the sky doesn't count as the ground.)
   groundTop(x) {
     const col = this.cols[Math.floor(x / TILE)];
-    if (!col) return null;
-    const row = col.indexOf(T_GROUND);
-    return row < 0 ? null : row * TILE;
+    if (!col || col[ROWS - 1] !== T_GROUND) return null;
+    let row = ROWS - 1;
+    while (row > 0 && col[row - 1] === T_GROUND) row--;
+    return row * TILE;
+  }
+
+  // Which biome a column is in
+  biomeAt(col) {
+    return this.colBiome[clamp(col, 0, this.colBiome.length - 1)] || this.biome;
+  }
+
+  // Is the ground's surface in this column slippery ice?
+  isIce(col) {
+    return this.ice[col] === true;
   }
 
   // ---- Spike shooters ----
@@ -196,15 +215,17 @@ class Level {
     return Object.keys(weights)[0];
   }
 
-  column(groundRow) {
+  column(groundRow, icy = false) {
     const c = new Uint8Array(ROWS);
     if (groundRow !== null) c.fill(T_GROUND, groundRow);
+    this.colBiome.push(this.biome);
+    this.ice.push(icy && groundRow !== null);
     this.cols.push(c);
     return c;
   }
 
-  flat(n) {
-    for (let i = 0; i < n; i++) this.column(this.groundRow);
+  flat(n, icy = false) {
+    for (let i = 0; i < n; i++) this.column(this.groundRow, icy);
   }
 
   empty(n) {
@@ -229,19 +250,31 @@ class Level {
   // ---- Sections ----
 
   addSection() {
+    if (this.col >= this.biomeEnd) return this.newBiome();
+
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
     if (this.col > 60) weights.shooter = 4;
     if (this.col > 120 && this.col - this.lastOrbCol > 160) weights.orb = 4;
+    if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 3, snowball: 3 });
 
     const type = this.pickWeighted(weights);
     SECTIONS[type].call(this, this.difficulty());
     this.flat(this.rand(2, 4)); // breathing room between sections
   }
+
+  // A calm stretch, then a sign, and from there on a different biome
+  newBiome() {
+    this.flat(4);
+    this.biome = this.pickFrom(BIOMES.filter((b) => b !== this.biome));
+    this.signs.push({ x: this.col * TILE + 2, biome: this.biome });
+    this.flat(8);
+    this.biomeEnd = this.col + this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
+  }
 }
 
 const SECTIONS = {
   flat() {
-    this.flat(this.rand(4, 8));
+    this.flat(this.rand(4, 8), this.biome === "snow" && this.rng() < 0.4);
   },
 
   // The ground steps up or down.
@@ -379,6 +412,40 @@ const SECTIONS = {
       });
       this.flat(16); // room to stop safely between two maces
     }
+  },
+
+  // ---- Snow only ----
+
+  // A slippery stretch of ice. Later on there may be spikes in the middle of it.
+  ice(d) {
+    this.flat(2);
+    this.flat(this.rand(5, 9), true);
+    if (d > 0.3 && this.rng() < 0.6) {
+      for (let i = this.rand(1, 2); i > 0; i--) this.column(this.groundRow, true)[this.groundRow - 1] = T_SPIKE;
+      this.flat(this.rand(7, 9), true); // room to land and slide
+    }
+    this.flat(2);
+  },
+
+  // A snowy rock ledge overhead with icicles under it. Get close and they shake, then drop.
+  icicles() {
+    this.flat(4);
+    const ledgeRow = this.groundRow - 5; // its underside is 4 tiles up: you can walk under the icicles
+    const width = this.rand(4, 7);
+    for (let i = 0; i < width; i++) {
+      this.column(this.groundRow)[ledgeRow] = T_GROUND;
+      if (i % 2 === 1 || (i === 0 && this.rng() < 0.5)) {
+        this.icicles.push({ id: this.nextId++, x: (this.col - 1) * TILE + 1, y: (ledgeRow + 1) * TILE, len: this.rand(10, 13) });
+      }
+    }
+    this.flat(5);
+  },
+
+  // A long open stretch. When you get close, a snowball comes rolling at you from the far end, growing as it rolls.
+  snowball() {
+    this.flat(this.rand(16, 22));
+    this.snowballSpots.push({ id: this.nextId++, x: (this.col - 2) * TILE });
+    this.flat(2);
   },
 
   // A floating orb that swaps the two players' positions. You have to jump

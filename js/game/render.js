@@ -49,9 +49,18 @@ const Renderer = (() => {
   // ---- One player's half of the screen ----
 
   function drawView(world, player, other, camX) {
-    drawBackground(camX);
+    const snow = snowAmount(world.level, camX);
+    if (snow < 1) drawBackground(camX);
+    if (snow > 0) {
+      b.globalAlpha = snow; // fades in and out at the edge of the snow biome
+      drawSnowBackground(camX);
+      b.globalAlpha = 1;
+    }
     for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
     drawTiles(world.level, camX);
+    drawSigns(world.level, camX);
+    drawIcicles(world.level, player, camX, world.time);
+    drawSnowballs(player, camX);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
@@ -74,7 +83,137 @@ const Renderer = (() => {
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
     drawParticles(player, camX);
+    if (snow > 0) drawSnowfall(camX, world.time, snow);
     drawFire(world.fire, player, camX, world.time);
+  }
+
+  // ---- Snow biome ----
+
+  // How much of this view is in the snow (0 to 1), looking a little either side
+  // of the middle of the screen, so the scenery fades smoothly at a border.
+  function snowAmount(level, camX) {
+    const mid = Math.floor((camX + VIEW_W / 2) / TILE);
+    let n = 0;
+    for (let k = -5; k <= 5; k++) if (level.biomeAt(mid + k * 5) === "snow") n++;
+    return n / 11;
+  }
+
+  function drawSnowBackground(camX) {
+    b.fillStyle = "#dfe7ef";
+    b.fillRect(0, 0, VIEW_W, VIEW_H);
+    b.fillStyle = "#cbd7e4";
+    b.fillRect(0, 0, VIEW_W, 70);
+    b.fillStyle = "#b4c3d6";
+    b.fillRect(0, 0, VIEW_W, 30);
+
+    // Far mountains with snowy tops (move slowly)
+    const far = camX * 0.2;
+    for (let x = 0; x < VIEW_W; x++) {
+      const wx = x + far;
+      const tri = 1 - Math.abs((((wx + 40) % 110) + 110) % 110 / 55 - 1);
+      const tri2 = 1 - Math.abs((((wx + 95) % 70) + 70) % 70 / 35 - 1);
+      const h = Math.round(78 - Math.max(30 * tri, 20 * tri2));
+      b.fillStyle = "#a8b9d2";
+      b.fillRect(x, h, 1, VIEW_H - h);
+      const cap = Math.round(Math.max(0, 64 - h) * 0.7);
+      if (cap > 0) {
+        b.fillStyle = "#f4f8fc";
+        b.fillRect(x, h, 1, cap);
+      }
+    }
+
+    // Near snowy hills with pine trees
+    const near = camX * 0.45;
+    b.fillStyle = "#e9f1f8";
+    for (let x = 0; x < VIEW_W; x += 2) {
+      const wx = x + near;
+      const h = 84 - 7 * (Math.sin(wx * 0.03) * 0.6 + Math.sin(wx * 0.069 + 1) * 0.4);
+      b.fillRect(x, Math.round(h), 2, VIEW_H);
+    }
+    const first = Math.floor(near / 32) - 1;
+    for (let k = first; k < first + VIEW_W / 32 + 3; k++) {
+      if (hash(k, 41) < 0.35) continue;
+      const tree = sprites.pines[Math.floor(hash(k, 42) * sprites.pines.length)];
+      const wx = k * 32 + Math.floor(hash(k, 43) * 20);
+      const hill = 84 - 7 * (Math.sin(wx * 0.03) * 0.6 + Math.sin(wx * 0.069 + 1) * 0.4);
+      b.drawImage(tree, Math.round(wx - near), Math.round(hill - tree.height + 3));
+    }
+  }
+
+  // Snowflakes drifting down and sideways, in front of everything
+  function drawSnowfall(camX, time, amount) {
+    b.fillStyle = "#ffffff";
+    for (let k = 0; k < 60; k++) {
+      const speed = 10 + hash(k, 11) * 14;
+      const y = (hash(k, 12) * VIEW_H + time * speed) % VIEW_H;
+      const x = ((hash(k, 13) * VIEW_W * 1.5 - camX * (0.6 + hash(k, 14) * 0.5) + Math.sin(time * 1.5 + k) * 6) % VIEW_W + VIEW_W) % VIEW_W;
+      b.globalAlpha = amount * (0.55 + hash(k, 15) * 0.45);
+      b.fillRect(Math.round(x), Math.round(y), hash(k, 16) < 0.25 ? 2 : 1, 1);
+    }
+    b.globalAlpha = 1;
+  }
+
+  function drawSigns(level, camX) {
+    for (const s of level.signs) {
+      const sx = Math.round(s.x - camX);
+      if (sx < -24 || sx > VIEW_W) continue;
+      const ground = level.groundTop(s.x + 10);
+      if (ground !== null) b.drawImage(sprites.signs[s.biome], sx, ground - 22);
+    }
+  }
+
+  // Icicles under snowy ledges: still, shaking, falling, or shattered (each player sees their own)
+  function drawIcicles(level, player, camX, time) {
+    for (const ic of level.icicles) {
+      const sx = Math.round(ic.x - camX);
+      if (sx < -8 || sx > VIEW_W) continue;
+      const s = player.icicleState.get(ic.id);
+      if (s && s.gone) {
+        if (s.goneT > 0.35) continue;
+        // little shards bursting out where it hit the ground
+        const ground = level.groundTop(ic.x + 3) ?? VIEW_H;
+        b.fillStyle = "#bfefff";
+        for (let k = 0; k < 6; k++) {
+          const dir = k < 3 ? -1 : 1;
+          const t = s.goneT;
+          b.fillRect(sx + 3 + dir * Math.round((4 + k * 3) * t * 4), Math.round(ground - 2 - (8 + k * 4) * t * 4 + 60 * t * t * 4), 1, 1);
+        }
+        continue;
+      }
+      let x = sx, y = ic.y;
+      if (s) {
+        if (s.t < SNOW.icicleShake) x += Math.floor(time * 40) % 2 ? 1 : -1; // shaking
+        y += Math.round(s.dy);
+      }
+      b.drawImage(sprites.icicles[ic.len], x, y);
+    }
+  }
+
+  function drawSnowballs(player, camX) {
+    for (const ball of player.snowballs) {
+      const sx = ball.x - camX;
+      if (sx < -12 || sx > VIEW_W + 12) continue;
+      if (ball.broke) {
+        // a puff of snow
+        b.fillStyle = "#ffffff";
+        const t = ball.brokeT;
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          const d = ball.r + t * 30;
+          b.globalAlpha = Math.max(0, 1 - t / 0.35);
+          b.fillRect(Math.round(sx + Math.cos(a) * d), Math.round(ball.y + Math.sin(a) * d * 0.7), 2, 2);
+        }
+        b.globalAlpha = 1;
+        continue;
+      }
+      const r = clamp(Math.round(ball.r), 2, 9);
+      b.drawImage(sprites.snowballs[r - 2], Math.round(sx - r), Math.round(ball.y - r));
+      // a couple of specks turning as it rolls
+      b.fillStyle = "#9fb7cf";
+      for (const off of [0, Math.PI]) {
+        b.fillRect(Math.round(sx + Math.cos(ball.spin + off) * r * 0.55), Math.round(ball.y + Math.sin(ball.spin + off) * r * 0.55), 1, 1);
+      }
+    }
   }
 
   function drawBackground(camX) {
@@ -114,19 +253,38 @@ const Renderer = (() => {
       for (let r = 0; r < ROWS; r++) {
         const t = level.tile(c, r);
         const sy = r * TILE;
+        const snowy = level.biomeAt(c) === "snow";
         if (t === T_SPIKE) {
-          b.drawImage(sprites.spike, sx, sy);
+          b.drawImage(snowy ? sprites.iceSpikes[Math.floor(hash(c, 77) * sprites.iceSpikes.length)] : sprites.spike, sx, sy);
         } else if (t === T_GROUND) {
           const variant = Math.floor(hash(c, r) * 4);
           const above = level.tile(c, r - 1);
           if (above === T_GROUND) {
-            b.drawImage(sprites.dirt[variant], sx, sy);
+            b.drawImage((snowy ? sprites.snowDirt : sprites.dirt)[variant], sx, sy);
+          } else if (snowy) {
+            const surface = level.groundTop(c * TILE) === sy; // ledges in the sky are never ice
+            b.drawImage(surface && level.isIce(c) ? sprites.ice[variant] : sprites.snowTop[variant], sx, sy);
+            if (above === T_EMPTY && !level.isIce(c)) drawSnowDecoration(c, sx, sy);
           } else {
             b.drawImage(sprites.grass[variant], sx, sy);
             if (above === T_EMPTY) drawDecoration(c, sx, sy);
           }
         }
       }
+    }
+  }
+
+  // Little snow lumps and pebbles in the snow
+  function drawSnowDecoration(c, sx, sy) {
+    const n = hash(c, 99);
+    if (n < 0.2) {
+      const fx = sx + Math.floor(hash(c, 5) * 5);
+      b.fillStyle = "#ffffff";
+      b.fillRect(fx, sy - 1, 3, 1);
+      b.fillRect(fx + 1, sy - 2, 1, 1);
+    } else if (n < 0.28) {
+      b.fillStyle = "#6e5f6b";
+      b.fillRect(sx + Math.floor(hash(c, 3) * 6), sy - 1, 2, 1);
     }
   }
 
@@ -905,6 +1063,14 @@ const Renderer = (() => {
       if (p.flash > 0) {
         ctx.fillStyle = `rgba(220, 245, 255, ${Math.min(1, p.flash) * 0.45})`;
         ctx.fillRect(0, top, W, viewH);
+      }
+
+      // Entering a new biome: its name, fading out
+      if (p.biomeBanner > 0) {
+        ctx.globalAlpha = Math.min(1, p.biomeBanner * 2);
+        const name = { snow: "SNOW", prairie: "PRAIRIE" }[p.biome] || p.biome.toUpperCase();
+        text(ctx, name, W / 2, top + 64, p.biome === "snow" ? "#e8f6ff" : "#8be070", 18, "center");
+        ctx.globalAlpha = 1;
       }
 
       const mid = top + viewH / 2;
