@@ -498,6 +498,59 @@ function makeTumbleweed() {
   return c;
 }
 
+// ---- Vultures (desert) ----
+// Facing right. Letters: o outline, b body, d dark feathers, w wing tips, r head, y beak, n neck ruff
+const VULTURE_FRAMES = {
+  glide: [
+    "....................",
+    "oooo............oooo",
+    "ddddoo........oodddd",
+    ".dddbbooo..ooobbddd.",
+    "..ddbbbbbonnbbbbdd..",
+    "...wdbbbbbnnrrro....",
+    ".....wwbbbbbbryy....",
+    ".......ooobbbo.y....",
+    "..........o.o.......",
+  ],
+  up: [
+    "..oo............oo..",
+    ".oddo..........oddo.",
+    "..oddo........oddo..",
+    "...oddoo....oodd....",
+    "....odbbo..obbdo....",
+    "....wdbbbonnbbo.....",
+    ".....wwbbbnnrrro....",
+    ".......obbbbbryy....",
+    "........ooobbo.y....",
+  ],
+  down: [
+    "....................",
+    "....................",
+    "......oooonnoo......",
+    "....obbbbbnnrrro....",
+    "..odbbbbbbbbbryy....",
+    ".oddbbbbbbbbbo.y....",
+    "oddddoobbbbbdoo.....",
+    "oddo....ooooddddo...",
+    ".oo..........oddddo.",
+  ],
+  dive: [
+    "..........oo........",
+    "........oodbo.......",
+    "......oodbbbo.......",
+    "....oodbbbbbo.......",
+    "...odbbbbbnnro......",
+    "..owbbbbbbnnrro.....",
+    ".owwbbbbbbbbryyo....",
+    "..oooooooobbbo.y....",
+    "............oo......",
+  ],
+};
+const VULTURE_PALETTES = {
+  brown: { o: "#1d120c", b: "#6b4a32", d: "#4a3020", w: "#a88a6a", r: "#e88a8a", y: "#f2e6c8", n: "#f4efe6" },
+  black: { o: "#120c0c", b: "#2e2a30", d: "#1b181d", w: "#6b6670", r: "#c8424a", y: "#f2e6c8", n: "#4a4450" },
+};
+
 // ---- The bear (snow biome) ----
 // Built on a grid of color letters, then outlined. Facing right.
 // Frames 0-2: galloping. Frame 3: rearing up to swipe.
@@ -614,6 +667,8 @@ function buildSprites() {
     quicksand: [0, 1, 2, 3].map((f) => [0, 1, 2, 3].map((v) => makeQuicksand(f, v))),
     cactus: Object.fromEntries(DESERT.cactusHeights.map((h) => [h, [0, 1, 2].map((a) => makeCactus(h, a))])),
     tumbleweed: makeTumbleweed(),
+    vultures: Object.fromEntries(Object.entries(VULTURE_PALETTES).map(([kind, pal]) =>
+      [kind, Object.fromEntries(Object.entries(VULTURE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, pal)]))])),
     bears: Object.fromEntries(Object.entries(BEAR_PALETTES).map(([kind, pal]) => [kind, [0, 1, 2, 3].map((f) => makeBear(pal, f))])),
   };
 }

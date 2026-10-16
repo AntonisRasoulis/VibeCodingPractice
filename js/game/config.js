@@ -116,6 +116,18 @@ const DESERT = {
   tumbleAhead: 240,   // a tumbleweed starts rolling when you're this far from where it starts
 };
 
+// The desert's special danger: vultures come for the player in the lead, in groups of 1-3,
+// about as often as the prairie's missiles. They skim the ground at your feet: jump over them.
+const VULTURE = {
+  every: [160, 240],   // random meters run (by the leader) between groups
+  groupSizes: { 1: 3, 2: 2, 3: 1 }, // how likely each group size is
+  stagger: 0.8,        // seconds between the vultures in a group
+  brown: { circle: 2, dive: 0.6, skim: 140 }, // circles above you first; grabs you and carries you back
+  black: { dive: 0.45, skim: 230 },           // faster, straight in for the kill
+  carryTime: 0.8,      // how long a brown vulture carries you backwards
+  carrySpeed: 140,     // ...and how fast (about 14 tiles back in all)
+};
+
 // The snow biome's special danger: once per snow biome a bear comes charging in from
 // the left after the player in the lead. Keep running right and you stay just ahead.
 const BEAR = {

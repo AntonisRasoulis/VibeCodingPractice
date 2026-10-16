@@ -46,6 +46,8 @@ const Game = (() => {
       hands: [], // mystic hands flying, grabbing or swatting
       missiles: [], // missiles zooming in, locking on, flying or exploding
       bears: [],    // bears chasing a player (snow only)
+      vultures: [], // vultures circling, diving and skimming the ground (desert only)
+      nextVulture: null, // the leader's distance (meters) when the next group comes
       nextMissile: null, // the leader's distance (meters) when the next missile comes (set once someone passes 300m)
       winner: null,
     };
@@ -112,6 +114,7 @@ const Game = (() => {
     updateHands(dt);
     updateMissiles(dt);
     updateBears(dt);
+    updateVultures(dt);
     checkOrbs();
     levelSounds();
     checkFire();
@@ -369,11 +372,11 @@ const Game = (() => {
 
   function spawnMissile() {
     const { players } = world;
-    // Missiles only come for a player who is in the prairie
-    const alive = players.filter((p) => !p.dead && !p.caught &&
-      world.level.biomeAt(Math.floor((p.x + HITBOX_W / 2) / TILE)) === "prairie");
+    // Missiles only come for the player in the lead, and only in the prairie
+    const alive = players.filter((p) => !p.dead && !p.caught);
     if (!alive.length) return;
-    const near = alive[Math.floor(Math.random() * alive.length)];
+    const near = alive.reduce((a, b) => (b.x > a.x ? b : a));
+    if (world.level.biomeAt(Math.floor((near.x + HITBOX_W / 2) / TILE)) !== "prairie") return;
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
     const striped = leaderMeters > MISSILE.stripedAt && Math.random() < 0.5;
     const side = Math.random() < 0.5 ? -1 : 1; // comes in on the left or the right of the player
@@ -623,6 +626,128 @@ const Game = (() => {
       }
     }
     world.bears = world.bears.filter((b) => !b.done);
+  }
+
+  // ---- Vultures (desert) ----
+
+  function spawnVultures(leader) {
+    const n = Number(pickWeighted(VULTURE.groupSizes));
+    for (let i = 0; i < n; i++) {
+      const kind = Math.random() < 0.5 ? "brown" : "black";
+      world.vultures.push({ kind, target: leader, state: "wait", t: -i * VULTURE.stagger, x: leader.x + 270, y: -12, angle: Math.random() * 6.28, facing: -1 });
+    }
+  }
+
+  function pickWeighted(weights) {
+    const total = Object.values(weights).reduce((a, b) => a + b, 0);
+    let roll = Math.random() * total;
+    for (const [key, w] of Object.entries(weights)) if ((roll -= w) < 0) return key;
+    return Object.keys(weights)[0];
+  }
+
+  // The height a skimming vulture flies at: just above the ground, at your feet
+  function skimY(x, fallback) {
+    const g = world.level.groundTop(x);
+    return g === null ? fallback : g - 5;
+  }
+
+  function updateVultures(dt) {
+    const { players, level } = world;
+    const runners = players.filter((p) => !p.dead && !p.caught);
+    if (runners.length) {
+      const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
+      const meters = leader.x / TILE;
+      if (level.biomeAt(Math.floor(meters)) === "desert") {
+        if (world.nextVulture === null) world.nextVulture = meters + rand(20, VULTURE.every[1]);
+        if (meters >= world.nextVulture) {
+          spawnVultures(leader);
+          world.nextVulture = meters + rand(VULTURE.every[0], VULTURE.every[1]);
+        }
+      }
+    }
+
+    for (const v of world.vultures) {
+      v.t += dt;
+      const p = v.target;
+      const kind = VULTURE[v.kind];
+      const lost = p.dead || p.caught;
+      if (v.state === "wait") {
+        if (v.t < 0) continue;
+        v.t = 0;
+        if (v.kind === "brown") { v.state = "circle"; Sound.play("vultureCry"); }
+        else { v.state = "diving"; v.sx = p.x + 260; v.sy = 8; v.facing = -1; Sound.play("vultureScreech"); }
+      }
+      if (lost && v.state !== "leave" && v.state !== "carry") { v.state = "leave"; v.t = 0; }
+
+      if (v.state === "circle") {
+        // Glides in from the top right, then circles above the leader
+        v.angle += dt * 3;
+        const cx = p.x + 50 + Math.cos(v.angle) * 34;
+        const cy = 24 + Math.sin(v.angle) * 9;
+        const ease = Math.min(1, v.t / 0.6);
+        const px = v.x;
+        v.x += (cx - v.x) * Math.min(1, dt * (2 + ease * 8));
+        v.y += (cy - v.y) * Math.min(1, dt * (2 + ease * 8));
+        v.facing = v.x >= px ? 1 : -1;
+        if (v.t >= kind.circle) { v.state = "diving"; v.t = 0; v.sx = v.x; v.sy = v.y; Sound.play("vultureScreech"); }
+      }
+      if (v.state === "diving") {
+        // Swoops down to the ground just in front of the leader (aiming for where they'll be)
+        if (v.t < dt * 1.5) { v.ex = p.x + PHYSICS.runSpeed * kind.dive + 50; v.ey = skimY(v.ex, p.y + HITBOX_H - 5); }
+        const u = Math.min(1, v.t / kind.dive);
+        v.x = v.sx + (v.ex - v.sx) * u;
+        v.y = v.sy + (v.ey - v.sy) * u * u;
+        v.facing = -1;
+        if (u >= 1) { v.state = "skim"; v.t = 0; }
+      }
+      if (v.state === "skim") {
+        v.x -= kind.skim * dt;
+        v.y = skimY(v.x, v.y);
+        if (v.x < p.x - VIEW_W * 0.6) { v.state = "leave"; v.t = 0; }
+      }
+      if ((v.state === "diving" || v.state === "skim") && !p.held && !lost &&
+          overlaps(p.x, p.y, HITBOX_W, HITBOX_H, v.x - 6, v.y - 3, 12, 6)) {
+        if (v.kind === "black") {
+          p.showHit("PECKED!", "#ff4d3d");
+          Sound.play("vultureScreech");
+          p.die();
+          v.state = "leave";
+        } else {
+          p.showHit("SNATCHED!", "#e88a8a");
+          Sound.play("vultureCry");
+          p.held = true;
+          p.inQuick = false;
+          p.vx = p.vy = 0;
+          v.state = "carry";
+        }
+        v.t = 0;
+      }
+      if (v.state === "carry") {
+        // Carries the player up and back, then drops them
+        v.x -= VULTURE.carrySpeed * dt;
+        const g = level.groundTop(v.x);
+        v.y += ((g === null ? v.y : g - 34) - v.y) * Math.min(1, dt * 4);
+        v.facing = -1;
+        p.x = v.x - HITBOX_W / 2;
+        p.y = v.y + 3;
+        if (v.t >= VULTURE.carryTime && level.groundTop(v.x) !== null) {
+          p.held = false;
+          p.vx = 0;
+          p.vy = 0;
+          p.onGround = false;
+          p.stun = 0.3;
+          v.state = "leave";
+          v.t = 0;
+        }
+      }
+      if (v.state === "leave") {
+        v.x -= 120 * dt;
+        v.y -= 90 * dt;
+        v.facing = -1;
+        if (v.y < -30) v.done = true;
+      }
+    }
+    world.vultures = world.vultures.filter((v) => !v.done);
   }
 
   function checkFire() {

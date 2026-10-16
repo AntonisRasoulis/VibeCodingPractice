@@ -188,6 +188,10 @@ const Sound = (() => {
     tumble: () => noise({ filter: "bandpass", f: 2500, to: 1500, q: 2, dur: 0.5, vol: 0.18, attack: 0.1 }),
     tumbleBreak: () => { noise({ filter: "highpass", f: 2000, dur: 0.2, vol: 0.35 }); noise({ f: 600, dur: 0.15, vol: 0.2 }); },
 
+    // Vultures
+    vultureCry: () => { tone({ f: 900, to: 600, dur: 0.35, type: "sawtooth", vol: 0.08, vibrato: 40 }); noise({ filter: "bandpass", f: 2000, q: 3, dur: 0.3, vol: 0.12 }); },
+    vultureScreech: () => { tone({ f: 1400, to: 700, dur: 0.45, type: "sawtooth", vol: 0.12, vibrato: 60 }); noise({ filter: "highpass", f: 3000, dur: 0.4, vol: 0.15 }); },
+
     // Bears
     roar: () => {
       tone({ f: 110, to: 70, dur: 1.1, type: "sawtooth", vol: 0.22, attack: 0.08, vibrato: 18 });

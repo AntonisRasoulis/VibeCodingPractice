@@ -67,6 +67,7 @@ const Renderer = (() => {
     drawSnowballs(player, camX);
     drawTumbleweeds(player, camX);
     for (const bear of world.bears) drawBear(bear, camX, world.time);
+    for (const v of world.vultures) drawVultureShadow(v, world.level, camX);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
@@ -90,6 +91,7 @@ const Renderer = (() => {
     for (const m of world.missiles) if (m.state !== "approach") drawMissile(m, world, camX);
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
+    for (const v of world.vultures) drawVulture(v, camX, world.time);
     drawParticles(player, camX);
     if (snow > 0) drawSnowfall(camX, world.time, snow);
     drawFire(world.fire, player, camX, world.time);
@@ -262,6 +264,37 @@ const Renderer = (() => {
         for (let i = 0; i < 8 * t; i++) b.fillRect(nose - 4 + i, y + 2 + k * 3 + Math.round(i * 0.6), 1, 1);
       }
     }
+  }
+
+  // A vulture: flapping while it circles or carries you, wings tucked as it dives, spread as it skims
+  function drawVulture(v, camX, time) {
+    if (v.state === "wait") return;
+    const x = Math.round(v.x - camX);
+    if (x < -24 || x > VIEW_W + 24) return;
+    const frames = sprites.vultures[v.kind];
+    const flap = ["up", "glide", "down", "glide"][Math.floor(time * 10) % 4];
+    const img = v.state === "diving" ? frames.dive : v.state === "skim" ? frames.glide : v.state === "circle" ? (Math.floor(time * 3) % 3 ? frames.glide : frames[flap]) : frames[flap];
+    const y = Math.round(v.y) - 5;
+    if (v.facing < 0) {
+      b.save();
+      b.translate(x + 10, y);
+      b.scale(-1, 1);
+      b.drawImage(img, 0, 0);
+      b.restore();
+    } else {
+      b.drawImage(img, x - 10, y);
+    }
+  }
+
+  // Its shadow on the ground while it dives and skims, to help you time your jump
+  function drawVultureShadow(v, level, camX) {
+    if (v.state !== "diving" && v.state !== "skim") return;
+    const g = level.groundTop(v.x);
+    if (g === null) return;
+    const x = Math.round(v.x - camX);
+    const size = Math.max(2, 8 - Math.round((g - v.y) / 10));
+    b.fillStyle = "rgba(60, 30, 10, 0.35)";
+    b.fillRect(x - size, g - 1, size * 2, 1);
   }
 
   // Honey dripping off a player who got caught by a black bear
