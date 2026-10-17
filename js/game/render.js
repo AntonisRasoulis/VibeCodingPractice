@@ -1283,19 +1283,21 @@ const Renderer = (() => {
       else if (world.swapFlash > 0) text(ctx, "SWAP!", W / 2, mid, "#ffd23f", 24, "center");
     });
 
+    // The whole canvas: one view in 1-player mode, two views (and the divider) otherwise
+    const fullH = (world.players.length === 1 ? VIEW_H : VIEW_H * 2 + DIVIDER) * SCALE;
     if (world.swapFlash > 0) {
       ctx.fillStyle = `rgba(255, 255, 255, ${world.swapFlash * 0.5})`;
-      ctx.fillRect(0, 0, W, (VIEW_H * 2 + DIVIDER) * SCALE);
+      ctx.fillRect(0, 0, W, fullH);
     }
 
-    const center = (VIEW_H + DIVIDER / 2) * SCALE;
+    const center = fullH / 2;
     if (world.state === "countdown") {
       text(ctx, String(Math.ceil(world.countdown)), W / 2, center, "#ffffff", 40, "center");
     } else if (world.state === "playing" && world.time < 0.6) {
       text(ctx, "GO!", W / 2, center, "#ffffff", 40, "center");
     } else if (world.state === "paused") {
       ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      ctx.fillRect(0, 0, W, (VIEW_H * 2 + DIVIDER) * SCALE);
+      ctx.fillRect(0, 0, W, fullH);
       text(ctx, "PAUSED", W / 2, center, "#ffffff", 28, "center");
     }
   }
