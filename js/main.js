@@ -1,6 +1,7 @@
 // Website glue: connects the page (buttons, win counters) to the game.
 
 const startButton = document.getElementById("start-button");
+const soloButton = document.getElementById("solo-button");
 const pauseButton = document.getElementById("pause-button");
 const overlay = document.getElementById("game-overlay");
 const message = document.getElementById("game-message");
@@ -11,11 +12,28 @@ const scoreLine = document.getElementById("score-line");
 const soundButton = document.getElementById("sound-button");
 const wins = { RED: 0, BLUE: 0 };
 let gameLoaded = false;
+let lastMode = 2;
+let best = 0; // best distance in 1-player mode (remembered by the browser)
+try { best = Number(localStorage.getItem("fire-run-best")) || 0; } catch (e) { /* storage blocked */ }
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
 const gameCallbacks = {
   onGameOver(winner) {
+    if (winner && winner.solo) {
+      // 1 player: how far did you get?
+      const record = winner.meters > best;
+      if (record) {
+        best = winner.meters;
+        try { localStorage.setItem("fire-run-best", String(best)); } catch (e) { /* storage blocked */ }
+      }
+      message.textContent = record ? `New record: ${winner.meters} m!` : `You reached ${winner.meters} m`;
+      message.className = "game-message red";
+      scoreLine.textContent = `Best: ${best} m`;
+      scoreLine.hidden = false;
+      showOverlay();
+      return;
+    }
     if (winner) {
       wins[winner]++;
       document.getElementById(winner === "RED" ? "red-wins" : "blue-wins").textContent = wins[winner];
@@ -28,10 +46,7 @@ const gameCallbacks = {
     // The win counters are hidden in fullscreen, so show the score on the game-over screen too
     scoreLine.innerHTML = `<span class="red">Red ${wins.RED}</span> &middot; <span class="blue">Blue ${wins.BLUE}</span>`;
     scoreLine.hidden = false;
-    startButton.textContent = "Play again";
-    overlay.classList.remove("hidden");
-    pauseButton.disabled = true;
-    startButton.focus();
+    showOverlay();
   },
   onPauseChange(paused) {
     pauseButton.textContent = paused ? "Resume" : "Pause";
@@ -44,6 +59,7 @@ try {
   Game.init(canvas, gameCallbacks);
   gameLoaded = true;
   startButton.disabled = false;
+  soloButton.disabled = false;
 } catch (error) {
   const box = document.getElementById("game-error");
   box.textContent = "The game couldn't load. Make sure the whole folder was downloaded and unzipped, " +
@@ -51,16 +67,27 @@ try {
   box.hidden = false;
 }
 
-function startGame() {
+function showOverlay() {
+  startButton.textContent = lastMode === 2 ? "Play again" : "2 Players";
+  soloButton.textContent = lastMode === 1 ? "Play again (1 Player)" : "1 Player";
+  overlay.classList.remove("hidden");
+  pauseButton.disabled = true;
+  (lastMode === 1 ? soloButton : startButton).focus();
+}
+
+function startGame(players) {
+  lastMode = players;
   overlay.classList.add("hidden");
   pauseButton.disabled = false;
   pauseButton.textContent = "Pause";
   startButton.blur();
+  soloButton.blur();
   canvas.scrollIntoView({ behavior: "smooth", block: "center" });
-  Game.start();
+  Game.start(players);
 }
 
-startButton.addEventListener("click", startGame);
+startButton.addEventListener("click", () => startGame(2));
+soloButton.addEventListener("click", () => startGame(1));
 pauseButton.addEventListener("click", () => {
   Game.togglePause();
   pauseButton.blur(); // so the space bar / Enter don't press it again

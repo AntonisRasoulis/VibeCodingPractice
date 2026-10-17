@@ -24,18 +24,19 @@ const Game = (() => {
   const fireQueued = [false, false];
   let nextBoltId = 1;
   let racesStarted = 0; // the first race after opening the website always starts in the prairie
+  let solo = false;     // 1-player mode: one runner, one big view, WASD or the arrow keys
 
   function newWorld(startBiome = "prairie") {
-    const level = new Level(Math.floor(Math.random() * 1e9), startBiome);
+    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo });
     level.ensure(VIEW_W * 2);
     const startX = 4 * TILE;
     const startY = level.groundRow * TILE - HITBOX_H;
     world = {
       level,
-      players: [
-        new Player("RED", PALETTES.red, startX, startY),
-        new Player("BLUE", PALETTES.blue, startX, startY),
-      ],
+      players: solo
+        ? [new Player("RED", PALETTES.red, startX, startY)]
+        : [new Player("RED", PALETTES.red, startX, startY), new Player("BLUE", PALETTES.blue, startX, startY)],
+      solo,
       fire: { x: -FIRE.startOffset, speed: FIRE.startSpeed },
       state: "menu", // menu, countdown, playing, paused, ending, over
       countdown: 3,
@@ -59,16 +60,19 @@ const Game = (() => {
   }
 
   function readInput(i) {
-    const c = CONTROLS[i];
-    const input = {
-      left: keys.has(c.left),
-      right: keys.has(c.right),
-      jump: keys.has(c.jump),
-      jumpPressed: jumpQueued[i],
-      firePressed: fireQueued[i],
-    };
-    jumpQueued[i] = false;
-    fireQueued[i] = false;
+    // In 1-player mode both sets of keys (WASD and the arrows) work
+    const sets = solo ? [0, 1] : [i];
+    const input = { left: false, right: false, jump: false, jumpPressed: false, firePressed: false };
+    for (const k of sets) {
+      const c = CONTROLS[k];
+      input.left ||= keys.has(c.left);
+      input.right ||= keys.has(c.right);
+      input.jump ||= keys.has(c.jump);
+      input.jumpPressed ||= jumpQueued[k];
+      input.firePressed ||= fireQueued[k];
+      jumpQueued[k] = false;
+      fireQueued[k] = false;
+    }
     return input;
   }
 
@@ -94,7 +98,7 @@ const Game = (() => {
     fire.speed = FIRE.startSpeed + FIRE.speedGain * world.time;
     fire.x += fire.speed * dt;
 
-    level.ensure(Math.max(players[0].x, players[1].x) + VIEW_W * 2);
+    level.ensure(Math.max(...players.map((p) => p.x)) + VIEW_W * 2);
     level.update(world.time);
 
     if (world.state === "ending") {
@@ -107,7 +111,7 @@ const Game = (() => {
       return;
     }
 
-    const inputs = [readInput(0), readInput(1)];
+    const inputs = players.map((p, i) => readInput(i));
     players.forEach((p, i) => p.update(dt, inputs[i], level));
     players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
     updateBolts(dt);
@@ -760,8 +764,13 @@ const Game = (() => {
     if (caught.length === 0) return;
 
     for (const p of caught) p.burnUp();
-    world.winner = caught.length === 2 ? null : world.players.find((p) => !p.caught).name;
-    Sound.play(world.winner ? "win" : "draw");
+    if (world.solo) {
+      world.winner = { solo: true, meters: Math.floor(world.players[0].trackX / TILE) };
+      Sound.play("draw");
+    } else {
+      world.winner = caught.length === 2 ? null : world.players.find((p) => !p.caught).name;
+      Sound.play(world.winner ? "win" : "draw");
+    }
     world.state = "ending";
     world.endTimer = 1.5;
   }
@@ -829,7 +838,11 @@ const Game = (() => {
       requestAnimationFrame(frame);
     },
 
-    start() {
+    // mode: 1 or 2 players
+    start(players = 2) {
+      solo = players === 1;
+      canvas.height = (solo ? VIEW_H : VIEW_H * 2 + DIVIDER) * SCALE;
+      canvas.style.aspectRatio = `auto ${canvas.width} / ${canvas.height}`;
       Sound.unlock(); // the Start click lets the browser play sound
       newWorld(racesStarted++ === 0 ? "prairie" : BIOMES[Math.floor(Math.random() * BIOMES.length)]);
       world.state = "countdown";

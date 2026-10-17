@@ -40,8 +40,11 @@
             <p class="game-warning">The game can't run here because JavaScript is turned off. Open <code>index.html</code> in a web browser such as Chrome, Edge, Safari or Firefox.</p>
           </noscript>
           <p id="game-error" class="game-warning" hidden></p>
-          <!-- Stays disabled until the game has loaded (see js/main.js) -->
-          <button id="start-button" class="button" disabled>Start</button>
+          <!-- Stay disabled until the game has loaded (see js/main.js) -->
+          <div class="start-buttons">
+            <button id="start-button" class="button" disabled>2 Players</button>
+            <button id="solo-button" class="button secondary" disabled>1 Player</button>
+          </div>
         </div>
       </div>
       <div class="game-hud">
@@ -90,6 +93,7 @@
         <li><strong>Lightning orbs</strong> — golden orbs with a white zigzag. Grab one to store a lightning shot, then press <kbd>S</kbd> (Red) or <kbd>↓</kbd> (Blue) to fire it along the ground. It flies the way you're facing when you shoot, so turn around (press left) to shoot back at a player behind you. It travels to the other player wherever they are. Jump over it, or get zapped back.</li>
         <li><strong>Hand orbs</strong> — golden orbs with a purple hand. Grab one, then press <kbd>S</kbd> (Red) or <kbd>↓</kbd> (Blue) to throw a mystic hand a short way in the direction you're facing. Facing right, it grabs the other player and suplexes them backwards. Facing left, it backhands them further back. It flies in a straight line, so jump over it or duck under it. You hold one power at a time: a new wind dash, lightning or hand orb replaces the old one.</li>
       </ul>
+      <p><strong>1 Player:</strong> race the fire on your own, with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or the arrow keys, and see how far you get. Only the dash and wind dash orbs appear (the others only matter against another player).</p>
       <p>Press <kbd>P</kbd> or <kbd>Esc</kbd> to pause. Press <kbd>F</kbd> or the Fullscreen button to make the game fill the screen. Press <kbd>M</kbd> or the Sound button to turn the sound off or on.</p>
     </section>
 

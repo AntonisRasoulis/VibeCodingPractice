@@ -36,8 +36,9 @@ function clamp(value, min, max) {
 }
 
 class Level {
-  constructor(seed, startBiome = "prairie") {
+  constructor(seed, startBiome = "prairie", options = {}) {
     this.rng = makeRng(seed);
+    this.solo = options.solo === true; // 1 player: only orbs that help you on your own
     this.biome = startBiome;  // the biome new columns are built in
     this.colBiome = [];       // colBiome[x] = which biome each column is in
     this.ice = [];            // ice[x] = true where the ground's surface is slippery ice
@@ -510,7 +511,9 @@ const SECTIONS = {
     this.flat(4);
     // Some orbs are freeze orbs in disguise: only the arrows in the middle are flipped
     const roll = this.rng();
-    const kind = roll < WIND.chance ? "wind"
+    // On your own, swap / freeze / lightning / hand orbs would do nothing (or nothing good): only dashes
+    const kind = this.solo ? (roll < WIND.chance / (WIND.chance + DASH.chance) ? "wind" : "dash")
+      : roll < WIND.chance ? "wind"
       : roll < WIND.chance + DASH.chance ? "dash"
       : roll < WIND.chance + DASH.chance + ZAP.chance ? "zap"
       : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance ? "hand"

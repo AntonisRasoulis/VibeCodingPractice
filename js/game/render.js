@@ -24,7 +24,7 @@ const Renderer = (() => {
   }
 
   function render(ctx, world, dt) {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < world.players.length; i++) {
       const p = world.players[i];
       const target = p.x - VIEW_W * 0.35;
       cams[i] += (target - cams[i]) * Math.min(1, dt * 6);
@@ -38,11 +38,14 @@ const Renderer = (() => {
       drawView(world, p, world.players[1 - i], camX);
       b.restore();
     }
-    b.fillStyle = "#1b1b2f";
-    b.fillRect(0, VIEW_H, VIEW_W, DIVIDER);
+    const height = world.players.length === 1 ? VIEW_H : BUFFER_H; // 1 player: just the one view
+    if (world.players.length > 1) {
+      b.fillStyle = "#1b1b2f";
+      b.fillRect(0, VIEW_H, VIEW_W, DIVIDER);
+    }
 
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(buffer, 0, 0, VIEW_W * SCALE, BUFFER_H * SCALE);
+    ctx.drawImage(buffer, 0, 0, VIEW_W, height, 0, 0, VIEW_W * SCALE, height * SCALE);
     drawText(ctx, world);
   }
 
@@ -72,7 +75,7 @@ const Renderer = (() => {
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
 
-    if (!other.dead && !other.caught) {
+    if (other && !other.dead && !other.caught) {
       b.globalAlpha = 0.35; // the other runner shows as a ghost
       drawRunner(other, camX);
       b.globalAlpha = 1;
@@ -1252,7 +1255,7 @@ const Renderer = (() => {
       text(ctx, `${p.name} ${meters}m`, 12, top + 16, p.palette.c, 12);
       text(ctx, `FIRE ${gap}m`, W - 12, top + 16, gapColor, 12, "right");
       if (p.power) {
-        const key = i === 0 ? "S" : "DOWN";
+        const key = world.solo ? "S/DOWN" : i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
         const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH" }[p.power];
         const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff" }[p.power];

@@ -11,6 +11,8 @@ Built with plain HTML, CSS and JavaScript. No frameworks or build tools are need
 | **Red** (top) | `W` | `A` / `D` | `S` |
 | **Blue** (bottom) | `↑` | `←` / `→` | `↓` |
 
+**1 Player:** pick it on the start screen to race the fire alone with WASD or the arrow keys. It shows one big view, only dash and wind dash orbs appear (the others need a second player), and your best distance is remembered.
+
 `P` or `Esc` pauses. `M` (or the Sound button) turns the sound off and on.
 
 ## Run it locally
