@@ -48,6 +48,7 @@ const Game = (() => {
       missiles: [], // missiles zooming in, locking on, flying or exploding
       bears: [],    // bears chasing a player (snow only)
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
+      drones: [],   // rescue drones: guarding a player, or flying to grab the leader
       nextVulture: null, // the leader's distance (meters) when the next group comes
       nextMissile: null, // the leader's distance (meters) when the next missile comes (set once someone passes 300m)
       winner: null,
@@ -114,6 +115,7 @@ const Game = (() => {
     const inputs = players.map((p, i) => readInput(i));
     players.forEach((p, i) => p.update(dt, inputs[i], level));
     players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
+    updateDrones(dt);
     updateBolts(dt);
     updateHands(dt);
     updateMissiles(dt);
@@ -160,10 +162,10 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
-          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind") {
+          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone") {
             p.power = orb.kind; // holding one power at a time: the newest replaces the old
-            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff" }[orb.kind]);
-            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind" }[orb.kind]);
+            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff" }[orb.kind]);
+            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone" }[orb.kind]);
             return;
           }
           if (orb.kind === "dash") {
@@ -204,6 +206,7 @@ const Game = (() => {
     if (p.power === "zap") fireBolt(p, owner);
     else if (p.power === "hand") throwHand(p, owner);
     else if (p.power === "wind") p.windDash();
+    else if (p.power === "drone") launchDrone(p);
     p.power = null;
   }
 
@@ -634,6 +637,107 @@ const Game = (() => {
       }
     }
     world.bears = world.bears.filter((b) => !b.done);
+  }
+
+  // ---- Rescue drone ----
+
+  // Used by the player behind: fly to the leader and bring them back. Used by the leader
+  // (or on your own): follow them and catch them once if they fall into a pit.
+  function launchDrone(p) {
+    const others = world.players.filter((q) => q !== p && !q.caught);
+    const leader = others.find((q) => q.trackX > p.trackX);
+    const drone = { owner: p, x: p.x + HITBOX_W / 2, y: p.y - 10, t: 0, done: false };
+    if (leader) {
+      Object.assign(drone, { mode: "hunt", target: leader });
+    } else {
+      // only one guard drone at a time: a new one replaces it
+      world.drones = world.drones.filter((d) => !(d.mode === "guard" && d.owner === p));
+      Object.assign(drone, { mode: "guard" });
+    }
+    world.drones.push(drone);
+    p.sparkle("#4fc0ff");
+    Sound.play("droneLaunch");
+  }
+
+  function updateDrones(dt) {
+    const { level } = world;
+    for (const d of world.drones) {
+      d.t += dt;
+      if (d.mode === "guard") {
+        const p = d.owner;
+        if (p.caught) { d.mode = "leave"; continue; }
+        // hover just above and behind the player
+        const hx = p.x + HITBOX_W / 2 - 10 * p.facing;
+        const hy = Math.max(6, p.y - 14 + Math.sin(d.t * 4) * 2);
+        d.x += (hx - d.x) * Math.min(1, dt * 8);
+        d.y += (hy - d.y) * Math.min(1, dt * 8);
+        // Falling into a pit? Catch them and carry them past it
+        if (!p.dead && !p.held && !p.onGround && p.vy > 0 && p.y > VIEW_H - 14 && level.groundTop(p.x + HITBOX_W / 2) === null) {
+          const spot = level.safeSpotAfter(p.x + HITBOX_W);
+          if (spot) {
+            d.mode = "carry";
+            d.target = p;
+            d.spot = spot;
+            p.held = true;
+            p.inQuick = false;
+            p.vx = p.vy = 0;
+            p.showHit("SAVED!", "#4fc0ff");
+            Sound.play("droneGrab");
+          }
+        }
+      } else if (d.mode === "hunt") {
+        const q = d.target;
+        if (q.caught) { d.mode = "leave"; continue; }
+        if (q.dead || q.held) { d.y += (20 - d.y) * Math.min(1, dt * 3); continue; } // wait for them
+        // if the owner has caught up and passed them, there's no one to bring back
+        if (d.owner.trackX >= q.trackX) { d.mode = "leave"; continue; }
+        const tx = q.x + HITBOX_W / 2, ty = q.y - 3;
+        const dist = Math.hypot(tx - d.x, ty - d.y);
+        const step = DRONE.flySpeed * dt;
+        if (dist <= step + 2) {
+          d.mode = "carry";
+          d.target = q;
+          q.held = true;
+          q.inQuick = false;
+          q.vx = q.vy = 0;
+          q.showHit("PULLED BACK!", "#4fc0ff");
+          Sound.play("droneGrab");
+        } else {
+          d.x += ((tx - d.x) / dist) * step;
+          d.y += ((ty - d.y) / dist) * step;
+        }
+      } else if (d.mode === "carry") {
+        const q = d.target;
+        // Leader being pulled back: drop them safely a little in front of the player behind
+        // (recomputed as that player moves). Guard save: drop them past the pit.
+        if (d.target !== d.owner) d.spot = level.safeSpotAfter(d.owner.x + DRONE.dropAhead) || d.spot;
+        const spot = d.spot || { x: q.x, y: q.y };
+        const tx = spot.x + HITBOX_W / 2, ty = Math.min(spot.y - 6, d.y);
+        const dist = Math.hypot(tx - d.x, ty - d.y);
+        const step = DRONE.carrySpeed * dt;
+        if (dist > step) { d.x += ((tx - d.x) / dist) * step; d.y += ((ty - d.y) / dist) * step; }
+        else { d.x = tx; d.y = ty; }
+        q.x = d.x - HITBOX_W / 2;
+        q.y = d.y + 5;
+        if (dist <= step + 1) {
+          // set them down gently on the safe spot
+          q.held = false;
+          q.x = spot.x;
+          q.y = spot.y;
+          q.vx = q.vy = 0;
+          q.onGround = false;
+          q.safeSpots.push({ x: spot.x, y: spot.y });
+          Sound.play("droneDrop");
+          d.mode = "leave";
+          d.t = 0;
+        }
+      } else if (d.mode === "leave") {
+        d.y -= 90 * dt;
+        d.x += 60 * dt;
+        if (d.y < -20) d.done = true;
+      }
+    }
+    world.drones = world.drones.filter((d) => !d.done);
   }
 
   // ---- Vultures (desert) ----

@@ -139,6 +139,15 @@ class Level {
   // safely come back after dying: firm, flat ground two tiles wide, with nothing dangerous
   // nearby (spikes, quicksand, pits, maces, shooter spikes or icicles about to drop).
   safeSpotBefore(x, range = 480) {
+    return this.findSafeSpot(x, -1, range);
+  }
+
+  // The same, but looking forward (used to drop someone past a pit or in front of a player)
+  safeSpotAfter(x, range = 480) {
+    return this.findSafeSpot(x, 1, range);
+  }
+
+  findSafeSpot(x, dir, range) {
     const safeCol = (c) => {
       const col = this.cols[c];
       const g = this.groundTop(c * TILE);
@@ -147,7 +156,7 @@ class Level {
       for (let r = Math.max(0, row - 2); r < row; r++) if (col[r] !== T_EMPTY) return false; // room to stand (no spikes, no ledge)
       return true;
     };
-    for (let c = Math.floor(x / TILE); c * TILE > x - range && c > 0; c--) {
+    for (let c = Math.floor(x / TILE) + (dir > 0 ? 1 : 0); dir < 0 ? c * TILE > x - range && c > 0 : c * TILE < x + range && c < this.cols.length - 2; c += dir) {
       if (!safeCol(c) || !safeCol(c + 1) || !safeCol(c - 1)) continue;
       const g = this.groundTop(c * TILE);
       if (this.groundTop((c + 1) * TILE) !== g) continue;
@@ -297,7 +306,7 @@ class Level {
 
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
     if (this.col > 60) weights.shooter = 4;
-    if (this.col > 120 && this.col - this.lastOrbCol > 70) weights.orb = 6; // about 5 orbs every 1000 m
+    if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
 
@@ -537,11 +546,13 @@ const SECTIONS = {
     // Some orbs are freeze orbs in disguise: only the arrows in the middle are flipped
     const roll = this.rng();
     // On your own, swap / freeze / lightning / hand orbs would do nothing (or nothing good): only dashes
-    const kind = this.solo ? (roll < WIND.chance / (WIND.chance + DASH.chance) ? "wind" : "dash")
+    const soloTotal = WIND.chance + DASH.chance + DRONE.chance; // (on your own, the drone saves you from pits)
+    const kind = this.solo ? (roll < WIND.chance / soloTotal ? "wind" : roll < (WIND.chance + DASH.chance) / soloTotal ? "dash" : "drone")
       : roll < WIND.chance ? "wind"
       : roll < WIND.chance + DASH.chance ? "dash"
       : roll < WIND.chance + DASH.chance + ZAP.chance ? "zap"
       : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance ? "hand"
+      : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance + DRONE.chance ? "drone"
       : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
     this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false, kind });
     this.lastOrbCol = this.col;

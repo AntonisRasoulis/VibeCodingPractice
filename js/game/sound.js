@@ -188,6 +188,12 @@ const Sound = (() => {
     tumble: () => noise({ filter: "bandpass", f: 2500, to: 1500, q: 2, dur: 0.5, vol: 0.18, attack: 0.1 }),
     tumbleBreak: () => { noise({ filter: "highpass", f: 2000, dur: 0.2, vol: 0.35 }); noise({ f: 600, dur: 0.15, vol: 0.2 }); },
 
+    // Rescue drone
+    gotDrone: () => { tone({ f: 660, to: 990, dur: 0.15, type: "square", vol: 0.08 }); tone({ f: 1320, dur: 0.12, type: "sine", vol: 0.08, at: 0.1 }); },
+    droneLaunch: () => { tone({ f: 220, to: 440, dur: 0.5, type: "sawtooth", vol: 0.07, vibrato: 60 }); noise({ filter: "bandpass", f: 1800, q: 4, dur: 0.5, vol: 0.12 }); },
+    droneGrab: () => { tone({ f: 880, to: 440, dur: 0.12, type: "square", vol: 0.1 }); noise({ filter: "highpass", f: 2500, dur: 0.08, vol: 0.2 }); },
+    droneDrop: () => notes([660, 880], { gap: 0.07, dur: 0.1, type: "triangle", vol: 0.1 }),
+
     // Vultures
     vultureCry: () => { tone({ f: 900, to: 600, dur: 0.35, type: "sawtooth", vol: 0.08, vibrato: 40 }); noise({ filter: "bandpass", f: 2000, q: 3, dur: 0.3, vol: 0.12 }); },
     vultureScreech: () => { tone({ f: 1400, to: 700, dur: 0.45, type: "sawtooth", vol: 0.12, vibrato: 60 }); noise({ filter: "highpass", f: 3000, dur: 0.4, vol: 0.15 }); },

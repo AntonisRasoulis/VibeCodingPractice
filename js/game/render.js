@@ -95,6 +95,7 @@ const Renderer = (() => {
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
     for (const v of world.vultures) drawVulture(v, camX, world.time);
+    for (const d of world.drones) drawDrone(d, camX, world.time);
     drawParticles(player, camX);
     if (snow > 0) drawSnowfall(camX, world.time, snow);
     drawFire(world.fire, player, camX, world.time);
@@ -267,6 +268,14 @@ const Renderer = (() => {
         for (let i = 0; i < 8 * t; i++) b.fillRect(nose - 4 + i, y + 2 + k * 3 + Math.round(i * 0.6), 1, 1);
       }
     }
+  }
+
+  // The rescue drone: propellers spinning, red light while it's carrying someone
+  function drawDrone(d, camX, time) {
+    const x = Math.round(d.x - camX) - 8;
+    if (x < -20 || x > VIEW_W + 4) return;
+    const f = d.mode === "carry" ? sprites.drone.grab : Math.floor(time * 20) % 2 ? sprites.drone.a : sprites.drone.b;
+    b.drawImage(f, x, Math.round(d.y) - 7);
   }
 
   // A vulture: flapping while it circles or carries you, wings tucked as it dives, spread as it skims
@@ -582,12 +591,12 @@ const Renderer = (() => {
       if (sx < -10 || sx > VIEW_W) continue;
       const bob = Math.round(Math.sin(time * 3 + o.x) * 1.5);
       if (Math.floor(time * 4) % 2) {
-        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind";
+        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone";
         b.fillStyle = ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb }[o.kind] || sprites.orb;
       if (o.kind === "wind") drawOrbWisps(sx, o.y + bob, time + o.x);
       b.drawImage(sprite, sx, o.y + bob);
     }
@@ -809,6 +818,7 @@ const Renderer = (() => {
       b.fillStyle = {
         hand: ["#ffffff", "#c9a3ff", "#9b5de5", "#c9a3ff"],
         wind: ["#ffffff", "#e8f4ff", "#ffffff", "#cfe3f5"],
+        drone: ["#ffffff", "#4fc0ff", "#c9d4df", "#4fc0ff"],
         zap: ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"],
       }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
@@ -1258,8 +1268,8 @@ const Renderer = (() => {
       if (p.power) {
         const key = world.solo ? "S/DOWN" : i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
-        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH" }[p.power];
-        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff" }[p.power];
+        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE" }[p.power];
+        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff" }[p.power];
         text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, color, 10);
       }
       if (p.flash > 0) {

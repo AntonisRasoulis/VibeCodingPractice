@@ -118,6 +118,16 @@ const WIND_ORB_ROWS = [
 // Light blue coin for the orbs that give you an ability to use with S / Down
 const ABILITY_ORB_PALETTE = { o: "#0d3f66", y: "#4fc0ff", w: "#ffffff" }; // dark outline so it stands out on the sky
 
+// ---- Rescue drone (white) ----
+const DRONE_FRAMES = {
+  a: ["oooo........oooo", ".dd..........dd.", "..o..oooooo..o..", "..oooggwwgggooo.", "....ogwwbbwgo...", "....oggwwwggo...", ".....oooooo.....", "......k..k......", ".....kk..kk....."],
+  b: [".oo..........oo.", "dd............dd", "..o..oooooo..o..", "..oooggwwgggooo.", "....ogwwbbwgo...", "....oggwwwggo...", ".....oooooo.....", "......k..k......", ".....k....k....."],
+  grab: ["oooo........oooo", ".dd..........dd.", "..o..oooooo..o..", "..oooggwwgggooo.", "....ogwwrrwgo...", "....oggwwwggo...", ".....oooooo.....", ".....k....k.....", ".....kk..kk....."],
+};
+const DRONE_PALETTE = { o: "#1c2633", w: "#ffffff", g: "#c9d4df", d: "#8a9aab", b: "#4fc0ff", r: "#ff4d6d", k: "#3a4656" };
+// The drone orb: a little white drone on the light blue coin
+const DRONE_ORB_ROWS = ["..oooo..", ".oyyyyo.", "oywwwwyo", "owywwywo", "oyywwyyo", "oywyywyo", ".oyyyyo.", "..oooo.."];
+
 // ---- Mystic hand (purple) ----
 
 // Open hand flying right, reaching to grab (wispy glowing wrist on the left)
@@ -651,6 +661,8 @@ function buildSprites() {
     // Orbs you use with S / Down (abilities) are light blue; the others are gold
     zapOrb: spriteFromRows(ZAP_ORB_ROWS, ABILITY_ORB_PALETTE),
     windOrb: spriteFromRows(WIND_ORB_ROWS, ABILITY_ORB_PALETTE),
+    droneOrb: spriteFromRows(DRONE_ORB_ROWS, ABILITY_ORB_PALETTE),
+    drone: Object.fromEntries(Object.entries(DRONE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, DRONE_PALETTE)])),
     handOrb: spriteFromRows(HAND_ORB_ROWS, { g: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, v: "#7b3fd0", l: "#c9a3ff" }),
     handOpen: spriteFromRows(HAND_OPEN_ROWS, HAND_PALETTE),
     handBack: spriteFromRows(HAND_BACK_ROWS, HAND_PALETTE),
