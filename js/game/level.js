@@ -272,7 +272,7 @@ class Level {
 
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
     if (this.col > 60) weights.shooter = 4;
-    if (this.col > 120 && this.col - this.lastOrbCol > 160) weights.orb = 4;
+    if (this.col > 120 && this.col - this.lastOrbCol > 70) weights.orb = 6; // about 5 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
 
