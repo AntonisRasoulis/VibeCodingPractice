@@ -70,6 +70,7 @@ class Player {
   }
 
   update(dt, input, level) {
+    this.level = level; // remembered so dying can look for a place to come back
     this.updateParticles(dt);
     this.updateFallingPlatforms(dt);
     this.updateSnow(dt, level);
@@ -593,6 +594,10 @@ class Player {
     const target = this.x - DEATH.respawnBehind;
     let spot = this.safeSpots[0];
     for (const s of this.safeSpots) if (s.x <= target) spot = s;
+    // If we haven't stood anywhere for a while (after a dash, or across platforms), find
+    // safe ground on the course a little behind us instead of going all the way back
+    const near = this.level && this.level.safeSpotBefore(target);
+    if (near && near.x > spot.x) spot = near;
     this.respawnX = spot.x;
     this.respawnY = spot.y;
     this.vx = 0;

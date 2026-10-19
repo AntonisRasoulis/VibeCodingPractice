@@ -135,6 +135,31 @@ class Level {
     return this.colBiome[clamp(col, 0, this.colBiome.length - 1)] || this.biome;
   }
 
+  // The closest place at or before x (looking back up to `range` pixels) where a runner can
+  // safely come back after dying: firm, flat ground two tiles wide, with nothing dangerous
+  // nearby (spikes, quicksand, pits, maces, shooter spikes or icicles about to drop).
+  safeSpotBefore(x, range = 480) {
+    const safeCol = (c) => {
+      const col = this.cols[c];
+      const g = this.groundTop(c * TILE);
+      if (!col || g === null || this.isQuick(c)) return false;
+      const row = g / TILE;
+      for (let r = Math.max(0, row - 2); r < row; r++) if (col[r] !== T_EMPTY) return false; // room to stand (no spikes, no ledge)
+      return true;
+    };
+    for (let c = Math.floor(x / TILE); c * TILE > x - range && c > 0; c--) {
+      if (!safeCol(c) || !safeCol(c + 1) || !safeCol(c - 1)) continue;
+      const g = this.groundTop(c * TILE);
+      if (this.groundTop((c + 1) * TILE) !== g) continue;
+      const px = c * TILE + 1;
+      if (this.maces.some((m) => Math.abs(m.x - px) < this.maceReach(m))) continue;
+      if (this.shooters.some((s) => Math.abs(s.x - px) < SHOOTER.range * Math.SQRT1_2 + 12)) continue;
+      if (this.icicles.some((ic) => ic.x - px > -10 && ic.x - px < SNOW.icicleTrigger + 16)) continue;
+      return { x: px, y: g - HITBOX_H };
+    }
+    return null;
+  }
+
   // Is the ground's surface in this column quicksand?
   isQuick(col) {
     return this.quick[col] === true;
