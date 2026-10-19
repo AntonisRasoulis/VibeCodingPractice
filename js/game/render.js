@@ -582,7 +582,8 @@ const Renderer = (() => {
       if (sx < -10 || sx > VIEW_W) continue;
       const bob = Math.round(Math.sin(time * 3 + o.x) * 1.5);
       if (Math.floor(time * 4) % 2) {
-        b.fillStyle = "rgba(255, 240, 150, 0.5)";
+        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind";
+        b.fillStyle = ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }

@@ -115,6 +115,9 @@ const WIND_ORB_ROWS = [
   "..oooo..",
 ];
 
+// Light blue coin for the orbs that give you an ability to use with S / Down
+const ABILITY_ORB_PALETTE = { o: "#0d3f66", y: "#4fc0ff", w: "#ffffff" }; // dark outline so it stands out on the sky
+
 // ---- Mystic hand (purple) ----
 
 // Open hand flying right, reaching to grab (wispy glowing wrist on the left)
@@ -645,9 +648,10 @@ function buildSprites() {
     orb: spriteFromRows(ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     freezeOrb: spriteFromRows(FREEZE_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     dashOrb: spriteFromRows(DASH_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
-    zapOrb: spriteFromRows(ZAP_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
-    windOrb: spriteFromRows(WIND_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
-    handOrb: spriteFromRows(HAND_ORB_ROWS, { g: "#b8860b", y: "#ffd23f", v: "#9b5de5", l: "#c9a3ff" }),
+    // Orbs you use with S / Down (abilities) are light blue; the others are gold
+    zapOrb: spriteFromRows(ZAP_ORB_ROWS, ABILITY_ORB_PALETTE),
+    windOrb: spriteFromRows(WIND_ORB_ROWS, ABILITY_ORB_PALETTE),
+    handOrb: spriteFromRows(HAND_ORB_ROWS, { g: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, v: "#7b3fd0", l: "#c9a3ff" }),
     handOpen: spriteFromRows(HAND_OPEN_ROWS, HAND_PALETTE),
     handBack: spriteFromRows(HAND_BACK_ROWS, HAND_PALETTE),
     handFist: spriteFromRows(HAND_FIST_ROWS, HAND_PALETTE),
