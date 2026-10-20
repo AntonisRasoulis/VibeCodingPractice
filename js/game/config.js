@@ -167,6 +167,11 @@ const SHOOTER = {
   warn: 0.45,   // seconds the shooter glows and shakes before each volley
 };
 
+const SAW = {
+  sizes: [6, 9, 12], // blade radius in pixels: small, medium, large
+  spin: 14,          // how fast the blades spin (radians per second)
+};
+
 const MACE_RADIUS = 5;   // how close a mace's ball can get before it hits you
 
 const FALLING = {

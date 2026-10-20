@@ -503,6 +503,15 @@ class Player {
       if ((ball.x - nearX) ** 2 + (ball.y - nearY) ** 2 < MACE_RADIUS ** 2) return this.die();
     }
 
+    // Saw blades: hit if the blade touches the body (the very tips of the teeth are forgiven)
+    for (const s of level.saws) {
+      if (cx < Math.min(s.x0, s.x1) - s.r - 8 || cx > Math.max(s.x0, s.x1) + s.r + 8) continue;
+      const c = level.sawPos(s, level.time);
+      const nearX = clamp(c.x, this.x, this.x + HITBOX_W);
+      const nearY = clamp(c.y, this.y, this.y + HITBOX_H);
+      if ((c.x - nearX) ** 2 + (c.y - nearY) ** 2 < (s.r - 1.5) ** 2) return this.die();
+    }
+
     // Flying spikes from shooters
     for (const s of level.shooters) {
       if (Math.abs(s.x - cx) > SHOOTER.range + 16) continue;

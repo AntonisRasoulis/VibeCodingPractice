@@ -55,6 +55,7 @@ class Level {
     this.orbs = [];      // swap orbs
     this.maces = [];     // spiked balls swinging on chains
     this.shooters = [];  // blocks that fire spikes diagonally
+    this.saws = [];      // spinning saw blades: sliding along a slot in the ground, or up and down a rail
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -92,6 +93,13 @@ class Level {
       p.dx = newX - p.x;
       p.x = newX;
     }
+  }
+
+  // Where a saw blade's center is at a given time. It glides from (x0, y0) to (x1, y1)
+  // and back, slowing down at each end. Worked out from the clock like the maces.
+  sawPos(s, time) {
+    const t = 0.5 - 0.5 * Math.cos(2 * Math.PI * (time / s.period + s.phase));
+    return { x: s.x0 + (s.x1 - s.x0) * t, y: s.y0 + (s.y1 - s.y0) * t };
   }
 
   // Where a mace's chain links and ball are at a given time. Used both for
@@ -171,6 +179,7 @@ class Level {
   // a shooter's spikes, or icicles that would drop on them.
   threatened(x, y) {
     if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
+    if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
@@ -324,7 +333,7 @@ class Level {
     this.iceBias = this.biome === "snow" && this.rng() < SNOW.iceSections;
 
     const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
-    if (this.col > 60) weights.shooter = 4;
+    if (this.col > 60) Object.assign(weights, { shooter: 4, saw: 4 });
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
@@ -485,6 +494,39 @@ const SECTIONS = {
       phase: this.rng(),
     });
     this.flat(9);
+  },
+
+  // A spinning saw blade. Sizes and speeds are random (a little faster later on), and
+  // like the maces there may be two in a row later. The speed ranges were measured to
+  // always leave a way through (see the README).
+  saw(d) {
+    this.flat(5, false);
+    const count = d > 0.4 && this.rng() < 0.5 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const r = this.pickFrom(SAW.sizes);
+      const gy = this.groundRow * TILE;
+      const kind = this.pickWeighted({ slot: 3, rail: 2, pit: 2 });
+      const saw = { kind, r, gy, phase: this.rng(), spinDir: this.rng() < 0.5 ? -1 : 1 };
+      if (kind === "slot") {
+        // slides left and right in a slot cut into the ground: only its top half shows
+        const len = this.rand(3, 8) * TILE; // how far it slides
+        const x0 = this.col * TILE + r;
+        this.flat(Math.ceil((len + 2 * r) / TILE) + 1, false);
+        Object.assign(saw, { x0, x1: x0 + len, y0: gy + 1, y1: gy + 1, period: 1.6 + this.rng() * 1.2 + len / 80 - d * 0.2 });
+      } else if (kind === "rail") {
+        // goes up and down a rail: duck back down into the ground, rise high enough to run under
+        const x = this.col * TILE + TILE * 2;
+        this.flat(4, false);
+        Object.assign(saw, { x0: x, x1: x, y0: gy + 1, y1: gy - HITBOX_H - 5 - r, period: 1.8 + this.rng() * 1.2 - d * 0.2 });
+      } else {
+        // rises up out of a pit and sinks back down: jump across while it's down
+        const x = this.col * TILE + TILE * 2;
+        this.empty(4);
+        Object.assign(saw, { x0: x, x1: x, y0: VIEW_H + r + 2, y1: gy - 40, period: 2.2 + this.rng() * 1.0 - d * 0.2 });
+      }
+      this.saws.push(saw);
+      this.flat(i + 1 < count ? 12 : 5, false); // room to stop safely between two saws
+    }
   },
 
   mace(d) {

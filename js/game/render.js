@@ -65,6 +65,7 @@ const Renderer = (() => {
     b.globalAlpha = 1;
     for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
     drawTiles(world.level, camX);
+    drawSawTracks(world.level, camX);
     drawSigns(world.level, camX);
     drawIcicles(world.level, player, camX, world.time);
     drawSnowballs(player, camX);
@@ -87,6 +88,7 @@ const Renderer = (() => {
       if (player.honey > 0) drawHoney(player, camX, world.time);
     }
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
+    drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
     if (player.power && !player.dead) drawCrackle(player, camX, world.time);
@@ -1096,6 +1098,119 @@ const Renderer = (() => {
   }
 
   // ---- Swinging maces ----
+
+  // ---- Saw blades ----
+
+  function sawOnScreen(s, camX) {
+    return Math.max(s.x0, s.x1) + s.r + 4 > camX && Math.min(s.x0, s.x1) - s.r - 4 < camX + VIEW_W;
+  }
+
+  // The slots and rails the saws run along (behind the runners)
+  function drawSawTracks(level, camX) {
+    for (const s of level.saws) {
+      if (!sawOnScreen(s, camX)) continue;
+      const x0 = Math.round(s.x0 - camX);
+      if (s.kind === "slot") {
+        drawSawSlot(x0 - s.r + 1, Math.round(s.x1 - camX) + s.r - 1, s.gy);
+      } else {
+        drawSawRail(x0, Math.round(s.y1) - s.r - 3, s.kind === "pit" ? VIEW_H : s.gy);
+        if (s.kind === "rail") drawSawSlot(x0 - s.r + 1, x0 + s.r - 1, s.gy);
+      }
+    }
+  }
+
+  function drawSaws(level, camX, time) {
+    for (const s of level.saws) {
+      if (!sawOnScreen(s, camX)) continue;
+      const c = level.sawPos(s, time);
+      const cx = Math.round(c.x - camX);
+      const angle = s.spinDir * time * SAW.spin;
+      if (s.kind === "pit") {
+        drawSawBlade(cx, c.y, s.r, angle);
+        continue;
+      }
+      // Sunk into the ground: only the part above it shows, with sparks where it cuts in
+      b.save();
+      b.beginPath();
+      b.rect(cx - s.r - 2, c.y - s.r - 2, 2 * s.r + 4, Math.max(0, s.gy - (c.y - s.r - 2)));
+      b.clip();
+      drawSawBlade(cx, c.y, s.r, angle);
+      b.restore();
+      if (c.y + s.r > s.gy + 2) {
+        const half = Math.round(Math.sqrt(Math.max(0, s.r * s.r - (s.gy - c.y) ** 2)));
+        const k = Math.floor(time * 30) % 3;
+        const side = s.spinDir > 0 ? -1 : 1; // sparks fly off the way the teeth come up out of the ground
+        b.fillStyle = "#ffd25a";
+        b.fillRect(cx + side * (half + 1 + k), s.gy - 1 - (k % 2), 1, 1);
+        b.fillStyle = "#ff8a2a";
+        b.fillRect(cx + side * (half + 2 + (k % 2)), s.gy - 2 - k, 1, 1);
+      }
+    }
+  }
+
+  // A steel disc with raked teeth, turned by `angle`
+  function drawSawBlade(cx, cy, r, angle) {
+    const n = r <= 6 ? 8 : r <= 9 ? 10 : 12;
+    const seg = (Math.PI * 2) / n;
+    const depth = r <= 6 ? 2.2 : 3; // how deep the teeth are cut
+    const shape = (x, y) => {
+      const d = Math.hypot(x, y);
+      if (d <= r - depth) return 1; // the disc
+      let t = (Math.atan2(y, x) - angle) % seg;
+      if (t < 0) t += seg;
+      return d <= r - depth * (t / seg) + 0.3 ? 2 : 0; // a tooth: rises slowly, drops sharply
+    };
+    const ox = Math.round(cx);
+    const oy = Math.round(cy);
+    for (let y = -r - 1; y <= r + 1; y++) {
+      for (let x = -r - 1; x <= r + 1; x++) {
+        const k = shape(x, y);
+        if (!k) continue;
+        const edge = !shape(x + 1, y) || !shape(x - 1, y) || !shape(x, y + 1) || !shape(x, y - 1);
+        const d = Math.hypot(x, y);
+        const lit = x + y < 0;
+        if (edge) b.fillStyle = "#2b2d33";
+        else if (k === 2) b.fillStyle = lit ? "#ffffff" : "#dfe3e9"; // sharp teeth
+        else if (d < Math.max(1.6, r * 0.25)) b.fillStyle = d < 0.8 ? "#cfd4dc" : "#2b2d33"; // bolt in the middle
+        else if (Math.abs(d - r * 0.62) < 0.5) b.fillStyle = "#6f7580"; // a groove ring
+        else b.fillStyle = lit ? "#b4bac3" : "#8d939d";
+        b.fillRect(ox + x, oy + y, 1, 1);
+      }
+    }
+    // three holes that turn with the blade (medium and large), so you can see it spin
+    if (r > 6) {
+      b.fillStyle = "#3f434b";
+      for (let k = 0; k < 3; k++) {
+        const a = angle + (k * Math.PI * 2) / 3;
+        const size = r > 9 ? 2 : 1;
+        b.fillRect(Math.round(cx + Math.cos(a) * r * 0.45), Math.round(cy + Math.sin(a) * r * 0.45), size, size);
+      }
+    }
+  }
+
+  // A groove cut into the ground, with metal caps at each end
+  function drawSawSlot(x0, x1, gy) {
+    b.fillStyle = "#1c1b22";
+    b.fillRect(x0, gy, x1 - x0, 2);
+    b.fillStyle = "#8a8f99";
+    b.fillRect(x0 - 1, gy - 1, 2, 3);
+    b.fillRect(x1 - 1, gy - 1, 2, 3);
+    b.fillStyle = "#cfd4dc";
+    b.fillRect(x0 - 1, gy - 1, 1, 1);
+    b.fillRect(x1 - 1, gy - 1, 1, 1);
+  }
+
+  // An upright metal rail from y0 (top) down to y1
+  function drawSawRail(x, y0, y1) {
+    b.fillStyle = "#3a3d44";
+    b.fillRect(x - 1, y0, 3, y1 - y0);
+    b.fillStyle = "#8a8f99";
+    b.fillRect(x, y0, 1, y1 - y0);
+    b.fillStyle = "#5c616b";
+    b.fillRect(x - 2, y0 - 1, 5, 2); // bracket at the top
+    b.fillStyle = "#cfd4dc";
+    b.fillRect(x - 1, y0 - 1, 1, 1);
+  }
 
   function drawMaces(level, camX, time) {
     for (const m of level.maces) {
