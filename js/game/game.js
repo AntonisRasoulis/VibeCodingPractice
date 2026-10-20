@@ -673,6 +673,15 @@ const Game = (() => {
     return null;
   }
 
+  // Where a pulled-back leader is dropped: safe ground a little in front of the player behind,
+  // but always at least two tiles behind where they were grabbed (never forward)
+  function pullBackSpot(d) {
+    const { level } = world;
+    const limit = d.fromX - 2 * TILE;
+    const from = Math.min(d.owner.x + DRONE.dropAhead, limit);
+    return (limit - from > TILE && level.safeSpotAfter(from, limit - from)) || level.safeSpotBefore(from);
+  }
+
   function updateDrones(dt) {
     const { level } = world;
     for (const d of world.drones) {
@@ -713,6 +722,7 @@ const Game = (() => {
         if (dist <= step + 2) {
           d.mode = "carry";
           d.target = q;
+          d.fromX = q.x; // where they were grabbed: they always end up behind this
           q.held = true;
           q.inQuick = false;
           q.vx = q.vy = 0;
@@ -726,7 +736,7 @@ const Game = (() => {
         const q = d.target;
         // Leader being pulled back: drop them safely a little in front of the player behind
         // (recomputed as that player moves). Guard save: drop them past the pit.
-        if (d.target !== d.owner) d.spot = level.safeSpotAfter(d.owner.x + DRONE.dropAhead) || d.spot;
+        if (d.target !== d.owner) d.spot = pullBackSpot(d) || d.spot;
         const spot = d.spot || { x: q.x, y: q.y };
         const tx = spot.x + HITBOX_W / 2, ty = Math.min(spot.y - 6, d.y);
         const dist = Math.hypot(tx - d.x, ty - d.y);
