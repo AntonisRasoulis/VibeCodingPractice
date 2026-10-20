@@ -659,6 +659,18 @@ const Game = (() => {
     Sound.play("droneLaunch");
   }
 
+  // The first firm, spike-free, quicksand-free ground ahead (two tiles wide)
+  function landingAfter(x) {
+    const { level } = world;
+    for (let c = Math.floor(x / TILE) + 1; c < Math.floor(x / TILE) + 200 && c < level.cols.length - 2; c++) {
+      const g = level.groundTop(c * TILE);
+      if (g === null || level.groundTop((c + 1) * TILE) !== g || level.isQuick(c) || level.isQuick(c + 1)) continue;
+      if (level.tile(c, g / TILE - 1) !== T_EMPTY || level.tile(c + 1, g / TILE - 1) !== T_EMPTY) continue;
+      return { x: c * TILE + 1, y: g - HITBOX_H };
+    }
+    return null;
+  }
+
   function updateDrones(dt) {
     const { level } = world;
     for (const d of world.drones) {
@@ -673,7 +685,9 @@ const Game = (() => {
         d.y += (hy - d.y) * Math.min(1, dt * 8);
         // Falling into a pit? Catch them and carry them past it
         if (!p.dead && !p.held && !p.onGround && p.vy > 0 && p.y > VIEW_H - 14 && level.groundTop(p.x + HITBOX_W / 2) === null) {
-          const spot = level.safeSpotAfter(p.x + HITBOX_W);
+          // Past the pit on safe ground; if there's none nearby (e.g. a shooter right there),
+          // the next firm ground ahead will do: it never lets you fall
+          const spot = level.safeSpotAfter(p.x + HITBOX_W) || landingAfter(p.x + HITBOX_W);
           if (spot) {
             d.mode = "carry";
             d.target = p;
