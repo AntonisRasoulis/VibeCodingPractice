@@ -161,12 +161,31 @@ class Level {
       const g = this.groundTop(c * TILE);
       if (this.groundTop((c + 1) * TILE) !== g) continue;
       const px = c * TILE + 1;
-      if (this.maces.some((m) => Math.abs(m.x - px) < this.maceReach(m))) continue;
-      if (this.shooters.some((s) => Math.abs(s.x - px) < SHOOTER.range * Math.SQRT1_2 + 12)) continue;
-      if (this.icicles.some((ic) => ic.x - px > -10 && ic.x - px < SNOW.icicleTrigger + 16)) continue;
+      if (this.threatened(px, g - HITBOX_H)) continue;
       return { x: px, y: g - HITBOX_H };
     }
     return null;
+  }
+
+  // Could a hazard get someone standing still at (x, y)? A mace swinging through,
+  // a shooter's spikes, or icicles that would drop on them.
+  threatened(x, y) {
+    if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
+    if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
+    return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
+  }
+
+  // Does any of a shooter's 4 spike paths pass through someone standing at (x, y)? (with room to spare)
+  shooterHits(s, x, y) {
+    const dist = this.shooterReach(s);
+    return SHOOTER_DIRS.some(([dx, dy], i) => {
+      for (let d = 0; d < dist[i]; d += 2) {
+        const step = 4 + d * Math.SQRT1_2;
+        const sx = s.x + dx * step, sy = s.y + dy * step;
+        if (sx > x - 4 && sx < x + HITBOX_W + 4 && sy > y - 4 && sy < y + HITBOX_H + 4) return true;
+      }
+      return false;
+    });
   }
 
   // Is the ground's surface in this column quicksand?

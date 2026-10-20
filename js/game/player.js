@@ -566,12 +566,8 @@ class Player {
   rememberSafeSpot(level) {
     const last = this.safeSpots[this.safeSpots.length - 1];
     if (Math.abs(last.x - this.x) < 4) return;
-    // Never respawn somewhere a mace can swing through
-    for (const m of level.maces) if (Math.abs(m.x - this.x) < level.maceReach(m)) return;
-    // ...or where a shooter's spikes can reach
-    for (const s of level.shooters) if (Math.abs(s.x - this.x) < SHOOTER.range * Math.SQRT1_2 + 12) return;
-    // ...or just before icicles (they'd drop the moment you came back)
-    for (const ic of level.icicles) if (ic.x - this.x > -10 && ic.x - this.x < SNOW.icicleTrigger + 16) return;
+    // Never respawn somewhere a mace, a shooter's spikes or icicles can reach
+    if (level.threatened(this.x, this.y)) return;
     this.safeSpots.push({ x: this.x, y: this.y });
     if (this.safeSpots.length > 300) this.safeSpots.shift();
   }
@@ -590,14 +586,17 @@ class Player {
     this.burst();
     Sound.play("die");
 
-    // Come back at the most recent safe spot a little behind where we died
+    // Come back at the nearest safe spot a little behind where we died: one we stood on,
+    // or safe ground on the course (after a dash, or across platforms, we may not have stood nearby)
     const target = this.x - DEATH.respawnBehind;
-    let spot = this.safeSpots[0];
-    for (const s of this.safeSpots) if (s.x <= target) spot = s;
-    // If we haven't stood anywhere for a while (after a dash, or across platforms), find
-    // safe ground on the course a little behind us instead of going all the way back
+    let spot = null;
+    for (const s of this.safeSpots) if (s.x <= target && (!spot || s.x > spot.x)) spot = s;
     const near = this.level && this.level.safeSpotBefore(target);
-    if (near && near.x > spot.x) spot = near;
+    if (near && (!spot || near.x > spot.x)) spot = near;
+    // Nothing behind (say, just carried far back by a drone): look further back,
+    // or else use the remembered spot closest to where we died
+    if (!spot) spot = this.level && this.level.safeSpotBefore(target, 4000);
+    if (!spot) for (const s of this.safeSpots) if (!spot || Math.abs(s.x - target) < Math.abs(spot.x - target)) spot = s;
     this.respawnX = spot.x;
     this.respawnY = spot.y;
     this.vx = 0;
