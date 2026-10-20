@@ -163,9 +163,11 @@ const Game = (() => {
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
           if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone") {
-            p.power = orb.kind; // holding one power at a time: the newest replaces the old
             p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff" }[orb.kind]);
             Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone" }[orb.kind]);
+            // Alone, the drone starts guarding right away with no button press
+            if (world.solo && orb.kind === "drone") launchDrone(p);
+            else p.power = orb.kind; // holding one power at a time: the newest replaces the old
             return;
           }
           if (orb.kind === "dash") {
