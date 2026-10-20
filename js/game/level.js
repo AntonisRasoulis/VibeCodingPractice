@@ -332,15 +332,15 @@ class Level {
     // In the snow, many sections are built on ice: the run-up, the ground under the danger and the landing
     this.iceBias = this.biome === "snow" && this.rng() < SNOW.iceSections;
 
-    const weights = { flat: 2, step: 3, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 3 };
-    if (this.col > 60) Object.assign(weights, { shooter: 4, saw: 4 });
+    const weights = { flat: 1, step: 2, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 4 };
+    if (this.col > 60) Object.assign(weights, { shooter: 5, saw: 5 });
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
 
     const type = this.pickWeighted(weights);
     SECTIONS[type].call(this, this.difficulty());
-    this.flat(this.rand(2, 4), false); // breathing room between sections (never icy)
+    this.flat(this.rand(1, 3), false); // breathing room between sections (never icy)
   }
 
   // A calm stretch, then a sign, and from there on a different biome
@@ -365,14 +365,14 @@ class Level {
 
 const SECTIONS = {
   flat() {
-    this.flat(this.rand(4, 8));
+    this.flat(this.rand(3, 6));
   },
 
   // The ground steps up or down.
   step() {
     const change = this.pickFrom([-2, -1, 1, 2]);
     this.groundRow = clamp(this.groundRow - change, MIN_GROUND_ROW, MAX_GROUND_ROW);
-    this.flat(this.rand(3, 6));
+    this.flat(this.rand(2, 5));
   },
 
   spikes(d) {
@@ -480,8 +480,9 @@ const SECTIONS = {
   // A block that fires spikes in 4 diagonal directions. It can sit on the
   // ground, float at head height (jump over it) or hang higher up (run under it).
   shooter(d) {
-    this.flat(6);
     const height = this.pickFrom([1, 1, 2, 3, 4, 5, 6]); // tiles above the ground
+    // Its downward spikes land further out the higher it is: leave room to wait on either side
+    this.flat(Math.max(4, height + 4));
     const row = this.groundRow - height;
     const col = this.col;
     this.column(this.groundRow)[row] = T_SHOOTER;
@@ -493,14 +494,14 @@ const SECTIONS = {
       period: 2.1 + this.rng() * 0.7 - d * 0.4, // each shooter fires at its own pace
       phase: this.rng(),
     });
-    this.flat(9);
+    this.flat(Math.max(6, height + 5));
   },
 
   // A spinning saw blade. Sizes and speeds are random (a little faster later on), and
   // like the maces there may be two in a row later. The speed ranges were measured to
   // always leave a way through (see the README).
   saw(d) {
-    this.flat(5, false);
+    this.flat(3, false);
     const count = d > 0.4 && this.rng() < 0.5 ? 2 : 1;
     for (let i = 0; i < count; i++) {
       const r = this.pickFrom(SAW.sizes);
@@ -525,7 +526,7 @@ const SECTIONS = {
         Object.assign(saw, { x0: x, x1: x, y0: VIEW_H + r + 2, y1: gy - 40, period: 2.2 + this.rng() * 1.0 - d * 0.2 });
       }
       this.saws.push(saw);
-      this.flat(i + 1 < count ? 12 : 5, false); // room to stop safely between two saws
+      this.flat(i + 1 < count ? 12 : 3, false); // room to stop safely between two saws
     }
   },
 
@@ -545,7 +546,7 @@ const SECTIONS = {
         phase: this.rng(),
         spin: (this.rng() < 0.5 ? -1 : 1) * (3 + this.rng() * 4),
       });
-      this.flat(16); // room to stop safely between two maces
+      this.flat(i + 1 < count ? 16 : 12); // room to stop safely between two maces (even if the next section starts with one)
     }
   },
 
