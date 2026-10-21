@@ -13,6 +13,8 @@ const soundButton = document.getElementById("sound-button");
 const wins = { RED: 0, BLUE: 0 };
 let gameLoaded = false;
 let lastMode = 2;
+let biomes = false; // snow and desert biomes: off until you turn them on (remembered by the browser)
+try { biomes = localStorage.getItem("fire-run-biomes") === "1"; } catch (e) { /* storage blocked */ }
 let best = 0; // best distance in 1-player mode (remembered by the browser)
 try { best = Number(localStorage.getItem("fire-run-best")) || 0; } catch (e) { /* storage blocked */ }
 
@@ -83,10 +85,22 @@ function startGame(players) {
   startButton.blur();
   soloButton.blur();
   canvas.scrollIntoView({ behavior: "smooth", block: "center" });
-  Game.start(players);
+  Game.start(players, { biomes });
 }
 
 startButton.addEventListener("click", () => startGame(2));
+
+const biomesButton = document.getElementById("biomes-button");
+function showBiomes() {
+  biomesButton.textContent = `Biomes: ${biomes ? "on" : "off"}`;
+  biomesButton.setAttribute("aria-pressed", String(biomes));
+}
+biomesButton.addEventListener("click", () => {
+  biomes = !biomes;
+  try { localStorage.setItem("fire-run-biomes", biomes ? "1" : "0"); } catch (e) { /* storage blocked */ }
+  showBiomes();
+});
+showBiomes();
 soloButton.addEventListener("click", () => startGame(1));
 pauseButton.addEventListener("click", () => {
   Game.togglePause();

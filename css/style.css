@@ -288,6 +288,11 @@ kbd {
   }
 }
 
+.button.small {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+}
+
 .start-buttons {
   display: flex;
   gap: 12px;

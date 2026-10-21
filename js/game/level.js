@@ -60,7 +60,8 @@ class Level {
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
     this.nextId = 1;
-    this.biomeEnd = this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
+    this.biomes = options.biomes !== false; // off: the whole course stays in the starting biome
+    this.biomeEnd = this.biomes ? this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]) : Infinity;
     this.addBiomeEvents(this.biomeEnd);
     this.flat(30); // calm start
   }
