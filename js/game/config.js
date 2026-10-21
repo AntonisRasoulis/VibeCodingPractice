@@ -151,6 +151,7 @@ const VULTURE = {
 // the left after the player in the lead. Keep running right and you stay just ahead.
 const BEAR = {
   startBehind: 150, // how far behind the player its nose starts (just off the left of their screen)
+  waitBehind: 60,   // the closest it waits behind someone it's chasing who died and is coming back
   polar: { speed: 124, chase: 5 },  // deadliest: slow down at all and it gets you
   brown: { speed: 102, chase: 10 }, // you can afford a short stop now and then
   black: { speed: 100, chase: 15 }, // slowest: it doesn't kill, it covers you in honey

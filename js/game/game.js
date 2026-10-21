@@ -610,12 +610,44 @@ const Game = (() => {
           }
         }
       }
-      if (bear.state === "approach" && (p.dead || p.caught)) { bear.state = "leave"; bear.t = 0; }
-      if (bear.state === "chase") {
-        if (p.dead || p.caught) {
-          bear.state = "leave";
+      if (p.caught && (bear.state === "approach" || bear.state === "chase" || bear.state === "regroup")) {
+        bear.state = "leave"; // the fire got them: nothing left to chase
+        bear.t = 0;
+      } else if (p.dead && (bear.state === "approach" || bear.state === "chase")) {
+        // They died to something else: go and wait where they'll come back, then carry on
+        bear.resume = bear.state;
+        bear.state = "regroup";
+      }
+      if (bear.state === "regroup") {
+        // Run (forwards or backwards) to wait just behind where they'll come back, where you can see it.
+        // Never so close that it could catch someone who runs flat out before its time is up.
+        const left = bear.resume === "chase" ? Math.max(0, bear.chase - bear.t) : bear.chase;
+        const behind = clamp((bear.speed - PHYSICS.runSpeed) * left + 16, BEAR.waitBehind, BEAR.startBehind);
+        const goal = (p.dead ? p.respawnX : p.x) - behind;
+        const step = BEAR.approachSpeed * dt;
+        if (Math.abs(goal - bear.x) > step) {
+          bear.facing = goal > bear.x ? 1 : -1;
+          bear.x += bear.facing * step;
+          bear.anim += step;
+          const { top, leaping } = bearGround(bear);
+          if (top !== null) bear.y += (top - bear.y) * Math.min(1, dt * 12);
+          bear.lift = leaping ? Math.min(6, bear.lift + dt * 40) : Math.max(0, bear.lift - dt * 40);
+        } else {
+          bear.x = goal;
+          bear.facing = 1;
+          bear.lift = Math.max(0, bear.lift - dt * 40);
+          if (!p.dead) {
+            bear.state = bear.resume; // back on the chase (the clock kept running)
+            Sound.play("roar");
+          }
+        }
+        if (bear.resume === "chase" && bear.t >= bear.chase) {
+          bear.state = "leave"; // time's up, even while waiting
           bear.t = 0;
-        } else if (bear.x >= p.x + 2 && p.y + HITBOX_H > bear.y - 34) {
+          Sound.play("grumble");
+        }
+      } else if (bear.state === "chase") {
+        if (bear.x >= p.x + 2 && p.y + HITBOX_H > bear.y - 34) {
           // Caught!
           bear.state = "swipe";
           bear.t = 0;

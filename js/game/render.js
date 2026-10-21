@@ -253,7 +253,7 @@ const Renderer = (() => {
     if (nose < -BEAR_W - 4 || nose > VIEW_W + BEAR_W) return;
     const frame = bear.state === "swipe" ? frames[3] : frames[Math.floor(bear.anim / 9) % 3];
     const y = Math.round(bear.y - (BEAR_H - 1) - bear.lift);
-    if (bear.state === "leave") {
+    if (bear.state === "leave" || (bear.state === "regroup" && bear.facing < 0)) {
       b.save();
       b.translate(nose + 1, y);
       b.scale(-1, 1); // heading back to the left (flipped in place, so it doesn't jump when it turns)
