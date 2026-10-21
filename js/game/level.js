@@ -356,11 +356,15 @@ class Level {
     this.addBiomeEvents(length);
   }
 
-  // Each biome's special danger. Snow: one bear, somewhere in the biome.
+  // Each biome's special danger. Snow: two bears, at random spots in the biome (at least 70 m apart).
   addBiomeEvents(length) {
     if (this.biome !== "snow") return;
-    const col = this.col + this.rand(40, Math.max(41, length - 140));
-    this.bearSpots.push({ col, kind: this.pickFrom(["polar", "brown", "black"]), used: false });
+    const last = Math.max(110, length - 140); // the chases should be over before the snow ends
+    const first = this.rand(40, Math.max(40, last - 70));
+    const second = this.rand(first + 70, Math.max(first + 70, last));
+    for (const at of [first, second]) {
+      this.bearSpots.push({ col: this.col + at, kind: this.pickFrom(["polar", "brown", "black"]), used: false });
+    }
   }
 }
 

@@ -546,6 +546,7 @@ const Game = (() => {
       const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
       for (const spot of level.bearSpots) {
         if (spot.used || leader.x / TILE < spot.col) continue;
+        if (world.bears.some((bb) => bb.state !== "leave")) continue; // one chase at a time: wait for the other bear
         spot.used = true;
         if (level.biomeAt(Math.floor(leader.x / TILE)) !== "snow") continue;
         const meters = leader.x / TILE;
