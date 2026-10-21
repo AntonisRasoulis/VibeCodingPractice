@@ -516,10 +516,12 @@ const SECTIONS = {
         this.flat(Math.ceil((len + 2 * r) / TILE) + 1, false);
         Object.assign(saw, { x0, x1: x0 + len, y0: gy + 1, y1: gy + 1, period: 1.6 + this.rng() * 1.2 + len / 80 - d * 0.2 });
       } else if (kind === "rail") {
-        // goes up and down a rail: duck back down into the ground, rise high enough to run under
+        // goes up and down a rail: from sunk in the ground (jump it) up high into the air (run under it).
+        // On the way it sweeps right through where a jump takes you, so jumping isn't always safe.
         const x = this.col * TILE + TILE * 2;
         this.flat(4, false);
-        Object.assign(saw, { x0: x, x1: x, y0: gy + 1, y1: gy - HITBOX_H - 5 - r, period: 1.8 + this.rng() * 1.2 - d * 0.2 });
+        const top = this.rand(Math.min(44, r + 30), 44); // how high its center rises above the ground
+        Object.assign(saw, { x0: x, x1: x, y0: gy + 1, y1: gy - top, period: 1.5 + this.rng() * 1.1 - d * 0.2 });
       } else {
         // rises up out of a pit and sinks back down: jump across while it's down
         const x = this.col * TILE + TILE * 2;
