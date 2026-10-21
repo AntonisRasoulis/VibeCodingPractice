@@ -45,7 +45,8 @@ class Level {
     this.signs = [];          // wooden signs where a new biome starts
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
-    this.bearSpots = [];      // once per snow biome: when the leader gets here, a bear charges in
+    this.bearSpots = [];      // twice per snow biome: when the leader gets here, a bear charges in
+    this.missileSpots = [];   // in the prairie: when the leader gets here, a missile comes
     this.quick = [];          // quick[x] = true where the ground's surface is quicksand
     this.tumbleSpots = [];    // where tumbleweeds start rolling from
     this.cols = [];      // cols[x][row] = tile type
@@ -62,7 +63,9 @@ class Level {
     this.nextId = 1;
     this.biomes = options.biomes !== false; // off: the whole course stays in the starting biome
     this.biomeEnd = this.biomes ? this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]) : Infinity;
-    this.addBiomeEvents(this.biomeEnd);
+    // With biomes off it's all prairie: every MISSILE.stretch meters counts as one "biome" for the missiles
+    this.stretchEnd = this.biomes ? Infinity : MISSILE.stretch;
+    this.addBiomeEvents(this.biomes ? this.biomeEnd : MISSILE.stretch);
     this.flat(30); // calm start
   }
 
@@ -329,6 +332,10 @@ class Level {
   // ---- Sections ----
 
   addSection() {
+    if (this.col >= this.stretchEnd) {
+      this.addBiomeEvents(MISSILE.stretch);
+      this.stretchEnd += MISSILE.stretch;
+    }
     if (this.col >= this.biomeEnd) return this.newBiome();
     // In the snow, many sections are built on ice: the run-up, the ground under the danger and the landing
     this.iceBias = this.biome === "snow" && this.rng() < SNOW.iceSections;
@@ -358,6 +365,13 @@ class Level {
 
   // Each biome's special danger. Snow: two bears, at random spots in the biome (at least 70 m apart).
   addBiomeEvents(length) {
+    if (this.biome === "prairie") {
+      // Missiles: usually 2 (MISSILE.perBiome), spread out across the biome
+      const n = Number(this.pickWeighted(MISSILE.perBiome));
+      const part = length / n;
+      for (let i = 0; i < n; i++) this.missileSpots.push({ col: this.col + Math.round(part * (i + 0.25 + this.rng() * 0.5)), used: false });
+      return;
+    }
     if (this.biome !== "snow") return;
     const last = Math.max(110, length - 140); // the chases should be over before the snow ends
     const first = this.rand(40, Math.max(40, last - 70));

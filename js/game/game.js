@@ -51,7 +51,6 @@ const Game = (() => {
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
       drones: [],   // rescue drones: guarding a player, or flying to grab the leader
       nextVulture: null, // the leader's distance (meters) when the next group comes
-      nextMissile: null, // the leader's distance (meters) when the next missile comes (set once someone passes 300m)
       winner: null,
     };
     for (const p of world.players) {
@@ -443,14 +442,13 @@ const Game = (() => {
 
   function updateMissiles(dt) {
     const { players, level } = world;
-    // Once anyone passes 300m, a missile comes about every 200m the leader runs
+    // When the leader reaches one of the prairie's missile spots (past 400 m), a missile comes.
+    // One at a time: if one is still in the air, the next waits for it.
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
-    if (leaderMeters > MISSILE.startAt) {
-      if (world.nextMissile === null) world.nextMissile = leaderMeters + rand(20, MISSILE.every[1]);
-      if (leaderMeters >= world.nextMissile) {
-        spawnMissile();
-        world.nextMissile = leaderMeters + rand(MISSILE.every[0], MISSILE.every[1]);
-      }
+    for (const spot of level.missileSpots) {
+      if (spot.used || leaderMeters < spot.col || world.missiles.length) continue;
+      spot.used = true;
+      if (spot.col >= MISSILE.startAt) spawnMissile();
     }
 
     for (const m of world.missiles) {

@@ -94,7 +94,8 @@ const THREATS = {
 const MISSILE = {
   startAt: THREATS.baseAt,      // meters before the first black missile can come
   stripedAt: THREATS.specialAt, // meters before red-striped missiles can come too
-  every: [160, 240], // random meters run (by the leader) between missiles: about 1 per 200m
+  perBiome: { 1: 15, 2: 75, 3: 10 }, // how many come in each prairie biome (in %): usually 2
+  stretch: 350,      // with biomes off, every this many meters counts as one prairie "biome"
   approach: 1.4,   // seconds zooming in from far away in the background
   lock: 0.6,       // seconds aiming (red target + aim line) before it fires
   speed: 340,      // how fast it flies once fired (normal running is 96)
