@@ -84,6 +84,7 @@ class Level {
     this.saws = [];      // spinning saw blades: sliding along a slot in the ground, or up and down a rail
     this.traps = [];     // bear traps in the prairie grass: { id, x (middle), size, bush }
     this.bushes = [];    // bushes you can hide in: { x0, w, h, gy, seed, berries, tops, torn }
+    this.scatterFrom = 0; // traps and bushes have been sprinkled over the course up to here
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -214,10 +215,10 @@ class Level {
 
   // Could a hazard get someone standing still at (x, y)? A mace swinging through,
   // a shooter's spikes, or icicles that would drop on them.
-  threatened(x, y) {
+  threatened(x, y, ignoreTraps = false) {
     if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
-    if (this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
+    if (!ignoreTraps && this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
@@ -376,7 +377,7 @@ class Level {
 
     const weights = { flat: 1, step: 2, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 4 };
     if (this.col > 60) Object.assign(weights, { shooter: 5, saw: 5 });
-    if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 3, bush: 3 });
+    if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 2, bush: 2 });
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
@@ -384,6 +385,104 @@ class Level {
     const type = this.pickWeighted(weights);
     SECTIONS[type].call(this, this.difficulty());
     this.flat(this.rand(1, 3), false); // breathing room between sections (never icy)
+    this.scatter();
+  }
+
+  // Prairie: sprinkle bear traps and bushes all over the course, not just in their own sections.
+  // Done a little behind the newest section, so everything around a spot is already built.
+  scatter() {
+    const until = this.col - SCATTER.behind;
+    for (const bush of this.bushes) {
+      if (!bush.wantsTrap || bush.x0 + bush.w >= until * TILE) continue;
+      bush.wantsTrap = false;
+      this.tryTrap(Math.floor((bush.x0 + bush.w / 2) / TILE), bush);
+    }
+    for (let c = Math.max(this.scatterFrom, 61); c < until; c++) {
+      if (this.colBiome[c] !== "prairie") continue;
+      const roll = this.rng();
+      if (roll < SCATTER.trap) this.tryTrap(c, null);
+      else if (roll < SCATTER.trap + SCATTER.bush) this.tryBush(c);
+    }
+    this.scatterFrom = Math.max(this.scatterFrom, until);
+  }
+
+  // A scattered trap only goes where it can always be jumped over: 5 tiles of flat ground on
+  // each side, nothing overhead in the way of a jump, no spikes, pits
+  // edges, saw slots, portals or other traps close by. The deadly large ones also stay out of
+  // reach of other dangers, so you never have to dodge two things at once to get past one.
+  trapFits(c, size) {
+    const g = this.groundTop(c * TILE);
+    if (g === null) return false;
+    const row = g / TILE;
+    for (let k = -5; k <= 5; k++) {
+      const col = this.cols[c + k], gk = this.groundTop((c + k) * TILE);
+      if (!col || gk === null || this.isQuick(c + k) || this.isIce(c + k) || this.colBiome[c + k] !== "prairie") return false;
+      if (gk !== g) return false; // flat all round: no hopping up a step straight onto it
+      for (let r = row - 6; r < gk / TILE; r++) if (this.tile(c + k, r) !== T_EMPTY) return false; // spikes, shooters, ledges
+    }
+    const x = c * TILE + TILE / 2 + 0.5, near = (px, tiles) => Math.abs(px - x) < tiles * TILE;
+    if (this.traps.some((t) => near(t.x, 8))) return false;
+    const reach = TRAP.sizes[size] + TILE; // never hidden by some other bush by accident
+    if (this.bushes.some((bu) => bu !== this.trapBush && x > bu.x0 - reach && x < bu.x0 + bu.w + reach)) return false;
+    if (this.saws.some((s) => s.kind !== "pit" && x > Math.min(s.x0, s.x1) - s.r - TILE && x < Math.max(s.x0, s.x1) + s.r + TILE)) return false;
+    if (this.portals.some((p) => x > p.x - 8 * TILE && x < p.toX + 4 * TILE)) return false;
+    if (this.platforms.some((p) => x + 5 * TILE > p.x && x - 5 * TILE < p.x + p.w && p.y > g - 7 * TILE)) return false;
+    if (this.orbs.some((o) => near(o.x, 3))) return false;
+    if (size === 2 && this.threatened(x - HITBOX_W / 2, g - HITBOX_H)) return false;
+    // Between two dangers there must still be somewhere safe to stand and wait for your moment
+    const edge = (dir) => {
+      for (let k = 1; k <= 20; k++) {
+        const ex = x - HITBOX_W / 2 + dir * k * TILE / 2, eg = this.groundTop(ex + HITBOX_W / 2);
+        if (eg !== null && this.threatened(ex, eg - HITBOX_H, true)) return ex;
+      }
+      return null;
+    };
+    const left = edge(-1), right = edge(1);
+    if (left !== null && right !== null) {
+      this.traps.push({ x, size });
+      let room = false;
+      for (let sx = left + 1; sx + HITBOX_W < right && !room; sx += 2) {
+        const sg = this.groundTop(sx);
+        room = sg !== null && sg === this.groundTop(sx + HITBOX_W - 1) && !this.isQuick(Math.floor(sx / TILE)) && !this.threatened(sx, sg - HITBOX_H);
+      }
+      this.traps.pop();
+      if (!room) return false;
+    }
+    return true;
+  }
+
+  tryTrap(c, bush) {
+    this.trapBush = bush; // (a trap may sit in its own bush)
+    let size = this.col >= THREATS.baseAt && c >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+    if (size === 2 && !this.trapFits(c, 2)) size = this.rand(0, 1); // too risky here for a deadly one
+    if (!this.trapFits(c, size)) return false;
+    this.traps.push({ id: this.nextId++, x: c * TILE + TILE / 2 + 0.5, size, bush });
+    return true;
+  }
+
+  // A scattered bush: flat ground under all of it (and a tile either side), nothing in the way
+  // above, and it never covers spikes, saw slots, pits or other traps, so it can't hide a danger.
+  tryBush(c) {
+    const [w, h] = this.pickFrom(BUSH.sizes);
+    const x0 = c * TILE + 2, c1 = Math.ceil((x0 + w) / TILE);
+    const g = this.groundTop(c * TILE);
+    if (g === null) return false;
+    for (let k = c - 1; k <= c1; k++) {
+      if (!this.cols[k] || this.groundTop(k * TILE) !== g || this.isQuick(k) || this.isIce(k) || this.colBiome[k] !== "prairie") return false;
+      for (let r = g / TILE - Math.ceil(h / TILE) - 1; r < g / TILE; r++) if (this.tile(k, r) !== T_EMPTY) return false;
+    }
+    const left = x0 - TILE, right = x0 + w + TILE;
+    if (this.bushes.some((bu) => bu.x0 < right + TILE && bu.x0 + bu.w > left - TILE)) return false;
+    if (this.traps.some((t) => t.x > left - 2 * TILE && t.x < right + 2 * TILE)) return false;
+    if (this.saws.some((s) => s.kind !== "pit" && Math.max(s.x0, s.x1) + s.r > left && Math.min(s.x0, s.x1) - s.r < right)) return false;
+    if (this.portals.some((p) => right > p.x - 4 * TILE && left < p.toX + 4 * TILE)) return false;
+    if (this.platforms.some((p) => right > p.x && left < p.x + p.w && p.y > g - h - TILE)) return false;
+    if (this.orbs.some((o) => o.x > left - TILE && o.x < right + TILE)) return false;
+    const bush = { x0, w, h, gy: g, seed: this.rng() * 100, berries: this.rng() < 0.35, torn: false };
+    bush.tops = bushTops(w, h, bush.seed);
+    this.bushes.push(bush);
+    if (this.rng() < TRAP.inBush) this.tryTrap(Math.floor((x0 + w / 2) / TILE), bush);
+    return true;
   }
 
   // A calm stretch, then a sign, and from there on a different biome
@@ -588,14 +687,14 @@ const SECTIONS = {
 
   // Bear traps lying in the grass: one, or later two in a row. Small and medium ones hold you
   // for a moment; large ones (only after 400 m) kill.
+  // (5+ tiles of flat ground on each side of every trap, so it can always be jumped over)
   trap(d) {
-    this.flat(4, false);
+    this.flat(6, false);
     const count = d > 0.4 && this.rng() < 0.4 ? 2 : 1;
     for (let i = 0; i < count; i++) {
-      this.addTrap(this.col + 2, null);
-      this.flat(5, false);
+      this.addTrap(this.col, null);
+      this.flat(i + 1 < count ? 9 : 6, false);
     }
-    this.flat(3, false);
   },
 
   // A few bushes to hide in. Each one might have a trap hidden inside (TRAP.inBush).
@@ -605,8 +704,8 @@ const SECTIONS = {
       const [w, h] = this.pickFrom(BUSH.sizes);
       const bush = { x0: this.col * TILE + 2, w, h, gy: this.groundRow * TILE, seed: this.rng() * 100, berries: this.rng() < 0.35, torn: false };
       bush.tops = bushTops(w, h, bush.seed);
+      bush.wantsTrap = this.rng() < TRAP.inBush; // put in later (scatter), once there's room around it to check
       this.bushes.push(bush);
-      if (this.rng() < TRAP.inBush) this.addTrap((bush.x0 + w / 2) / TILE, bush);
       this.flat(Math.ceil((w + 4) / TILE) + this.rand(1, 4), false);
     }
   },
@@ -627,7 +726,7 @@ const SECTIONS = {
         phase: this.rng(),
         spin: (this.rng() < 0.5 ? -1 : 1) * (3 + this.rng() * 4),
       });
-      this.flat(i + 1 < count ? 16 : 12); // room to stop safely between two maces (even if the next section starts with one)
+      this.flat(i + 1 < count ? 18 : 12); // room to stop safely between two maces (even if the next section starts with one)
     }
   },
 

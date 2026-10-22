@@ -173,7 +173,12 @@ const SHOOTER = {
 const TRAP = {
   sizes: [4, 6, 8],  // jaw radius in pixels: small, medium, large
   hold: [1, 2],      // seconds a small / medium trap holds you (a large one kills)
-  inBush: 0.1,       // chance a bush has a trap hidden in it
+  inBush: 0.18,      // chance to try hiding a trap in a bush (some have no room for one: about 10% end up with one)
+};
+const SCATTER = {   // traps and bushes sprinkled all over the prairie, not just in their own sections
+  trap: 0.035,      // chance per column to try a trap there (most spots don't fit)
+  bush: 0.03,       // ...and a bush
+  behind: 24,       // done this many tiles behind the newest section, once its neighbours are built
 };
 const BUSH = {
   sizes: [[16, 14], [22, 15], [30, 17], [40, 20]], // [width, height] in pixels
