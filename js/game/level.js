@@ -35,6 +35,31 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+// How tall a bush is in each of its columns: tops[x] = the first leafy row from the top
+// (or null if that column is empty). Shared by drawing and hiding, so what you see is what hides you.
+function bushShape(w, h, seed) {
+  const bumps = 3 + Math.round(w / 6);
+  const ph = seed * 1.7;
+  return (x, y) => {
+    const nx = (x + 0.5 - w / 2) / (w / 2), ny = (h - (y + 0.5)) / h; // nx -1..1, ny 0 (ground)..1 (top)
+    if (ny < 0 || Math.abs(nx) > 1.05) return false;
+    const a = Math.atan2(ny, nx);
+    const lumpy = 1 + 0.09 * Math.sin(a * bumps + ph) + 0.05 * Math.sin(a * bumps * 2.3 + ph * 2);
+    return Math.sqrt(nx * nx + ny * ny) <= lumpy && !(ny < 0.12 && Math.abs(nx) > 0.92);
+  };
+}
+
+function bushTops(w, h, seed) {
+  const inside = bushShape(w, h, seed);
+  const tops = [];
+  for (let x = 0; x < w; x++) {
+    let top = null;
+    for (let y = 0; y < h && top === null; y++) if (inside(x, y)) top = y;
+    tops.push(top);
+  }
+  return tops;
+}
+
 class Level {
   constructor(seed, startBiome = "prairie", options = {}) {
     this.rng = makeRng(seed);
@@ -57,6 +82,8 @@ class Level {
     this.maces = [];     // spiked balls swinging on chains
     this.shooters = [];  // blocks that fire spikes diagonally
     this.saws = [];      // spinning saw blades: sliding along a slot in the ground, or up and down a rail
+    this.traps = [];     // bear traps in the prairie grass: { id, x (middle), size, bush }
+    this.bushes = [];    // bushes you can hide in: { x0, w, h, gy, seed, berries, tops, torn }
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -179,11 +206,18 @@ class Level {
     return null;
   }
 
+  // A bear trap with its middle at column `col` (large ones only after 400 m)
+  addTrap(col, bush) {
+    const size = this.col >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+    this.traps.push({ id: this.nextId++, x: Math.round(col * TILE) + 0.5, size, bush });
+  }
+
   // Could a hazard get someone standing still at (x, y)? A mace swinging through,
   // a shooter's spikes, or icicles that would drop on them.
   threatened(x, y) {
     if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
+    if (this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
@@ -342,6 +376,7 @@ class Level {
 
     const weights = { flat: 1, step: 2, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 4 };
     if (this.col > 60) Object.assign(weights, { shooter: 5, saw: 5 });
+    if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 3, bush: 3 });
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
@@ -548,6 +583,31 @@ const SECTIONS = {
       }
       this.saws.push(saw);
       this.flat(i + 1 < count ? 12 : 3, false); // room to stop safely between two saws
+    }
+  },
+
+  // Bear traps lying in the grass: one, or later two in a row. Small and medium ones hold you
+  // for a moment; large ones (only after 400 m) kill.
+  trap(d) {
+    this.flat(4, false);
+    const count = d > 0.4 && this.rng() < 0.4 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      this.addTrap(this.col + 2, null);
+      this.flat(5, false);
+    }
+    this.flat(3, false);
+  },
+
+  // A few bushes to hide in. Each one might have a trap hidden inside (TRAP.inBush).
+  bush() {
+    this.flat(3, false);
+    for (let i = this.rand(1, 3); i > 0; i--) {
+      const [w, h] = this.pickFrom(BUSH.sizes);
+      const bush = { x0: this.col * TILE + 2, w, h, gy: this.groundRow * TILE, seed: this.rng() * 100, berries: this.rng() < 0.35, torn: false };
+      bush.tops = bushTops(w, h, bush.seed);
+      this.bushes.push(bush);
+      if (this.rng() < TRAP.inBush) this.addTrap((bush.x0 + w / 2) / TILE, bush);
+      this.flat(Math.ceil((w + 4) / TILE) + this.rand(1, 4), false);
     }
   },
 

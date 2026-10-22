@@ -75,23 +75,32 @@ const Renderer = (() => {
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
+    drawTraps(world.level, player, other, camX);
+    drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
-    if (other && !other.dead && !other.caught) {
+    // (someone hiding in a bush can't be seen, on either screen)
+    if (other && !other.dead && !other.caught && !other.hiddenIn) {
       b.globalAlpha = 0.35; // the other runner shows as a ghost
       drawRunner(other, camX);
       b.globalAlpha = 1;
     }
-    if (!player.dead && !player.caught && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
+    if (!player.dead && !player.caught && !player.hiddenIn && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
       drawDashEffects(player, camX, world.time);
       drawRunner(player, camX);
       if (player.frozen > 0) drawIce(player, camX);
       if (player.honey > 0) drawHoney(player, camX, world.time);
     }
+    for (const p of [player, other]) {
+      if (!p || p.trapped <= 0 || p.dead) continue; // the jaws in front of someone's legs
+      const t = world.level.traps.find((tt) => tt.id === p.trapId);
+      if (t) drawTrap(t.x - camX, world.level.groundTop(t.x) ?? p.y + HITBOX_H, t.size, "shut");
+    }
+    drawBushes(world.level, camX, false); // whole bushes: in front, so they hide whoever is inside
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
-    if (player.power && !player.dead) drawCrackle(player, camX, world.time);
+    if (player.power && !player.dead && !player.hiddenIn) drawCrackle(player, camX, world.time);
     for (const h of world.hands) drawHand(h, world, camX);
     for (const m of world.missiles) if (m.state !== "approach") drawMissile(m, world, camX);
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
@@ -1098,6 +1107,133 @@ const Renderer = (() => {
   }
 
   // ---- Swinging maces ----
+
+  // ---- Bear traps and bushes ----
+
+  // Each player has their own traps: on your screen, a trap is shut if it got you,
+  // or if it's holding the other player right now
+  function drawTraps(level, player, other, camX) {
+    for (const t of level.traps) {
+      const sx = t.x - camX;
+      if (sx < -40 || sx > VIEW_W + 40) continue;
+      if (t.bush && !t.bush.torn) continue; // hidden in a bush
+      const shut = player.trapState.has(t.id) || (other && other.trapped > 0 && other.trapId === t.id);
+      const gy = level.groundTop(t.x);
+      if (gy !== null) drawTrap(sx, gy, t.size, shut ? "shut" : "open");
+    }
+  }
+
+  // A bear trap, like a real one: two round jaws hinged on posts at each end, a round trigger pan
+  // in the middle, a long leaf spring out each side and a chain. Open, it lies flat in the grass
+  // (hard to spot); snapped, the jaws stand up in an arch with the teeth meshed and the springs sprung.
+  function drawTrap(cx, gy, size, state) {
+    const w = TRAP.sizes[size];
+    const sp = Math.round(w * 0.9); // how far each spring sticks out
+    const px = (c, x, y, ww = 1, hh = 1) => { b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), ww, hh); };
+    cx = Math.round(cx);
+    const steel = "#b4bac3", shade = "#7d838d", dark = "#2b2d33", tooth = "#ffffff";
+    const base = gy - 1;
+    // chain off the right spring, to a stake
+    const links = size === 2 ? 5 : 3, chainX = cx + w + sp + 2;
+    for (let k = 0; k < links; k++) px(k % 2 ? steel : shade, chainX + k, base - (k % 2));
+    px(dark, chainX + links, base - 3, 1, 4);
+    px("#8a5a3c", chainX + links, base - 4);
+    // the leaf springs: long thin V's lying sideways, a loop at the far end
+    for (const side of [-1, 1]) {
+      const x0 = cx + side * (w + 1), x1 = cx + side * (w + sp);
+      const spread = state === "shut" ? Math.round(w * 0.6) : 0; // snapped: the spring has sprung open
+      for (let i = 0; i <= sp; i++) {
+        const f = 1 - i / sp; // 1 at the jaw, 0 at the loop
+        px(dark, x0 + side * i, base);
+        if (spread) px(shade, x0 + side * i, base - 1 - Math.round(spread * f));
+      }
+      px(dark, x1 + side, base - (spread ? 2 : 1), 1, spread ? 3 : 2);
+      if (spread) px(steel, x1 + side * 2, base - 1);
+    }
+    if (state === "open") {
+      // jaws lying flat: a thin ring, teeth poking up here and there, the pan in the middle
+      px(dark, cx - w, base, 2 * w + 1, 1);
+      px(shade, cx - w, base - 1, 2 * w + 1, 1);
+      for (let dx = -w + 1; dx < w; dx += 2) if (Math.abs(dx) > 1) px(tooth, cx + dx, base - 2);
+      px(dark, cx - w - 1, base - 1);
+      px(dark, cx + w + 1, base - 1);
+      px(size === 2 ? "#d1403a" : "#9a6a44", cx - 1, base - 1, 3, 1); // red pan on the deadly large one
+    } else {
+      // snapped: both jaws stood up and slammed together into one arch, teeth meshed in a zigzag along the top
+      const h = Math.round(w * 1.05);
+      for (let dx = -w; dx <= w; dx++) {
+        const k = Math.sqrt(Math.max(0, 1 - (dx / (w + 0.4)) ** 2));
+        const top = base - Math.round(h * k);
+        px(dark, cx + dx, top - 1);
+        px(dx < 0 ? steel : shade, cx + dx, top);
+        px(shade, cx + dx, top + 1);
+        if (Math.abs(dx) >= w - 1) px(dx < 0 ? steel : shade, cx + dx, top, 1, base - top);
+        if (k > 0.3) px((dx + 64) % 2 ? tooth : dark, cx + dx, top - 2 + ((dx + 64) % 2));
+      }
+      px(dark, cx - w - 1, base - 2, 1, 3);
+      px(dark, cx + w + 1, base - 2, 1, 3);
+      px(dark, cx - w + 1, base, 2 * w - 1, 1);
+      px(size === 2 ? "#d1403a" : "#9a6a44", cx - 2, base - 1, 5, 1);
+    }
+  }
+
+  // Bushes: torn ones (a trap went off inside) are drawn behind the runners, whole ones in front
+  function drawBushes(level, camX, torn) {
+    for (const bush of level.bushes) {
+      if (bush.torn !== torn) continue;
+      const sx = Math.round(bush.x0 - camX);
+      if (sx > VIEW_W || sx + bush.w < 0) continue;
+      if (!bush.sprite) bush.sprite = { whole: makeBushSprite(bush, false), torn: makeBushSprite(bush, true) };
+      b.drawImage(torn ? bush.sprite.torn : bush.sprite.whole, sx, bush.gy - bush.h - 8);
+    }
+  }
+
+  // A rounded, lumpy dome of leaves, lit from the top-left (drawn once, then reused)
+  function makeBushSprite(bush, torn) {
+    const { w, h, seed } = bush;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h + 8; // room above for leaves flying off a torn bush
+    const g = c.getContext("2d");
+    const inside = bushShape(w, h, seed);
+    const rnd = (a, k) => { const s = Math.sin(a * 127.1 + k * 311.7 + seed * 74.7) * 43758.5453; return s - Math.floor(s); };
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!inside(x, y)) continue;
+        if (torn && y < h - 3 && rnd(x >> 1, y >> 1) < 0.4) continue; // leaves knocked off
+        const nx = (x - w / 2) / (w / 2), ny = 1 - y / h;
+        const lx = x % 3, ly = (y + (Math.floor(x / 3) % 2)) % 3;
+        const leaf = rnd(Math.floor(x / 3), Math.floor((y + (Math.floor(x / 3) % 2)) / 3));
+        let col;
+        if (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1)) col = "#1d4a33"; // outline
+        else if (!inside(x, y - 2) && nx < 0.5) col = "#7ad35f";                           // sunlit rim
+        else if (ny < 0.22) col = lx === 0 && leaf < 0.5 ? "#3e8948" : "#265c42";          // shade near the ground
+        else if (lx === 0 && ly === 0 && leaf < 0.45) col = nx - ny < -0.2 ? "#7ad35f" : "#63c74d"; // a few leaf highlights
+        else if (lx === 2 && ly === 2 && leaf > 0.8) col = "#265c42";                       // the odd gap under a leaf
+        else col = nx + (1 - ny) > 1.1 ? "#357a42" : "#3e8948";                           // darker on the right
+        g.fillStyle = col;
+        g.fillRect(x, y + 8, 1, 1);
+      }
+    }
+    if (bush.berries) {
+      for (let k = 0; k < Math.max(2, Math.floor(w / 7)); k++) {
+        const bx = 2 + Math.floor(rnd(k, 9) * (w - 4)), by = 3 + Math.floor(rnd(k, 4) * (h - 7));
+        if (inside(bx, by) && inside(bx, by - 2) && inside(bx - 1, by) && inside(bx + 1, by)) {
+          g.fillStyle = "#e43b44";
+          g.fillRect(bx, by + 8, 1, 1);
+          g.fillStyle = "#ff9aa0";
+          g.fillRect(bx, by + 7, 1, 1);
+        }
+      }
+    }
+    if (torn) {
+      for (let k = 0; k < 7; k++) {
+        g.fillStyle = k % 2 ? "#3e8948" : "#63c74d";
+        g.fillRect(Math.floor(rnd(k, 1) * w), 7 - Math.floor(rnd(k, 2) * 7), k % 3 ? 1 : 2, 1);
+      }
+    }
+    return c;
+  }
 
   // ---- Saw blades ----
 

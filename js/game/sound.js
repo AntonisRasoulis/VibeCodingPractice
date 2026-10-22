@@ -213,6 +213,15 @@ const Sound = (() => {
     trample: () => { tone({ f: 150, to: 900, dur: 0.35, type: "square", vol: 0.12 }); noise({ f: 600, dur: 0.12, vol: 0.3 }); },
     grumble: () => tone({ f: 90, to: 60, dur: 0.7, type: "sawtooth", vol: 0.12, attack: 0.1, vibrato: 12 }),
 
+    // Bear traps and bushes
+    trapSnap: () => {
+      noise({ filter: "highpass", f: 2500, dur: 0.08, vol: 0.6 });
+      tone({ f: 1800, to: 900, dur: 0.18, type: "square", vol: 0.1 });
+      tone({ f: 2600, dur: 0.25, type: "sine", vol: 0.06, at: 0.02 });
+    },
+    trapOpen: () => { tone({ f: 500, to: 900, dur: 0.12, type: "square", vol: 0.07 }); noise({ filter: "highpass", f: 1800, dur: 0.06, vol: 0.25 }); },
+    rustle: () => noise({ filter: "bandpass", f: 2200, to: 1400, q: 1.2, dur: 0.25, vol: 0.22, attack: 0.03 }),
+
     // Level dangers
     shooterFire: () => tone({ f: 800, to: 250, dur: 0.12, vol: 0.09 }),
     maceSwoosh: () => noise({ filter: "bandpass", f: 400, to: 900, q: 2, dur: 0.28, vol: 0.4, attack: 0.1 }),

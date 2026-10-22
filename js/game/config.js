@@ -169,6 +169,16 @@ const SHOOTER = {
   warn: 0.45,   // seconds the shooter glows and shakes before each volley
 };
 
+// Prairie: bear traps lying in the grass, and bushes to hide in (some with a trap inside)
+const TRAP = {
+  sizes: [4, 6, 8],  // jaw radius in pixels: small, medium, large
+  hold: [1, 2],      // seconds a small / medium trap holds you (a large one kills)
+  inBush: 0.1,       // chance a bush has a trap hidden in it
+};
+const BUSH = {
+  sizes: [[16, 14], [22, 15], [30, 17], [40, 20]], // [width, height] in pixels
+};
+
 const SAW = {
   sizes: [6, 9, 12], // blade radius in pixels: small, medium, large
   spin: 14,          // how fast the blades spin (radians per second)

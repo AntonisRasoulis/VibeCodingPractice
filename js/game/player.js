@@ -48,6 +48,10 @@ class Player {
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
     this.fallState = new Map();  // crumbling platforms *this* player has stepped on
     this.icicleState = new Map(); // icicles *this* player has set off (each player gets their own, like the platforms)
+    this.trapState = new Set();   // bear traps that have snapped on *this* player (each player gets their own)
+    this.trapped = 0;             // seconds left stuck in a bear trap
+    this.trapId = null;           // ...which one
+    this.hiddenIn = null;         // the bush we're hiding in (nobody can see us)
     this.snowballs = [];          // snowballs rolling at this player
     this.snowballStarted = new Set();
     this.onIce = false;
@@ -80,7 +84,7 @@ class Player {
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
     if (this.caught) return;
-    if (this.held) return; // being carried by a hand
+    if (this.held) { this.trapped = 0; return; } // being carried by a hand (it pulls you out of a trap)
 
     if (this.dead) {
       this.deadTimer -= dt;
@@ -151,6 +155,15 @@ class Player {
       this.jumpBuffer = 0;
     }
 
+    // Caught in a bear trap: can't move until it lets go
+    if (this.trapped > 0) {
+      this.trapped -= dt;
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+      this.jumpBuffer = 0;
+      this.vx = 0;
+      if (this.trapped <= 0) Sound.play("trapOpen");
+    }
+
     // Running
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     if (dir !== 0) {
@@ -203,9 +216,12 @@ class Player {
     }
     if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
 
+    if (this.onGround && !this.standingOn && !this.inQuick) this.checkTraps(level);
+    if (this.dead) return;
     this.checkHazards(level);
     if (this.dead) return;
     this.checkPortals(level);
+    this.checkBushes(level);
 
     if (this.onGround && !this.standingOn) this.rememberSafeSpot(level);
     this.animDist += Math.abs(this.vx * dt);
@@ -554,6 +570,44 @@ class Player {
     }
   }
 
+  // Stepping on an open bear trap: it snaps shut. Large ones kill; the others hold you for a bit.
+  checkTraps(level) {
+    const cx = this.x + HITBOX_W / 2;
+    for (const t of level.traps) {
+      if (this.trapState.has(t.id) || Math.abs(cx - t.x) > TRAP.sizes[t.size] - 1) continue;
+      this.trapState.add(t.id);
+      this.trapId = t.id;
+      if (t.bush) t.bush.torn = true; // the snap tears the bush open: no more hiding in it
+      Sound.play("trapSnap");
+      this.sparkle("#ffffff");
+      if (t.size === 2) {
+        this.showHit("SNAP!", "#ff4d3d");
+        return this.die();
+      }
+      this.trapped = TRAP.hold[t.size];
+      this.vx = 0;
+      this.x = t.x - HITBOX_W / 2; // the jaws grab you right in the middle
+      this.showHit("TRAPPED!", "#d6dbe2");
+      return;
+    }
+  }
+
+  // Inside a bush (every column of us under its leaves)? Then nobody can see us.
+  checkBushes(level) {
+    const was = this.hiddenIn;
+    this.hiddenIn = null;
+    for (const bush of level.bushes) {
+      if (bush.torn || this.x < bush.x0 || this.x + HITBOX_W > bush.x0 + bush.w || this.y + HITBOX_H > bush.gy + 1) continue;
+      let covered = true;
+      for (let x = Math.floor(this.x - bush.x0); x < Math.ceil(this.x + HITBOX_W - bush.x0) && covered; x++) {
+        const top = bush.tops[x];
+        if (top === null || top === undefined || this.y < bush.gy - bush.h + top + 1) covered = false;
+      }
+      if (covered) { this.hiddenIn = bush; break; }
+    }
+    if (this.hiddenIn && this.hiddenIn !== was) Sound.play("rustle");
+  }
+
   checkPortals(level) {
     if (this.portalCooldown > 0) return;
     for (const portal of level.portals) {
@@ -583,6 +637,8 @@ class Player {
 
   die() {
     if (this.dead) return;
+    this.trapped = 0;
+    this.hiddenIn = null;
     this.held = false;
     this.stun = 0;
     this.spin = 0;
@@ -625,6 +681,9 @@ class Player {
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
     this.icicleState.clear(); // ...and so do icicles
+    this.trapState.clear();   // ...and bear traps
+    this.trapped = 0;
+    this.hiddenIn = null;
     this.honey = 0;
     this.inQuick = false;
     this.tumbleweeds = [];
