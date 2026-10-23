@@ -13,7 +13,7 @@ const Game = (() => {
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
     "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome",
-    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "hiddenIn", "inSink", "sinkT", "sinkFrom"];
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -122,8 +122,23 @@ const Game = (() => {
     updateBears(dt);
     updateVultures(dt);
     checkOrbs();
+    checkThinIce();
     levelSounds();
     checkFire();
+  }
+
+  // Both players standing on the same thin ice at once: too heavy, it breaks
+  function checkThinIce() {
+    const { players, level } = world;
+    if (players.length < 2) return;
+    for (const pond of level.ponds) {
+      if (pond.state !== "ice") continue;
+      const on = players.filter((p) => !p.dead && !p.caught && p.onGround && !p.standingOn && level.pondAt(p.x + HITBOX_W / 2) === pond);
+      if (on.length === players.length) {
+        level.breakPond(pond);
+        for (const p of on) p.freezeIn(pond); // both go in together: one block of ice
+      }
+    }
   }
 
   // Shooters firing and maces swooshing past, if a player is close enough to hear them
@@ -188,6 +203,8 @@ const Game = (() => {
             return;
           }
           for (const f of SWAP_FIELDS) [a[f], b[f]] = [b[f], a[f]];
+          // (a pond remembers who's frozen in it: that moves with the swap too)
+          for (const pond of world.level.ponds) pond.frozen = pond.frozen.map((q) => (q === a ? b : q === b ? a : q));
           Renderer.swapCameras();
           world.swapFlash = 1;
           Sound.play("swap");

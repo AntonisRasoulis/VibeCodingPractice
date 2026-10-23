@@ -86,6 +86,7 @@ class Level {
     this.bushes = [];    // bushes you can hide in: { x0, w, h, gy, seed, berries, tops, torn }
     this.scatterFrom = 0; // traps, bushes and sinkholes have been sprinkled over the course up to here
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
+    this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -220,6 +221,7 @@ class Level {
     if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
     if (!ignoreTraps && this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
+    if (!ignoreTraps && this.ponds.some((p) => x + HITBOX_W > p.x0 - 2 && x < p.x1 + 2)) return true;
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
@@ -382,6 +384,7 @@ class Level {
     if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 2, bush: 2 });
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
+    if (this.biome === "snow" && this.col > 60) weights.thinIce = 3;
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
 
@@ -401,6 +404,10 @@ class Level {
       this.tryTrap(Math.floor((bush.x0 + bush.w / 2) / TILE), bush);
     }
     for (let c = Math.max(this.scatterFrom, 61); c < until; c++) {
+      if (this.colBiome[c] === "snow") {
+        if (this.rng() < SCATTER.pond) this.tryPond(c);
+        continue;
+      }
       if (this.colBiome[c] === "desert") {
         if (this.rng() < SCATTER.sink) this.trySink(c);
         continue;
@@ -444,6 +451,7 @@ class Level {
     const x = c * TILE + TILE / 2 + 0.5, near = (px, tiles) => Math.abs(px - x) < tiles * TILE;
     if (this.traps.some((t) => near(t.x, half + 3))) return false;
     if (this.sinkholes.some((s) => near(s.x, half + 3 + (s.size === 2 ? SINK.gap : 0)))) return false;
+    if (this.ponds.some((p) => p.x1 > x - (half + 3) * TILE && p.x0 < x + (half + 3) * TILE)) return false;
     // never hidden by some other bush by accident
     if (this.bushes.some((bu) => bu !== this.trapBush && x > bu.x0 - reach - TILE && x < bu.x0 + bu.w + reach + TILE)) return false;
     if (this.saws.some((s) => s.kind !== "pit" && x > Math.min(s.x0, s.x1) - s.r - TILE && x < Math.max(s.x0, s.x1) + s.r + TILE)) return false;
@@ -473,6 +481,34 @@ class Level {
       if (!room) return false;
     }
     return true;
+  }
+
+  // Thin ice from column c, `tiles` long: flat snow all round, like the traps, so you can always
+  // walk across, jump over it, or climb out and carry on
+  tryPond(c) {
+    const tiles = this.rand(THIN_ICE.widths[0], THIN_ICE.widths[1]);
+    const mid = c + Math.floor(tiles / 2), half = Math.ceil(tiles / 2) + 5;
+    if (!this.spotFits(mid, half, false, "snow", 0, () => this.ponds.push({ x0: c * TILE, x1: (c + tiles) * TILE, state: "ice" }), () => this.ponds.pop())) return false;
+    this.addPond(c, tiles);
+    return true;
+  }
+
+  addPond(c, tiles) {
+    // (a thin ice section adds it just before building the ground under it: that ground will be at groundRow)
+    const gy = this.groundTop(c * TILE) ?? this.groundRow * TILE;
+    this.ponds.push({ id: this.nextId++, x0: c * TILE, x1: (c + tiles) * TILE, gy, state: "ice", frozen: [] });
+  }
+
+  // The thin ice gives way: from now on it's open icy water (for everyone)
+  breakPond(p) {
+    p.state = "water";
+    p.brokeAt = this.time;
+    Sound.play("iceBreak");
+  }
+
+  // The pond (if any) under the middle of someone standing at x
+  pondAt(x) {
+    return this.ponds.find((p) => x >= p.x0 && x < p.x1) || null;
   }
 
   trySink(c) {
@@ -830,6 +866,15 @@ const SECTIONS = {
       this.addSinkhole(this.col, size);
       this.flat(i + 1 < count ? 2 * SINK.gap + 9 : SINK.gap + 6, false);
     }
+  },
+
+  // A patch of thin ice over a pond, with flat snow all round
+  thinIce() {
+    this.iceBias = false;
+    this.flat(6, false);
+    const tiles = this.rand(THIN_ICE.widths[0], THIN_ICE.widths[1]);
+    this.addPond(this.col, tiles);
+    this.flat(tiles + 6, false);
   },
 
   // A pit of quicksand: step in and you sink. Spam jump to pull yourself out (or jump over it).

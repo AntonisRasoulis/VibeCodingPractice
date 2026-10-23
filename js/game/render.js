@@ -77,6 +77,7 @@ const Renderer = (() => {
     drawOrbs(world.level, camX, world.time);
     drawTraps(world.level, player, other, camX);
     drawSinkholes(world.level, camX, world.time);
+    drawPonds(world.level, world.players, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
     // (someone hiding in a bush can't be seen, on either screen)
@@ -98,6 +99,7 @@ const Renderer = (() => {
     }
     drawBushes(world.level, camX, false); // whole bushes: in front, so they hide whoever is inside
     for (const p of [player, other]) if (p && p.inSink && !p.dead) drawSinkPile(p.inSink, camX); // sand round their legs
+    drawIceBlocks(world.level, camX); // anyone frozen in a pond, in their block of ice
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
@@ -1109,6 +1111,79 @@ const Renderer = (() => {
   }
 
   // ---- Swinging maces ----
+
+  // ---- Thin ice (snow) ----
+
+  function drawPonds(level, players, camX, time) {
+    const px = (c, x, y, w = 1, h = 1) => { b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    for (const pond of level.ponds) {
+      const x0 = Math.round(pond.x0 - camX), w = pond.x1 - pond.x0, gy = pond.gy;
+      if (x0 > VIEW_W || x0 + w < 0) continue;
+      if (pond.state === "ice") {
+        // a pale, frosty sheet with the dark water just showing through in blotches
+        const someoneOn = players.some((p) => !p.dead && p.onGround && level.pondAt(p.x + HITBOX_W / 2) === pond);
+        for (let x = 0; x < w; x++) {
+          px(hash(pond.id, x * 3) < 0.15 ? "#ffffff" : "#eef7fc", x0 + x, gy);
+          px("#d3e8f4", x0 + x, gy + 1);
+          const dark = hash(pond.id + Math.floor(x / 3), 5) < 0.45;
+          px(dark ? "#7fa9c8" : "#b7d4e6", x0 + x, gy + 2);
+          px(dark ? "#5d88aa" : "#9fc2d9", x0 + x, gy + 3);
+          px("#6f6474", x0 + x, gy + 4);
+        }
+        if (someoneOn) {
+          // it creaks: cracks spread out under your feet
+          for (let k = 0; k < Math.floor(w / 9) + 1; k++) {
+            let cx = x0 + 4 + Math.floor(hash(pond.id + k, 7) * (w - 8));
+            for (let i = 0; i < 7; i++) {
+              px("#3d6688", cx, gy + (i % 3 === 1 ? 1 : 0));
+              cx += hash(k, i + pond.id) < 0.5 ? 1 : -1;
+            }
+          }
+        }
+      } else {
+        // broken: open icy water with bits of ice bobbing in it
+        for (let x = 0; x < w; x++) {
+          const wave = Math.sin(x * 0.6 + time * 5) > 0.6 ? 1 : 0;
+          px("#8ccbef", x0 + x, gy + 1 + wave);
+          px("#3f7fb2", x0 + x, gy + 2 + wave);
+          px("#2b5d8a", x0 + x, gy + 3 + wave, 1, 6 - wave);
+        }
+        for (let k = 0; k < Math.floor(w / 8); k++) {
+          const cx = x0 + 2 + Math.floor((hash(pond.id + k, 2) * w + time * 3) % (w - 5));
+          px("#f2fbff", cx, gy + 1, 3, 1);
+          px("#b9d6e8", cx, gy + 2, 3, 1);
+        }
+      }
+      px("#ffffff", x0 - 1, gy - 1, 2, 1); // snow on the banks
+      px("#ffffff", x0 + w - 1, gy - 1, 2, 1);
+    }
+  }
+
+  // Everyone frozen in the same pond shares one block of ice; cracks show their jumps so far
+  function drawIceBlocks(level, camX) {
+    const px = (c, x, y, w = 1, h = 1) => { b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    for (const pond of level.ponds) {
+      if (!pond.frozen.length) continue;
+      const xs = pond.frozen.map((p) => Math.round(p.x - camX));
+      const x = Math.min(...xs) - 2, w = Math.max(...xs) - Math.min(...xs) + HITBOX_W + 4;
+      const top = pond.gy - 9, h = 13;
+      if (x > VIEW_W || x + w < 0) continue;
+      b.globalAlpha = 0.35;
+      px("#c8ecff", x, top, w, h);
+      b.globalAlpha = 1;
+      px("#ffffff", x, top, w, 1);
+      px("#ffffff", x, top, 1, h);
+      px("#ffffff", x + 2, top + 2, 1, 3);
+      px("#5fb6e8", x + w - 1, top + 1, 1, h - 1);
+      for (const p of pond.frozen) {
+        let cx = Math.round(p.x - camX) + 1;
+        for (let c = 0; c < p.pondHits; c++, cx += 2) {
+          for (let i = 0; i < 5; i++) px("#ffffff", cx + (i % 2 ? 1 : 0), top + 1 + i * 2, 1, 2);
+        }
+      }
+      px("#3f7fb2", x - 1, pond.gy + 1, w + 2, 1); // the water lapping at the block
+    }
+  }
 
   // ---- Desert sinkholes ----
 

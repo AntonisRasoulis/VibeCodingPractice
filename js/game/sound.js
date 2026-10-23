@@ -223,6 +223,9 @@ const Sound = (() => {
     sinkOpen: () => { noise({ filter: "lowpass", f: 900, to: 200, dur: 0.5, vol: 0.4 }); tone({ f: 200, to: 90, dur: 0.4, type: "sine", vol: 0.12 }); },
     sinkSlip: () => noise({ filter: "bandpass", f: 700, to: 400, q: 1.5, dur: 0.18, vol: 0.25 }),
     sinkCollapse: () => { noise({ filter: "lowpass", f: 600, to: 120, dur: 0.9, vol: 0.55 }); tone({ f: 80, to: 40, dur: 0.8, type: "sawtooth", vol: 0.15 }); },
+    iceCrack: () => { noise({ filter: "highpass", f: 3000, dur: 0.08, vol: 0.4 }); tone({ f: 1800, to: 2400, dur: 0.06, type: "square", vol: 0.05 }); },
+    iceBreak: () => { noise({ filter: "highpass", f: 2200, dur: 0.25, vol: 0.55 }); tone({ f: 900, to: 300, dur: 0.3, type: "triangle", vol: 0.12 }); },
+    splash: () => noise({ filter: "lowpass", f: 1400, to: 300, dur: 0.45, vol: 0.4, attack: 0.02 }),
     rustle: () => noise({ filter: "bandpass", f: 2200, to: 1400, q: 1.2, dur: 0.25, vol: 0.22, attack: 0.03 }),
 
     // Level dangers

@@ -55,6 +55,8 @@ class Player {
     this.inSink = null;           // the sinkhole we're stuck in
     this.sinkT = 0;               // ...for how long
     this.sinkFrom = null;         // where we were when it got us (we slide down from there)
+    this.inPond = null;           // the icy pond we're frozen in (thin ice broke under us)
+    this.pondHits = 0;            // ...and how many jumps we've cracked our block of ice with
     this.snowballs = [];          // snowballs rolling at this player
     this.snowballStarted = new Set();
     this.onIce = false;
@@ -143,6 +145,7 @@ class Player {
     // Stuck in quicksand: sinking, unless you keep pressing jump
     if (this.inQuick) return this.updateQuicksand(dt, input, level);
     if (this.inSink) return this.updateSink(dt, input, level);
+    if (this.inPond) return this.updatePond(dt, input, level);
 
     // Thrown by a hand: no control until we recover (gravity and momentum still work)
     if (this.stun > 0) {
@@ -184,6 +187,9 @@ class Player {
     this.coyote = this.onGround ? PHYSICS.coyoteTime : this.coyote - dt;
     this.jumpBuffer = input.jumpPressed ? PHYSICS.jumpBuffer : this.jumpBuffer - dt;
     if (this.jumpBuffer > 0 && this.coyote > 0) {
+      // jumping off thin ice breaks it
+      const pond = this.onGround && !this.standingOn && level.pondAt(this.x + HITBOX_W / 2);
+      if (pond && pond.state === "ice") level.breakPond(pond);
       this.vy = -PHYSICS.jumpSpeed;
       this.jumpBuffer = 0;
       this.coyote = 0;
@@ -219,6 +225,11 @@ class Player {
       Sound.play("sandSink");
     }
     if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
+    if (this.onGround && !this.standingOn) {
+      const pond = level.pondAt(this.x + HITBOX_W / 2);
+      if (pond && pond.state === "ice" && !wasOnGround) level.breakPond(pond); // landing on thin ice breaks it
+      if (pond && pond.state === "water") this.freezeIn(pond);
+    }
 
     if (this.onGround && !this.standingOn && !this.inQuick) this.checkTraps(level);
     if (this.onGround && !this.standingOn && !this.inQuick && !this.dead) this.checkSinkholes(level);
@@ -667,6 +678,58 @@ class Player {
     this.checkHazards(level);
   }
 
+  // Into the icy water: frozen solid in a block of ice. Everyone frozen in the same pond is
+  // stuck in the same ice: the first to break out cracks it, and the others shatter with it.
+  freezeIn(pond) {
+    this.inPond = pond;
+    this.pondHits = 0;
+    pond.frozen.push(this);
+    this.x = clamp(this.x, pond.x0 - HITBOX_W / 2 + 1, pond.x1 - HITBOX_W / 2 - 1);
+    this.y = pond.gy - HITBOX_H + THIN_ICE.sink;
+    this.vx = 0;
+    this.vy = 0;
+    this.onGround = false;
+    this.hiddenIn = null;
+    Sound.play("splash");
+    Sound.play("freeze");
+    this.showHit("FROZEN!", "#a6e1ff");
+  }
+
+  updatePond(dt, input, level) {
+    const pond = this.inPond;
+    if (this.stun > 0) this.stun -= dt;
+    if (this.frozen > 0) {
+      this.frozen -= dt;
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+    }
+    this.vx = 0;
+    this.vy = 0;
+    const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    if (dir) this.facing = dir;
+    if (input.jumpPressed) {
+      this.pondHits++;
+      Sound.play("iceCrack");
+      this.sparkle("#e8f8ff");
+      if (this.pondHits >= THIN_ICE.jumpsToBreak) {
+        // Broke out! Whoever else was frozen in with us shatters with the ice
+        pond.frozen = pond.frozen.filter((q) => q !== this);
+        for (const q of pond.frozen.slice()) {
+          q.showHit("SHATTERED!", "#a6e1ff");
+          q.die();
+        }
+        this.inPond = null;
+        this.y = pond.gy - HITBOX_H - 0.5;
+        this.vy = -PHYSICS.jumpSpeed;
+        this.vx = this.facing * PHYSICS.runSpeed * 0.7;
+        this.noCut = 0.3;
+        Sound.play("iceBreak");
+        Sound.play("jump");
+        return;
+      }
+    }
+    this.checkHazards(level);
+  }
+
   // Inside a bush (every column of us under its leaves)? Then nobody can see us.
   checkBushes(level) {
     const was = this.hiddenIn;
@@ -714,6 +777,8 @@ class Player {
     if (this.dead) return;
     this.trapped = 0;
     this.inSink = null;
+    if (this.inPond) this.inPond.frozen = this.inPond.frozen.filter((q) => q !== this);
+    this.inPond = null;
     this.hiddenIn = null;
     this.held = false;
     this.stun = 0;

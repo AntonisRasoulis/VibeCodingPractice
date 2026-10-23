@@ -179,6 +179,7 @@ const SCATTER = {   // traps and bushes sprinkled all over the prairie, not just
   trap: 0.035,      // chance per column to try a trap there (most spots don't fit)
   bush: 0.03,       // ...and a bush
   sink: 0.05,       // desert: chance per column to try a sinkhole there
+  pond: 0.03,       // snow: ...and thin ice
   behind: 24,       // done this many tiles behind the newest section, once its neighbours are built
 };
 // Desert: little holes in the sand. Step too close and it spins open and pulls you in.
@@ -191,6 +192,13 @@ const SINK = {
   calm: 0.2,                // ...for this long: jump then to get out
   pull: 0.3,                // seconds to slide down to the bottom
   slip: 0.5,                // jump at the wrong moment and you slide back: no getting out for this long
+};
+// Snow: patches of thin ice over a frozen pond. Walk on it and it holds; jump on (or off) it,
+// or both stand on it at once, and it breaks: you're frozen in the icy water.
+const THIN_ICE = {
+  widths: [3, 5],    // how many tiles long a patch is (random in this range)
+  jumpsToBreak: 3,   // frozen in: jumps it takes to break out of the block of ice
+  sink: 4,           // how far into the water you sink (pixels)
 };
 const BUSH = {
   sizes: [[16, 14], [22, 15], [30, 17], [40, 20]], // [width, height] in pixels
