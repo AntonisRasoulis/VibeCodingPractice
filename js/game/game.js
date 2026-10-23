@@ -536,6 +536,14 @@ const Game = (() => {
     return { top, leaping };
   }
 
+  // Could anyone see this bear? (each screen shows from a little behind its player)
+  function bearOnScreen(bear) {
+    return world.players.some((p) => {
+      const left = p.x - VIEW_W * 0.35 - 8, right = left + VIEW_W + 16;
+      return bear.x > left && bear.x - BEAR_W < right;
+    });
+  }
+
   function updateBears(dt) {
     const { level, players } = world;
     // Once per snow biome, when the leader reaches the bear's spot, it charges in from the left
@@ -666,8 +674,13 @@ const Game = (() => {
         }
       } else if (bear.state === "swipe") {
         if (bear.t >= BEAR.swipeTime) { bear.state = "leave"; bear.t = 0; }
-      } else if (bear.t > 4) {
-        bear.done = true;
+      } else if (bear.state === "leave") {
+        // Heading home: it only disappears once nobody can see it (it runs out past the left
+        // edge of every screen, including the player behind's, instead of vanishing in front of them)
+        if (!bearOnScreen(bear) || bear.t > 30) bear.done = true;
+      } else if (bear.state === "approach" && bear.t > 15) {
+        bear.state = "leave"; // never caught up with the leader: give up (and leave out of sight)
+        bear.t = 0;
       }
     }
     world.bears = world.bears.filter((b) => !b.done);
