@@ -484,7 +484,9 @@ class Level {
   }
 
   addSinkhole(c, size) {
-    this.sinkholes.push({ id: this.nextId++, x: c * TILE + TILE / 2 + 0.5, col: c, size, gy: this.groundTop(c * TILE), state: "idle", openedAt: 0 });
+    // (a sinkhole section adds it just before building the ground under it: that ground will be at groundRow)
+    const gy = this.groundTop(c * TILE) ?? this.groundRow * TILE;
+    this.sinkholes.push({ id: this.nextId++, x: c * TILE + TILE / 2 + 0.5, col: c, size, gy, state: "idle", openedAt: 0 });
   }
 
   // A large sinkhole caves in: the ground falls away, leaving a gap for everyone
