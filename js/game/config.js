@@ -178,7 +178,19 @@ const TRAP = {
 const SCATTER = {   // traps and bushes sprinkled all over the prairie, not just in their own sections
   trap: 0.035,      // chance per column to try a trap there (most spots don't fit)
   bush: 0.03,       // ...and a bush
+  sink: 0.05,       // desert: chance per column to try a sinkhole there
   behind: 24,       // done this many tiles behind the newest section, once its neighbours are built
+};
+// Desert: little holes in the sand. Step too close and it spins open and pulls you in.
+const SINK = {
+  hole: [3, 5, 7],          // half width of the little hole you can see: small, medium, large
+  catch: [8, 11, 12],       // step (on the ground) this close to its middle and it gets you
+  funnel: [[11, 9], [16, 13]], // [half width, depth] of the hole a small / medium one opens into
+  gap: 2,                   // a large one caves in to a gap this many tiles either side (5 wide)
+  period: 0.9,              // stuck inside: the sand pours in, but stops every this many seconds...
+  calm: 0.2,                // ...for this long: jump then to get out
+  pull: 0.3,                // seconds to slide down to the bottom
+  slip: 0.5,                // jump at the wrong moment and you slide back: no getting out for this long
 };
 const BUSH = {
   sizes: [[16, 14], [22, 15], [30, 17], [40, 20]], // [width, height] in pixels

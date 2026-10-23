@@ -84,7 +84,8 @@ class Level {
     this.saws = [];      // spinning saw blades: sliding along a slot in the ground, or up and down a rail
     this.traps = [];     // bear traps in the prairie grass: { id, x (middle), size, bush }
     this.bushes = [];    // bushes you can hide in: { x0, w, h, gy, seed, berries, tops, torn }
-    this.scatterFrom = 0; // traps and bushes have been sprinkled over the course up to here
+    this.scatterFrom = 0; // traps, bushes and sinkholes have been sprinkled over the course up to here
+    this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -219,6 +220,7 @@ class Level {
     if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
     if (!ignoreTraps && this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
+    if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
@@ -381,6 +383,7 @@ class Level {
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
+    if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
 
     const type = this.pickWeighted(weights);
     SECTIONS[type].call(this, this.difficulty());
@@ -398,6 +401,10 @@ class Level {
       this.tryTrap(Math.floor((bush.x0 + bush.w / 2) / TILE), bush);
     }
     for (let c = Math.max(this.scatterFrom, 61); c < until; c++) {
+      if (this.colBiome[c] === "desert") {
+        if (this.rng() < SCATTER.sink) this.trySink(c);
+        continue;
+      }
       if (this.colBiome[c] !== "prairie") continue;
       const roll = this.rng();
       if (roll < SCATTER.trap) this.tryTrap(c, null);
@@ -411,24 +418,41 @@ class Level {
   // edges, saw slots, portals or other traps close by. The deadly large ones also stay out of
   // reach of other dangers, so you never have to dodge two things at once to get past one.
   trapFits(c, size) {
+    return this.spotFits(c, 5, size === 2, "prairie", TRAP.sizes[size] + TILE, () => this.traps.push({ x: c * TILE + TILE / 2 + 0.5, size }), () => this.traps.pop());
+  }
+
+  // Desert sinkholes get the same rules. A large one caves in to a gap SINK.gap tiles either side,
+  // so it needs that much more flat ground around it.
+  sinkFits(c, size) {
+    const half = size === 2 ? SINK.gap + 5 : 5;
+    return this.spotFits(c, half, size === 2, "desert", SINK.catch[size], () => this.sinkholes.push({ x: c * TILE + TILE / 2 + 0.5, size, state: "idle" }), () => this.sinkholes.pop());
+  }
+
+  // Shared by traps and sinkholes: `half` tiles of flat ground on each side, nothing overhead,
+  // nothing else in the way; `deadly` ones also out of every other danger's reach. `reach` is
+  // how far out it can get you (for keeping clear of bushes); add/remove try it out for a moment.
+  spotFits(c, half, deadly, biome, reach, add, remove) {
     const g = this.groundTop(c * TILE);
     if (g === null) return false;
     const row = g / TILE;
-    for (let k = -5; k <= 5; k++) {
+    for (let k = -half; k <= half; k++) {
       const col = this.cols[c + k], gk = this.groundTop((c + k) * TILE);
-      if (!col || gk === null || this.isQuick(c + k) || this.isIce(c + k) || this.colBiome[c + k] !== "prairie") return false;
+      if (!col || gk === null || this.isQuick(c + k) || this.isIce(c + k) || this.colBiome[c + k] !== biome) return false;
       if (gk !== g) return false; // flat all round: no hopping up a step straight onto it
       for (let r = row - 6; r < gk / TILE; r++) if (this.tile(c + k, r) !== T_EMPTY) return false; // spikes, shooters, ledges
     }
     const x = c * TILE + TILE / 2 + 0.5, near = (px, tiles) => Math.abs(px - x) < tiles * TILE;
-    if (this.traps.some((t) => near(t.x, 8))) return false;
-    const reach = TRAP.sizes[size] + TILE; // never hidden by some other bush by accident
-    if (this.bushes.some((bu) => bu !== this.trapBush && x > bu.x0 - reach && x < bu.x0 + bu.w + reach)) return false;
+    if (this.traps.some((t) => near(t.x, half + 3))) return false;
+    if (this.sinkholes.some((s) => near(s.x, half + 3 + (s.size === 2 ? SINK.gap : 0)))) return false;
+    // never hidden by some other bush by accident
+    if (this.bushes.some((bu) => bu !== this.trapBush && x > bu.x0 - reach - TILE && x < bu.x0 + bu.w + reach + TILE)) return false;
     if (this.saws.some((s) => s.kind !== "pit" && x > Math.min(s.x0, s.x1) - s.r - TILE && x < Math.max(s.x0, s.x1) + s.r + TILE)) return false;
     if (this.portals.some((p) => x > p.x - 8 * TILE && x < p.toX + 4 * TILE)) return false;
     if (this.platforms.some((p) => x + 5 * TILE > p.x && x - 5 * TILE < p.x + p.w && p.y > g - 7 * TILE)) return false;
     if (this.orbs.some((o) => near(o.x, 3))) return false;
-    if (size === 2 && this.threatened(x - HITBOX_W / 2, g - HITBOX_H)) return false;
+    // not in the open stretch a tumbleweed or snowball rolls along (stuck there, you couldn't dodge it)
+    if ([...this.tumbleSpots, ...this.snowballSpots].some((r) => x > r.x - 26 * TILE && x < r.x + 7 * TILE)) return false;
+    if (deadly) for (let k = -half; k <= half; k += 2) if (this.threatened(x - HITBOX_W / 2 + k * TILE / 2, g - HITBOX_H)) return false;
     // Between two dangers there must still be somewhere safe to stand and wait for your moment
     const edge = (dir) => {
       for (let k = 1; k <= 20; k++) {
@@ -439,16 +463,44 @@ class Level {
     };
     const left = edge(-1), right = edge(1);
     if (left !== null && right !== null) {
-      this.traps.push({ x, size });
+      add();
       let room = false;
       for (let sx = left + 1; sx + HITBOX_W < right && !room; sx += 2) {
         const sg = this.groundTop(sx);
         room = sg !== null && sg === this.groundTop(sx + HITBOX_W - 1) && !this.isQuick(Math.floor(sx / TILE)) && !this.threatened(sx, sg - HITBOX_H);
       }
-      this.traps.pop();
+      remove();
       if (!room) return false;
     }
     return true;
+  }
+
+  trySink(c) {
+    let size = c >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+    if (size === 2 && !this.sinkFits(c, 2)) size = this.rand(0, 1); // too risky here for a deadly one
+    if (!this.sinkFits(c, size)) return false;
+    this.addSinkhole(c, size);
+    return true;
+  }
+
+  addSinkhole(c, size) {
+    this.sinkholes.push({ id: this.nextId++, x: c * TILE + TILE / 2 + 0.5, col: c, size, gy: this.groundTop(c * TILE), state: "idle", openedAt: 0 });
+  }
+
+  // A large sinkhole caves in: the ground falls away, leaving a gap for everyone
+  collapseSinkhole(s) {
+    s.state = "open";
+    s.openedAt = this.time;
+    for (let k = -SINK.gap; k <= SINK.gap; k++) {
+      this.cols[s.col + k] = new Array(ROWS).fill(T_EMPTY);
+      this.quick[s.col + k] = false;
+    }
+  }
+
+  // Stuck in a small or medium sinkhole: the sand keeps pouring in, but stops for a moment every so often
+  sinkCalm(s) {
+    const t = (this.time - s.openedAt) % SINK.period;
+    return t > SINK.period - SINK.calm;
   }
 
   tryTrap(c, bush) {
@@ -765,6 +817,18 @@ const SECTIONS = {
   },
 
   // ---- Desert only ----
+
+  // A sinkhole or two: little holes in the sand that open up when you step too close
+  // (with flat ground all round, so you can always jump over them or out of them)
+  sinkhole(d) {
+    this.flat(SINK.gap + 6, false);
+    const count = d > 0.4 && this.rng() < 0.4 ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const size = this.col >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+      this.addSinkhole(this.col, size);
+      this.flat(i + 1 < count ? 2 * SINK.gap + 9 : SINK.gap + 6, false);
+    }
+  },
 
   // A pit of quicksand: step in and you sink. Spam jump to pull yourself out (or jump over it).
   quicksand(d) {

@@ -13,7 +13,7 @@ const Game = (() => {
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
     "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome",
-    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "hiddenIn"];
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "hiddenIn", "inSink", "sinkT", "sinkFrom"];
 
   let canvas, ctx, callbacks;
   let world;

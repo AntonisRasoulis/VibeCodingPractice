@@ -76,6 +76,7 @@ const Renderer = (() => {
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
     drawTraps(world.level, player, other, camX);
+    drawSinkholes(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
     // (someone hiding in a bush can't be seen, on either screen)
@@ -96,6 +97,7 @@ const Renderer = (() => {
       if (t) drawTrap(t.x - camX, world.level.groundTop(t.x) ?? p.y + HITBOX_H, t.size, "shut");
     }
     drawBushes(world.level, camX, false); // whole bushes: in front, so they hide whoever is inside
+    for (const p of [player, other]) if (p && p.inSink && !p.dead) drawSinkPile(p.inSink, camX); // sand round their legs
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
@@ -1107,6 +1109,79 @@ const Renderer = (() => {
   }
 
   // ---- Swinging maces ----
+
+  // ---- Desert sinkholes ----
+
+  function drawSinkholes(level, camX, time) {
+    const px = (c, x, y, w = 1, h = 1) => { b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    for (const s of level.sinkholes) {
+      const cx = Math.round(s.x - camX), gy = s.gy;
+      if (cx < -60 || cx > VIEW_W + 60) continue;
+      if (s.state === "idle") {
+        // just a little dip in the sand, barely darker than the sand round it
+        const w = SINK.hole[s.size];
+        for (let dx = -w; dx <= w; dx++) {
+          const k = 1 - (dx / (w + 0.5)) ** 2;
+          px("#e3b673", cx + dx, gy, 1, 1);
+          if (k > 0.3) px("#d39a5c", cx + dx, gy + 1, 1, 1);
+          if (k > 0.75) px("#c98a4b", cx + dx, gy + 2, 1, 1);
+        }
+        px("#c98a4b", cx - 1, gy, 3, 1);
+        continue;
+      }
+      if (s.size === 2) {
+        // caved in: a dark gap, ragged edges, sand still pouring in
+        const W = (SINK.gap + 0.5) * TILE;
+        for (let dx = -W; dx <= W; dx++) {
+          const lip = Math.abs(dx) > W - 3 ? Math.round(hash(s.col + dx, 3) * 3) : 0;
+          for (let y = lip; y < VIEW_H - gy; y += 1) {
+            px(y < 4 ? "#8a5a2b" : y < 9 ? "#6b4420" : y < 16 ? "#4a2e14" : y < 22 ? "#2e1c0c" : "#170e06", cx + dx, gy + y, 1, 1);
+          }
+          if (lip) px("#c98a4b", cx + dx, gy, 1, lip);
+        }
+        const pour = Math.max(0, 1 - (time - s.openedAt) / 3); // pours for a few seconds, then trickles
+        for (let i = 0; i < 16; i++) {
+          if (i / 16 > pour + 0.2) continue;
+          const side = i % 2 ? 1 : -1;
+          px(i % 3 ? "#e3b673" : "#f2d091", cx + side * (W - 2 - (i % 4)), gy + 2 + ((time * 45 + i * 7) % 26), 1, 2);
+        }
+        continue;
+      }
+      // a small or medium one, opened into a funnel
+      const [W, D] = SINK.funnel[s.size];
+      const depth = (dx) => Math.round(D * Math.max(0, 1 - Math.abs(dx) / W) ** 0.7);
+      const spin = Math.min(1, (time - s.openedAt) / SINK.pull); // it widens as it opens
+      for (let dx = -W; dx <= W; dx++) {
+        const sd = Math.round(depth(dx) * spin);
+        for (let y = 0; y < sd; y++) px(y / D > 0.66 ? "#4a2e14" : y / D > 0.33 ? "#6b4420" : "#8a5a2b", cx + dx, gy + y, 1, 1);
+        px("#f2d091", cx + dx, gy + sd, 1, 1);
+        px("#d39a5c", cx + dx, gy + sd + 1, 1, 1);
+      }
+      if (!level.sinkCalm(s)) {
+        // loose sand streaming down the slopes to the middle
+        for (let i = 0; i < 10; i++) {
+          const side = i % 2 ? 1 : -1, f = (time * 1.4 + i / 10) % 1, dx = Math.round(side * (W - 1) * (1 - f));
+          px("#fff1cf", cx + dx, gy + Math.round(depth(dx) * spin) - 1, 1, 1);
+        }
+      } else {
+        // the sand stops for a moment: sparkle = jump now!
+        for (const side of [-1, 1]) {
+          px("#ffffff", cx + side * 5, gy + D - 15);
+          px("#ffffff", cx + side * 6, gy + D - 17);
+          px("#ffffff", cx + side * 4, gy + D - 18);
+        }
+      }
+    }
+  }
+
+  // Sand piled round the legs of someone stuck in a sinkhole
+  function drawSinkPile(s, camX) {
+    const cx = Math.round(s.x - camX), D = SINK.funnel[s.size][1];
+    b.fillStyle = "#e3b673";
+    b.fillRect(cx - 4, s.gy + D - 2, 9, 2);
+    b.fillStyle = "#f2d091";
+    b.fillRect(cx - 3, s.gy + D - 3, 7, 1);
+  }
 
   // ---- Bear traps and bushes ----
 

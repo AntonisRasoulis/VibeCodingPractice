@@ -220,6 +220,9 @@ const Sound = (() => {
       tone({ f: 2600, dur: 0.25, type: "sine", vol: 0.06, at: 0.02 });
     },
     trapOpen: () => { tone({ f: 500, to: 900, dur: 0.12, type: "square", vol: 0.07 }); noise({ filter: "highpass", f: 1800, dur: 0.06, vol: 0.25 }); },
+    sinkOpen: () => { noise({ filter: "lowpass", f: 900, to: 200, dur: 0.5, vol: 0.4 }); tone({ f: 200, to: 90, dur: 0.4, type: "sine", vol: 0.12 }); },
+    sinkSlip: () => noise({ filter: "bandpass", f: 700, to: 400, q: 1.5, dur: 0.18, vol: 0.25 }),
+    sinkCollapse: () => { noise({ filter: "lowpass", f: 600, to: 120, dur: 0.9, vol: 0.55 }); tone({ f: 80, to: 40, dur: 0.8, type: "sawtooth", vol: 0.15 }); },
     rustle: () => noise({ filter: "bandpass", f: 2200, to: 1400, q: 1.2, dur: 0.25, vol: 0.22, attack: 0.03 }),
 
     // Level dangers

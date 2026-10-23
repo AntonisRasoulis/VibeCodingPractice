@@ -52,6 +52,9 @@ class Player {
     this.trapped = 0;             // seconds left stuck in a bear trap
     this.trapId = null;           // ...which one
     this.hiddenIn = null;         // the bush we're hiding in (nobody can see us)
+    this.inSink = null;           // the sinkhole we're stuck in
+    this.sinkT = 0;               // ...for how long
+    this.sinkFrom = null;         // where we were when it got us (we slide down from there)
     this.snowballs = [];          // snowballs rolling at this player
     this.snowballStarted = new Set();
     this.onIce = false;
@@ -139,6 +142,7 @@ class Player {
 
     // Stuck in quicksand: sinking, unless you keep pressing jump
     if (this.inQuick) return this.updateQuicksand(dt, input, level);
+    if (this.inSink) return this.updateSink(dt, input, level);
 
     // Thrown by a hand: no control until we recover (gravity and momentum still work)
     if (this.stun > 0) {
@@ -217,6 +221,7 @@ class Player {
     if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
 
     if (this.onGround && !this.standingOn && !this.inQuick) this.checkTraps(level);
+    if (this.onGround && !this.standingOn && !this.inQuick && !this.dead) this.checkSinkholes(level);
     if (this.dead) return;
     this.checkHazards(level);
     if (this.dead) return;
@@ -592,6 +597,76 @@ class Player {
     }
   }
 
+  // Too close to a sinkhole: small and medium ones spin open and pull you in; a large one caves
+  // in under you (and you fall, unless you jumped it). Once open, they stay open for everyone.
+  checkSinkholes(level) {
+    const cx = this.x + HITBOX_W / 2;
+    for (const s of level.sinkholes) {
+      const d = Math.abs(cx - s.x);
+      if (s.size === 2) {
+        if (s.state === "idle" && d < SINK.catch[2]) {
+          level.collapseSinkhole(s);
+          Sound.play("sinkCollapse");
+          this.showHit("CAVE-IN!", "#ffb347");
+        }
+        continue;
+      }
+      if (d > (s.state === "open" ? SINK.funnel[s.size][0] - 3 : SINK.catch[s.size])) continue;
+      if (s.state === "idle") {
+        s.state = "open";
+        s.openedAt = level.time;
+      }
+      this.inSink = s;
+      this.sinkT = 0;
+      this.sinkSlip = 0;
+      this.sinkFrom = { x: this.x, y: this.y };
+      this.vx = 0;
+      this.vy = 0;
+      this.onGround = false;
+      this.hiddenIn = null;
+      Sound.play("sinkOpen");
+      this.showHit("SINKHOLE!", "#ffb347");
+      return;
+    }
+  }
+
+  // Stuck at the bottom of a sinkhole: slide down, then jump out when the sand stops for a moment
+  updateSink(dt, input, level) {
+    const s = this.inSink;
+    const [, depth] = SINK.funnel[s.size];
+    if (this.stun > 0) this.stun -= dt;
+    if (this.frozen > 0) {
+      this.frozen -= dt;
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+    }
+    this.sinkT += dt;
+    const f = Math.min(1, this.sinkT / SINK.pull);
+    const ease = f * (2 - f);
+    this.x = this.sinkFrom.x + (s.x - HITBOX_W / 2 - this.sinkFrom.x) * ease;
+    this.y = this.sinkFrom.y + (s.gy + depth - HITBOX_H - this.sinkFrom.y) * ease;
+    this.vx = 0;
+    this.vy = 0;
+    const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    if (dir) this.facing = dir;
+    if (this.sinkSlip > 0) this.sinkSlip -= dt;
+    if (input.jumpPressed && f >= 1) {
+      if (level.sinkCalm(s) && this.sinkSlip <= 0) {
+        // Out! Up to the rim and a full jump onward
+        this.inSink = null;
+        this.y = s.gy - HITBOX_H - 0.5;
+        this.vy = -PHYSICS.jumpSpeed;
+        this.vx = this.facing * PHYSICS.runSpeed * 0.7;
+        this.noCut = 0.3;
+        Sound.play("jump");
+        return;
+      }
+      Sound.play("sinkSlip"); // wrong moment: the sand drags you back down (and mashing won't help)
+      this.sparkle("#e3b673");
+      this.sinkSlip = SINK.slip;
+    }
+    this.checkHazards(level);
+  }
+
   // Inside a bush (every column of us under its leaves)? Then nobody can see us.
   checkBushes(level) {
     const was = this.hiddenIn;
@@ -638,6 +713,7 @@ class Player {
   die() {
     if (this.dead) return;
     this.trapped = 0;
+    this.inSink = null;
     this.hiddenIn = null;
     this.held = false;
     this.stun = 0;
@@ -655,13 +731,15 @@ class Player {
     // or safe ground on the course (after a dash, or across platforms, we may not have stood nearby)
     const target = this.x - DEATH.respawnBehind;
     let spot = null;
-    for (const s of this.safeSpots) if (s.x <= target && (!spot || s.x > spot.x)) spot = s;
+    const firm = (s) => !this.level || (this.level.groundTop(s.x + 1) !== null && this.level.groundTop(s.x + HITBOX_W - 1) !== null); // (a sinkhole may have caved in there since)
+    for (const s of this.safeSpots) if (s.x <= target && firm(s) && (!spot || s.x > spot.x)) spot = s;
     const near = this.level && this.level.safeSpotBefore(target);
     if (near && (!spot || near.x > spot.x)) spot = near;
     // Nothing behind (say, just carried far back by a drone): look further back,
     // or else use the remembered spot closest to where we died
     if (!spot) spot = this.level && this.level.safeSpotBefore(target, 4000);
-    if (!spot) for (const s of this.safeSpots) if (!spot || Math.abs(s.x - target) < Math.abs(spot.x - target)) spot = s;
+    if (!spot) for (const s of this.safeSpots) if (firm(s) && (!spot || Math.abs(s.x - target) < Math.abs(spot.x - target))) spot = s;
+    if (!spot) spot = this.safeSpots[0];
     this.respawnX = spot.x;
     this.respawnY = spot.y;
     this.vx = 0;
