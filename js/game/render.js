@@ -1121,7 +1121,6 @@ const Renderer = (() => {
       if (x0 > VIEW_W || x0 + w < 0) continue;
       if (pond.state === "ice") {
         // a pale, frosty sheet with the dark water just showing through in blotches
-        const someoneOn = players.some((p) => !p.dead && p.onGround && level.pondAt(p.x + HITBOX_W / 2) === pond);
         for (let x = 0; x < w; x++) {
           px(hash(pond.id, x * 3) < 0.15 ? "#ffffff" : "#eef7fc", x0 + x, gy);
           px("#d3e8f4", x0 + x, gy + 1);
@@ -1130,16 +1129,8 @@ const Renderer = (() => {
           px(dark ? "#5d88aa" : "#9fc2d9", x0 + x, gy + 3);
           px("#6f6474", x0 + x, gy + 4);
         }
-        if (someoneOn) {
-          // it creaks: cracks spread out under your feet
-          for (let k = 0; k < Math.floor(w / 9) + 1; k++) {
-            let cx = x0 + 4 + Math.floor(hash(pond.id + k, 7) * (w - 8));
-            for (let i = 0; i < 7; i++) {
-              px("#3d6688", cx, gy + (i % 3 === 1 ? 1 : 0));
-              cx += hash(k, i + pond.id) < 0.5 ? 1 : -1;
-            }
-          }
-        }
+        // Cracks: each one spreads out from where someone stepped, then stays
+        for (const c of pond.cracks) drawIceCrack(c, x0 - pond.x0, pond, Math.min(1, (time - c.t) / THIN_ICE.crackGrow));
       } else {
         // broken: open icy water with bits of ice bobbing in it
         for (let x = 0; x < w; x++) {
@@ -1156,6 +1147,34 @@ const Renderer = (() => {
       }
       px("#ffffff", x0 - 1, gy - 1, 2, 1); // snow on the banks
       px("#ffffff", x0 + w - 1, gy - 1, 2, 1);
+    }
+  }
+
+  // One crack in thin ice: two jagged lines zig-zagging out left and right from the footstep,
+  // forking as they go, growing with `grow` (0..1). A bright edge along each makes it read as a crack.
+  function drawIceCrack(c, offset, pond, grow) {
+    const px = (col, x, y) => {
+      if (x < pond.x0 || x >= pond.x1) return;
+      b.fillStyle = col;
+      b.fillRect(Math.round(x + offset), pond.gy + y, 1, 1);
+    };
+    // where the foot pressed down: a small dark star
+    px("#2f587c", c.x, 1);
+    if (grow > 0.15) { px("#2f587c", c.x - 1, 0); px("#2f587c", c.x + 1, 2); }
+    // a thin jagged line running out each way, sometimes forking, a bright edge above it
+    const reach = 5 + Math.floor(hash(c.seed, 1) * 5);
+    for (const dir of [-1, 1]) {
+      let x = c.x, y = 1;
+      const len = Math.round(reach * grow);
+      for (let i = 1; i <= len; i++) {
+        x += dir;
+        const r = hash(c.seed + dir * 7, i);
+        if (r < 0.35 && y > 0) y--;
+        else if (r > 0.65 && y < 2) y++;
+        px(i > reach - 2 ? "#6f97b8" : "#3d6688", x, y); // fades out toward the tip
+        if (y > 0 && i < reach - 1) px("#ffffff", x, y - 1);
+        if (i === 3 && hash(c.seed, dir + 5) < 0.6 && grow > 0.6) px("#6f97b8", x + dir, Math.min(3, y + 1)); // a small fork
+      }
     }
   }
 

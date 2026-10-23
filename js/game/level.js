@@ -86,6 +86,7 @@ class Level {
     this.bushes = [];    // bushes you can hide in: { x0, w, h, gy, seed, berries, tops, torn }
     this.scatterFrom = 0; // traps, bushes and sinkholes have been sprinkled over the course up to here
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
+    this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
@@ -93,6 +94,8 @@ class Level {
     this.nextId = 1;
     this.biomes = options.biomes !== false; // off: the whole course stays in the starting biome
     this.biomeEnd = this.biomes ? this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]) : Infinity;
+    this.biomeStart = 0;
+    this.pondTarget = this.rand(THIN_ICE.perBiome[0], THIN_ICE.perBiome[1]); // thin ice patches this snow biome gets (at least)
     // With biomes off it's all prairie: every MISSILE.stretch meters counts as one "biome" for the missiles
     this.stretchEnd = this.biomes ? Infinity : MISSILE.stretch;
     this.addBiomeEvents(this.biomes ? this.biomeEnd : MISSILE.stretch);
@@ -218,7 +221,7 @@ class Level {
   // Could a hazard get someone standing still at (x, y)? A mace swinging through,
   // a shooter's spikes, or icicles that would drop on them.
   threatened(x, y, ignoreTraps = false) {
-    if (this.maces.some((m) => Math.abs(m.x - x) < this.maceReach(m))) return true;
+    if (this.maces.some((m) => Math.abs(m.x - (x + HITBOX_W / 2)) < this.maceReach(m) + HITBOX_W / 2)) return true;
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
     if (!ignoreTraps && this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
     if (!ignoreTraps && this.ponds.some((p) => x + HITBOX_W > p.x0 - 2 && x < p.x1 + 2)) return true;
@@ -384,11 +387,16 @@ class Level {
     if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 2, bush: 2 });
     if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
-    if (this.biome === "snow" && this.col > 60) weights.thinIce = 3;
+    if (this.biome === "snow" && this.col > 60) weights.thinIce = 4;
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
 
-    const type = this.pickWeighted(weights);
+    let type = this.pickWeighted(weights);
+    // Snow: make sure this biome gets its thin ice before it ends
+    if (this.biome === "snow" && this.col > 60) {
+      const have = this.ponds.filter((p) => p.x0 >= this.biomeStart * TILE).length + this.pending.filter((w) => w.kind === "pond" && w.c >= this.biomeStart).length;
+      if (have < this.pondTarget && this.biomeEnd - this.col < (this.pondTarget - have) * 40 + 30) type = "thinIce";
+    }
     SECTIONS[type].call(this, this.difficulty());
     this.flat(this.rand(1, 3), false); // breathing room between sections (never icy)
     this.scatter();
@@ -398,6 +406,19 @@ class Level {
   // Done a little behind the newest section, so everything around a spot is already built.
   scatter() {
     const until = this.col - SCATTER.behind;
+    // what sinkhole and thin ice sections asked for, now that there's room round them to check
+    this.pending = this.pending.filter((want) => {
+      if (want.c + 15 >= until) return true;
+      if (want.kind === "pond") {
+        const mid = want.c + Math.floor(want.tiles / 2), half = Math.ceil(want.tiles / 2) + 5;
+        if (this.spotFits(mid, half, false, "snow", 0, () => this.ponds.push({ x0: want.c * TILE, x1: (want.c + want.tiles) * TILE, state: "ice" }), () => this.ponds.pop())) this.addPond(want.c, want.tiles);
+      } else {
+        let size = want.size;
+        if (size === 2 && !this.sinkFits(want.c, 2)) size = this.rand(0, 1);
+        if (this.sinkFits(want.c, size)) this.addSinkhole(want.c, size);
+      }
+      return false;
+    });
     for (const bush of this.bushes) {
       if (!bush.wantsTrap || bush.x0 + bush.w >= until * TILE) continue;
       bush.wantsTrap = false;
@@ -496,7 +517,7 @@ class Level {
   addPond(c, tiles) {
     // (a thin ice section adds it just before building the ground under it: that ground will be at groundRow)
     const gy = this.groundTop(c * TILE) ?? this.groundRow * TILE;
-    this.ponds.push({ id: this.nextId++, x0: c * TILE, x1: (c + tiles) * TILE, gy, state: "ice", frozen: [] });
+    this.ponds.push({ id: this.nextId++, x0: c * TILE, x1: (c + tiles) * TILE, gy, state: "ice", frozen: [], cracked: false, cracks: [] });
   }
 
   // The thin ice gives way: from now on it's open icy water (for everyone)
@@ -504,6 +525,13 @@ class Level {
     p.state = "water";
     p.brokeAt = this.time;
     Sound.play("iceBreak");
+  }
+
+  // Someone walks on thin ice: fresh cracks spread out from under their feet (and stay)
+  crackPond(p, x) {
+    p.cracked = true;
+    if (p.cracks.some((c) => Math.abs(c.x - x) < 11)) return;
+    p.cracks.push({ x, t: this.time, seed: p.id * 31 + Math.round(x) }); // (not this.rng(): that's for building the course)
   }
 
   // The pond (if any) under the middle of someone standing at x
@@ -584,6 +612,8 @@ class Level {
     this.flat(8);
     const length = this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);
     this.biomeEnd = this.col + length;
+    this.biomeStart = this.col;
+    this.pondTarget = this.rand(THIN_ICE.perBiome[0], THIN_ICE.perBiome[1]);
     this.addBiomeEvents(length);
   }
 
@@ -863,7 +893,7 @@ const SECTIONS = {
     const count = d > 0.4 && this.rng() < 0.4 ? 2 : 1;
     for (let i = 0; i < count; i++) {
       const size = this.col >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
-      this.addSinkhole(this.col, size);
+      this.pending.push({ kind: "sink", c: this.col, size });
       this.flat(i + 1 < count ? 2 * SINK.gap + 9 : SINK.gap + 6, false);
     }
   },
@@ -873,7 +903,7 @@ const SECTIONS = {
     this.iceBias = false;
     this.flat(6, false);
     const tiles = this.rand(THIN_ICE.widths[0], THIN_ICE.widths[1]);
-    this.addPond(this.col, tiles);
+    this.pending.push({ kind: "pond", c: this.col, tiles });
     this.flat(tiles + 6, false);
   },
 

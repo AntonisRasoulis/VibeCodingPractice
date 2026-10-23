@@ -56,6 +56,7 @@ class Player {
     this.sinkT = 0;               // ...for how long
     this.sinkFrom = null;         // where we were when it got us (we slide down from there)
     this.inPond = null;           // the icy pond we're frozen in (thin ice broke under us)
+    this.onPond = null;           // the thin ice we're standing on right now
     this.pondHits = 0;            // ...and how many jumps we've cracked our block of ice with
     this.snowballs = [];          // snowballs rolling at this player
     this.snowballStarted = new Set();
@@ -225,11 +226,18 @@ class Player {
       Sound.play("sandSink");
     }
     if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
-    if (this.onGround && !this.standingOn) {
-      const pond = level.pondAt(this.x + HITBOX_W / 2);
-      if (pond && pond.state === "ice" && !wasOnGround) level.breakPond(pond); // landing on thin ice breaks it
-      if (pond && pond.state === "water") this.freezeIn(pond);
+    // Thin ice: it cracks the first time anyone walks on it, and the cracks stay. Land a jump on it,
+    // or step back onto it once it's cracked, and it gives way.
+    const onPond = this.onGround && !this.standingOn ? level.pondAt(this.x + HITBOX_W / 2) : null;
+    if (onPond && onPond.state === "ice") {
+      if (!wasOnGround || (onPond !== this.onPond && onPond.cracked)) level.breakPond(onPond);
+      else {
+        if (!onPond.cracked) Sound.play("iceCrack");
+        level.crackPond(onPond, this.x + HITBOX_W / 2);
+      }
     }
+    if (onPond && onPond.state === "water") this.freezeIn(onPond);
+    this.onPond = onPond;
 
     if (this.onGround && !this.standingOn && !this.inQuick) this.checkTraps(level);
     if (this.onGround && !this.standingOn && !this.inQuick && !this.dead) this.checkSinkholes(level);
@@ -775,6 +783,7 @@ class Player {
 
   die() {
     if (this.dead) return;
+    this.onPond = null;
     this.trapped = 0;
     this.inSink = null;
     if (this.inPond) this.inPond.frozen = this.inPond.frozen.filter((q) => q !== this);
