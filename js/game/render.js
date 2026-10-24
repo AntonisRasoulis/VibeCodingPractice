@@ -1378,7 +1378,17 @@ const Renderer = (() => {
       if (t.bush && !t.bush.torn) continue; // hidden in a bush
       const shut = t.sprung; // once it's snapped on anyone, it stays shut for everyone
       const gy = level.groundTop(t.x);
-      if (gy !== null) drawTrap(sx, gy, t.size, shut ? "shut" : "open");
+      if (gy === null) continue;
+      const pop = t.poppedAt !== undefined ? level.time - t.poppedAt : 9;
+      if (pop < 0.3) {
+        // someone just got out: the jaws spring apart (jumping a pixel), with a few sparks
+        drawTrap(sx, gy - (pop < 0.1 ? 1 : 0), t.size, "open");
+        b.fillStyle = "#ffffff";
+        for (let k = 0; k < 4; k++) {
+          const a = (k / 4) * Math.PI + 0.3, d = 3 + pop * 30;
+          b.fillRect(Math.round(sx + Math.cos(a) * d * (k % 2 ? 1 : -1)), Math.round(gy - 2 - Math.sin(a) * d * 0.6), 1, 1);
+        }
+      } else drawTrap(sx, gy, t.size, shut ? "shut" : "open");
     }
   }
 

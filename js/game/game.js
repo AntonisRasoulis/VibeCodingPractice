@@ -138,9 +138,8 @@ const Game = (() => {
       for (const q of players) {
         if (q === p || q.dead || q.caught || q.held || q.trapped > 0 || q.rescueBlock > 0) continue;
         if (Math.abs(q.vx) < 20 || !overlaps(p.x, p.y, HITBOX_W, HITBOX_H, q.x, q.y, HITBOX_W, HITBOX_H)) continue; // has to run into them
-        p.trapped = 0;
+        p.escapeTrap(level, "FREED!");
         p.rescueBlock = 1; // (so they can't knock it straight back onto you)
-        p.showHit("FREED!", "#d6dbe2");
         q.trapped = TRAP.wiggles[t.size];
         q.trapId = t.id;
         q.lastWiggle = q.facing;

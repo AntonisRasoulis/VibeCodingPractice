@@ -178,10 +178,7 @@ class Player {
         this.facing = dir;
         this.trapShake = 0.12;
         if (this.trapped > 0) Sound.play("trapWiggle");
-        else {
-          Sound.play("trapOpen");
-          this.showHit("FREE!", "#d6dbe2");
-        }
+        else this.escapeTrap(level);
       }
       this.wiggleHeld = dir;
       if (this.trapShake > 0) this.trapShake -= dt;
@@ -758,6 +755,22 @@ class Player {
       }
     }
     this.checkHazards(level);
+  }
+
+  // Out of a bear trap: the jaws spring apart and we hop out of it
+  escapeTrap(level, text = "FREE!") {
+    this.trapped = 0;
+    const t = level.traps.find((tt) => tt.id === this.trapId);
+    if (t) t.poppedAt = level.time;
+    this.vy = -150; // a little hop
+    this.noCut = 0.2;
+    this.onGround = false;
+    this.standingOn = null;
+    for (let i = 0; i < 6; i++) {
+      this.particles.push({ x: this.x + HITBOX_W / 2 + (Math.random() - 0.5) * 8, y: this.y + HITBOX_H - 1, vx: (Math.random() - 0.5) * 50, vy: -Math.random() * 30, life: 0.35, size: 1, color: i % 2 ? "#c9a87a" : "#e8d9b5" });
+    }
+    Sound.play("trapOpen");
+    this.showHit(text, "#d6dbe2");
   }
 
   // Inside a bush (every column of us under its leaves)? Then nobody can see us.
