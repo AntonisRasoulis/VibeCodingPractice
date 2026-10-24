@@ -176,7 +176,7 @@ const TRAP = {
   inBush: 0.18,      // chance to try hiding a trap in a bush (some have no room for one: about 10% end up with one)
 };
 const SCATTER = {   // traps and bushes sprinkled all over the prairie, not just in their own sections
-  trap: 0.035,      // chance per column to try a trap there (most spots don't fit)
+  trap: 0.028,      // chance per column to try a trap there (most spots don't fit)
   bush: 0.03,       // ...and a bush
   sink: 0.05,       // desert: chance per column to try a sinkhole there
   pond: 0.04,       // snow: ...and thin ice
