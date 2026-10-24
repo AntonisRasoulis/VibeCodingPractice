@@ -1451,57 +1451,81 @@ const Renderer = (() => {
     for (const bush of level.bushes) {
       if (bush.torn !== torn) continue;
       const sx = Math.round(bush.x0 - camX);
-      if (sx > VIEW_W || sx + bush.w < 0) continue;
-      if (!bush.sprite) bush.sprite = { whole: makeBushSprite(bush, false), torn: makeBushSprite(bush, true) };
-      b.drawImage(torn ? bush.sprite.torn : bush.sprite.whole, sx, bush.gy - bush.h - 8);
+      if (sx > VIEW_W + 20 || sx + bush.w < -20) continue;
+      if (!bush.sprite) bush.sprite = makeBushSprites(bush);
+      const top = bush.gy - bush.h;
+      if (!torn) {
+        b.drawImage(bush.sprite.whole, sx, top);
+        continue;
+      }
+      b.drawImage(bush.sprite.stump, sx, top - 2);
+      // the top that got knocked off: flies up and tumbles away, fading out
+      const t = level.time - (bush.tornAt ?? -9);
+      if (t < 0.7) {
+        const f = t / 0.7;
+        b.globalAlpha = 1 - f * f;
+        b.drawImage(bush.sprite.top, Math.round(sx + 14 * f), Math.round(top - 22 * f + 26 * f * f));
+        b.globalAlpha = 1;
+        b.fillStyle = "#63c74d";
+        for (let k = 0; k < 6; k++) {
+          const dir = k % 2 ? 1 : -1, sp = 6 + hash(k, bush.seed) * 10;
+          b.fillRect(Math.round(sx + bush.w / 2 + dir * sp * f * 1.5), Math.round(top + 2 - 18 * f + (14 + k * 3) * f * f), 1, 1);
+        }
+      }
     }
   }
 
-  // A rounded, lumpy dome of leaves, lit from the top-left (drawn once, then reused)
-  function makeBushSprite(bush, torn) {
+  // A whole bush (a rounded, lumpy dome of leaves, lit from the top-left), and once a trap has
+  // gone off in it: the top that flies off, and the ruffled stump that's left
+  function makeBushSprites(bush) {
     const { w, h, seed } = bush;
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h + 8; // room above for leaves flying off a torn bush
-    const g = c.getContext("2d");
     const inside = bushShape(w, h, seed);
     const rnd = (a, k) => { const s = Math.sin(a * 127.1 + k * 311.7 + seed * 74.7) * 43758.5453; return s - Math.floor(s); };
+    const leafColor = (x, y) => {
+      const nx = (x - w / 2) / (w / 2), ny = 1 - y / h;
+      const lx = x % 3, ly = (y + (Math.floor(x / 3) % 2)) % 3;
+      const leaf = rnd(Math.floor(x / 3), Math.floor((y + (Math.floor(x / 3) % 2)) / 3));
+      if (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1)) return "#1d4a33";           // outline
+      if (!inside(x, y - 2) && nx < 0.5) return "#7ad35f";                                          // sunlit rim
+      if (ny < 0.22) return lx === 0 && leaf < 0.5 ? "#3e8948" : "#265c42";                         // shade near the ground
+      if (lx === 0 && ly === 0 && leaf < 0.45) return nx - ny < -0.2 ? "#7ad35f" : "#63c74d";       // a few leaf highlights
+      if (lx === 2 && ly === 2 && leaf > 0.8) return "#265c42";                                     // the odd gap under a leaf
+      return nx + (1 - ny) > 1.1 ? "#357a42" : "#3e8948";                                          // darker on the right
+    };
+    const canvas = (cw, ch) => { const c = document.createElement("canvas"); c.width = cw; c.height = ch; return [c, c.getContext("2d")]; };
+    const dot = (g, col, x, y) => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
+    // where the top breaks off: a ragged line a bit below half way
+    const cut = (x) => Math.round(h * 0.5 + (rnd(x, 3) - 0.5) * 3 + Math.sin(x * 0.9 + seed) * 1.2);
+    const [whole, gw] = canvas(w, h), [top, gt] = canvas(w, h), [stump, gs] = canvas(w, h + 2);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         if (!inside(x, y)) continue;
-        if (torn && y < h - 3 && rnd(x >> 1, y >> 1) < 0.4) continue; // leaves knocked off
-        const nx = (x - w / 2) / (w / 2), ny = 1 - y / h;
-        const lx = x % 3, ly = (y + (Math.floor(x / 3) % 2)) % 3;
-        const leaf = rnd(Math.floor(x / 3), Math.floor((y + (Math.floor(x / 3) % 2)) / 3));
-        let col;
-        if (!inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1)) col = "#1d4a33"; // outline
-        else if (!inside(x, y - 2) && nx < 0.5) col = "#7ad35f";                           // sunlit rim
-        else if (ny < 0.22) col = lx === 0 && leaf < 0.5 ? "#3e8948" : "#265c42";          // shade near the ground
-        else if (lx === 0 && ly === 0 && leaf < 0.45) col = nx - ny < -0.2 ? "#7ad35f" : "#63c74d"; // a few leaf highlights
-        else if (lx === 2 && ly === 2 && leaf > 0.8) col = "#265c42";                       // the odd gap under a leaf
-        else col = nx + (1 - ny) > 1.1 ? "#357a42" : "#3e8948";                           // darker on the right
-        g.fillStyle = col;
-        g.fillRect(x, y + 8, 1, 1);
+        const col = leafColor(x, y);
+        dot(gw, col, x, y);
+        if (y < cut(x)) dot(gt, col, x, y);
+        else dot(gs, y <= cut(x) + 1 ? (rnd(x, y) < 0.5 ? "#265c42" : "#357a42") : col, x, y + 2); // the broken edge is darker inside
       }
     }
     if (bush.berries) {
       for (let k = 0; k < Math.max(2, Math.floor(w / 7)); k++) {
         const bx = 2 + Math.floor(rnd(k, 9) * (w - 4)), by = 3 + Math.floor(rnd(k, 4) * (h - 7));
         if (inside(bx, by) && inside(bx, by - 2) && inside(bx - 1, by) && inside(bx + 1, by)) {
-          g.fillStyle = "#e43b44";
-          g.fillRect(bx, by + 8, 1, 1);
-          g.fillStyle = "#ff9aa0";
-          g.fillRect(bx, by + 7, 1, 1);
+          for (const [g, oy, keep] of [[gw, 0, true], [gt, 0, by < cut(bx)], [gs, 2, by >= cut(bx) + 2]]) {
+            if (!keep) continue;
+            dot(g, "#e43b44", bx, by + oy);
+            dot(g, "#ff9aa0", bx, by + oy - 1);
+          }
         }
       }
     }
-    if (torn) {
-      for (let k = 0; k < 7; k++) {
-        g.fillStyle = k % 2 ? "#3e8948" : "#63c74d";
-        g.fillRect(Math.floor(rnd(k, 1) * w), 7 - Math.floor(rnd(k, 2) * 7), k % 3 ? 1 : 2, 1);
-      }
+    // ruffled: leaves sticking up out of the broken top at odd angles, and a few down on the grass
+    for (let x = 1; x < w - 1; x++) {
+      if (!inside(x, cut(x)) || rnd(x, 11) > 0.45) continue;
+      const len = 1 + Math.floor(rnd(x, 12) * 3), lean = rnd(x, 13) < 0.5 ? -1 : 1;
+      for (let i = 1; i <= len; i++) dot(gs, i === len ? "#63c74d" : "#3e8948", x + (i === len && rnd(x, 14) < 0.6 ? lean : 0), cut(x) + 2 - i);
     }
-    return c;
+    for (let k = 0; k < 5; k++) dot(gs, k % 2 ? "#63c74d" : "#3e8948", Math.floor(rnd(k, 21) * w), h + 1 - (k % 2));
+    return { whole, top, stump };
   }
 
   // ---- Saw blades ----

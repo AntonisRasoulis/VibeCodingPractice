@@ -618,7 +618,7 @@ class Player {
       t.sprung = true;
       this.trapState.add(t.id);
       this.trapId = t.id;
-      if (t.bush) t.bush.torn = true; // the snap tears the bush open: no more hiding in it
+      if (t.bush) { t.bush.torn = true; t.bush.tornAt = level.time; } // the snap knocks the bush's top off: no more hiding in it
       Sound.play("trapSnap");
       this.sparkle("#ffffff");
       if (t.size === 2) {
