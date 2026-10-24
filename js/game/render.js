@@ -1119,6 +1119,11 @@ const Renderer = (() => {
     for (const pond of level.ponds) {
       const x0 = Math.round(pond.x0 - camX), w = pond.x1 - pond.x0, gy = pond.gy;
       if (x0 > VIEW_W || x0 + w < 0) continue;
+      const breaking = pond.state === "water" && time - pond.brokeAt < THIN_ICE.breakTime;
+      if (breaking) {
+        drawPondBreaking(pond, x0, time - pond.brokeAt, time);
+        continue;
+      }
       if (pond.state === "ice") {
         // a pale, frosty sheet with the dark water just showing through in blotches
         for (let x = 0; x < w; x++) {
@@ -1148,6 +1153,78 @@ const Renderer = (() => {
       px("#ffffff", x0 - 1, gy - 1, 2, 1); // snow on the banks
       px("#ffffff", x0 + w - 1, gy - 1, 2, 1);
     }
+  }
+
+  // The ice giving way: first cracks race out across the whole sheet from where it broke,
+  // then it snaps into chunks that tip, sink and drift apart while the water splashes up
+  function drawPondBreaking(pond, x0, t, time) {
+    const px = (c, x, y, w = 1, h = 1) => { b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    const w = pond.x1 - pond.x0, gy = pond.gy, bx = pond.breakX - pond.x0;
+    const crackPhase = 0.25; // seconds of cracking before it breaks up
+    if (t < crackPhase) {
+      // the sheet still holding for a moment, bold cracks racing out from the break
+      const f = t / crackPhase;
+      for (let x = 0; x < w; x++) {
+        px("#eef7fc", x0 + x, gy);
+        px("#d3e8f4", x0 + x, gy + 1);
+        px(hash(pond.id + Math.floor(x / 3), 5) < 0.45 ? "#7fa9c8" : "#b7d4e6", x0 + x, gy + 2);
+        px("#9fc2d9", x0 + x, gy + 3);
+        px("#6f6474", x0 + x, gy + 4);
+      }
+      for (const c of pond.cracks) drawIceCrack(c, x0 - pond.x0, pond, 1);
+      for (let k = 0; k < 6; k++) {
+        const dir = k % 2 ? 1 : -1, len = Math.round(w * Math.min(1, f * 1.6) * (0.5 + hash(pond.id, k) * 0.7));
+        let x = bx, y = k % 3;
+        for (let i = 0; i < len; i++) {
+          x += dir;
+          if (x < 0 || x >= w) break;
+          if (hash(pond.id + k, i) < 0.35) y = Math.max(0, Math.min(3, y + (hash(k, i) < 0.5 ? -1 : 1)));
+          px("#1f4466", x0 + x, gy + y);
+          if (y > 0) px("#ffffff", x0 + x, gy + y - 1);
+        }
+      }
+      px("#1f4466", x0 + bx - 1, gy, 3, 4); // the hole where it gave way
+      px("#3f7fb2", x0 + bx, gy + 1, 1, 2);
+    } else {
+      // the water underneath
+      for (let x = 0; x < w; x++) {
+        px("#8ccbef", x0 + x, gy + 1);
+        px("#3f7fb2", x0 + x, gy + 2);
+        px("#2b5d8a", x0 + x, gy + 3, 1, 6);
+      }
+      // broken up: slabs of ice tipping, sinking and drifting away from the break
+      const f = (t - crackPhase) / (THIN_ICE.breakTime - crackPhase);
+      let x = 0, k = 0;
+      while (x < w) {
+        const cw = 4 + Math.floor(hash(pond.id + k, 9) * 4), mid = x + cw / 2;
+        const away = Math.sign(mid - bx) || 1, near = 1 - Math.min(1, Math.abs(mid - bx) / w);
+        const drift = away * f * 3 * (0.5 + near);
+        const sink = f * (1.5 + 4 * near) + (hash(k, pond.id) < 0.3 ? f * 2 : 0);
+        const tilt = (hash(pond.id, k * 7) - 0.5) * 4 * Math.min(1, f * 2);
+        if (sink < 6) {
+          for (let i = 0; i < cw - 1; i++) {
+            const cx = x0 + x + i + drift;
+            if (cx < x0 || cx >= x0 + w) continue;
+            const cy = gy + sink + Math.round(tilt * (i / Math.max(1, cw - 2) - 0.5));
+            const edge = i === 0 || i === cw - 2;
+            px(edge ? "#2f587c" : "#ffffff", cx, cy);
+            px(edge ? "#2f587c" : "#d3e8f4", cx, cy + 1);
+            px("#7fa9c8", cx, cy + 2);
+          }
+        }
+        x += cw;
+        k++;
+      }
+      // splash: drops thrown up from the break, falling back
+      for (let i = 0; i < 10; i++) {
+        const dir = (hash(pond.id, i + 20) - 0.5) * 2, up = 14 + hash(i, pond.id) * 12, ft = f * 1.4;
+        const dx = dir * 12 * ft, dy = -up * ft + 24 * ft * ft;
+        if (dy > 1) continue;
+        px(i % 2 ? "#ffffff" : "#8ccbef", x0 + bx + dx, gy + dy, i % 3 ? 1 : 2, 1);
+      }
+    }
+    px("#ffffff", x0 - 1, gy - 1, 2, 1);
+    px("#ffffff", x0 + w - 1, gy - 1, 2, 1);
   }
 
   // One crack in thin ice: two jagged lines zig-zagging out left and right from the footstep,

@@ -135,7 +135,7 @@ const Game = (() => {
       if (pond.state !== "ice") continue;
       const on = players.filter((p) => !p.dead && !p.caught && p.onGround && !p.standingOn && level.pondAt(p.x + HITBOX_W / 2) === pond);
       if (on.length === players.length) {
-        level.breakPond(pond);
+        level.breakPond(pond, (on[0].x + on[1].x) / 2 + HITBOX_W / 2);
         for (const p of on) p.freezeIn(pond); // both go in together: one block of ice
       }
     }

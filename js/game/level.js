@@ -521,9 +521,10 @@ class Level {
   }
 
   // The thin ice gives way: from now on it's open icy water (for everyone)
-  breakPond(p) {
+  breakPond(p, x) {
     p.state = "water";
     p.brokeAt = this.time;
+    p.breakX = clamp(x ?? (p.x0 + p.x1) / 2, p.x0 + 1, p.x1 - 2); // where it gave way (the cracks race out from here)
     Sound.play("iceBreak");
   }
 

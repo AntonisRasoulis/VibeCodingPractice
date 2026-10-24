@@ -190,7 +190,7 @@ class Player {
     if (this.jumpBuffer > 0 && this.coyote > 0) {
       // jumping off thin ice breaks it
       const pond = this.onGround && !this.standingOn && level.pondAt(this.x + HITBOX_W / 2);
-      if (pond && pond.state === "ice") level.breakPond(pond);
+      if (pond && pond.state === "ice") level.breakPond(pond, this.x + HITBOX_W / 2);
       this.vy = -PHYSICS.jumpSpeed;
       this.jumpBuffer = 0;
       this.coyote = 0;
@@ -230,7 +230,7 @@ class Player {
     // or step back onto it once it's cracked, and it gives way.
     const onPond = this.onGround && !this.standingOn ? level.pondAt(this.x + HITBOX_W / 2) : null;
     if (onPond && onPond.state === "ice") {
-      if (!wasOnGround || (onPond !== this.onPond && onPond.cracked)) level.breakPond(onPond);
+      if (!wasOnGround || (onPond !== this.onPond && onPond.cracked)) level.breakPond(onPond, this.x + HITBOX_W / 2);
       else {
         if (!onPond.cracked) Sound.play("iceCrack");
         level.crackPond(onPond, this.x + HITBOX_W / 2);

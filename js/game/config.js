@@ -199,6 +199,7 @@ const THIN_ICE = {
   widths: [3, 5],    // how many tiles long a patch is (random in this range)
   perBiome: [2, 3],  // every snow biome gets at least this many patches (random in this range)
   crackGrow: 0.6,    // seconds a fresh crack takes to spread out
+  breakTime: 0.8,    // seconds the ice takes to crack all over and break up when it gives way
   jumpsToBreak: 3,   // frozen in: jumps it takes to break out of the block of ice
   sink: 4,           // how far into the water you sink (pixels)
 };
