@@ -48,8 +48,12 @@ class Player {
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
     this.fallState = new Map();  // crumbling platforms *this* player has stepped on
     this.icicleState = new Map(); // icicles *this* player has set off (each player gets their own, like the platforms)
-    this.trapState = new Set();   // bear traps that have snapped on *this* player (each player gets their own)
-    this.trapped = 0;             // seconds left stuck in a bear trap
+    this.trapState = new Set();   // bear traps that have snapped on *this* player
+    this.rescueBlock = 0;         // just got knocked free of a trap: can't knock anyone else in for a moment
+    this.trapped = 0;             // wiggles (left, right, left...) still needed to get out of a bear trap
+    this.lastWiggle = 0;          // the way we last wiggled
+    this.wiggleHeld = 0;          // the way we're pushing right now (holding doesn't count as a wiggle)
+    this.trapShake = 0;           // the trap jolts each time we wiggle
     this.trapId = null;           // ...which one
     this.hiddenIn = null;         // the bush we're hiding in (nobody can see us)
     this.inSink = null;           // the sinkhole we're stuck in
@@ -85,6 +89,7 @@ class Player {
     this.updateFallingPlatforms(dt);
     this.updateSnow(dt, level);
     if (this.biomeBanner > 0) this.biomeBanner -= dt;
+    if (this.rescueBlock > 0) this.rescueBlock -= dt;
     if (this.honey > 0) this.honey -= dt;
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
@@ -164,12 +169,25 @@ class Player {
     }
 
     // Caught in a bear trap: can't move until it lets go
+    // Caught in a bear trap: wiggle free by pressing left and right, back and forth
     if (this.trapped > 0) {
-      this.trapped -= dt;
+      const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+      if (dir && dir !== this.wiggleHeld && dir !== this.lastWiggle) {
+        this.trapped--;
+        this.lastWiggle = dir;
+        this.facing = dir;
+        this.trapShake = 0.12;
+        if (this.trapped > 0) Sound.play("trapWiggle");
+        else {
+          Sound.play("trapOpen");
+          this.showHit("FREE!", "#d6dbe2");
+        }
+      }
+      this.wiggleHeld = dir;
+      if (this.trapShake > 0) this.trapShake -= dt;
       input = { left: false, right: false, jump: false, jumpPressed: false };
       this.jumpBuffer = 0;
       this.vx = 0;
-      if (this.trapped <= 0) Sound.play("trapOpen");
     }
 
     // Running
@@ -598,7 +616,9 @@ class Player {
   checkTraps(level) {
     const cx = this.x + HITBOX_W / 2;
     for (const t of level.traps) {
-      if (this.trapState.has(t.id) || Math.abs(cx - t.x) > TRAP.sizes[t.size] - 1) continue;
+      // once a trap has snapped on anyone it stays shut: nobody else can step in it
+      if (t.sprung || Math.abs(cx - t.x) > TRAP.sizes[t.size] - 1) continue;
+      t.sprung = true;
       this.trapState.add(t.id);
       this.trapId = t.id;
       if (t.bush) t.bush.torn = true; // the snap tears the bush open: no more hiding in it
@@ -608,7 +628,9 @@ class Player {
         this.showHit("SNAP!", "#ff4d3d");
         return this.die();
       }
-      this.trapped = TRAP.hold[t.size];
+      this.trapped = TRAP.wiggles[t.size]; // wiggles left to get free
+      this.lastWiggle = this.facing;        // (holding the way you were running doesn't count)
+      this.wiggleHeld = this.facing;
       this.vx = 0;
       this.x = t.x - HITBOX_W / 2; // the jaws grab you right in the middle
       this.showHit("TRAPPED!", "#d6dbe2");
@@ -833,7 +855,7 @@ class Player {
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
     this.icicleState.clear(); // ...and so do icicles
-    this.trapState.clear();   // ...and bear traps
+    this.trapState.clear();
     this.trapped = 0;
     this.hiddenIn = null;
     this.honey = 0;

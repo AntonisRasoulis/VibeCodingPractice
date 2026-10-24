@@ -95,7 +95,9 @@ const Renderer = (() => {
     for (const p of [player, other]) {
       if (!p || p.trapped <= 0 || p.dead) continue; // the jaws in front of someone's legs
       const t = world.level.traps.find((tt) => tt.id === p.trapId);
-      if (t) drawTrap(t.x - camX, world.level.groundTop(t.x) ?? p.y + HITBOX_H, t.size, "shut");
+      const jolt = p.trapShake > 0 ? (p.lastWiggle > 0 ? 1 : -1) : 0; // it jerks the way you wiggle
+      if (t) drawTrap(t.x - camX + jolt, world.level.groundTop(t.x) ?? p.y + HITBOX_H, t.size, "shut");
+      if (!p.hiddenIn) drawWiggleHint(p, camX, world.time);
     }
     drawBushes(world.level, camX, false); // whole bushes: in front, so they hide whoever is inside
     for (const p of [player, other]) if (p && p.inSink && !p.dead) drawSinkPile(p.inSink, camX); // sand round their legs
@@ -1356,14 +1358,25 @@ const Renderer = (() => {
 
   // ---- Bear traps and bushes ----
 
-  // Each player has their own traps: on your screen, a trap is shut if it got you,
-  // or if it's holding the other player right now
+  // Little arrows above someone stuck in a trap, flashing left then right: wiggle!
+  function drawWiggleHint(p, camX, time) {
+    const cx = Math.round(p.x - camX) + HITBOX_W / 2, y = Math.round(p.y) - 6;
+    const left = Math.floor(time * 6) % 2 === 0;
+    for (const [dir, lit] of [[-1, left], [1, !left]]) {
+      b.fillStyle = lit ? "#ffffff" : "#8a8f99";
+      const x = cx + dir * 5; // an arrow pointing out: wide base, then narrower, then the tip
+      b.fillRect(x, y - 2, 1, 5);
+      b.fillRect(x + dir, y - 1, 1, 3);
+      b.fillRect(x + 2 * dir, y, 1, 1);
+    }
+  }
+
   function drawTraps(level, player, other, camX) {
     for (const t of level.traps) {
       const sx = t.x - camX;
       if (sx < -40 || sx > VIEW_W + 40) continue;
       if (t.bush && !t.bush.torn) continue; // hidden in a bush
-      const shut = player.trapState.has(t.id) || (other && other.trapped > 0 && other.trapId === t.id);
+      const shut = t.sprung; // once it's snapped on anyone, it stays shut for everyone
       const gy = level.groundTop(t.x);
       if (gy !== null) drawTrap(sx, gy, t.size, shut ? "shut" : "open");
     }

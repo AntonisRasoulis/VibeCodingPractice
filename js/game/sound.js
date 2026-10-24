@@ -219,6 +219,7 @@ const Sound = (() => {
       tone({ f: 1800, to: 900, dur: 0.18, type: "square", vol: 0.1 });
       tone({ f: 2600, dur: 0.25, type: "sine", vol: 0.06, at: 0.02 });
     },
+    trapWiggle: () => { noise({ filter: "highpass", f: 2600, dur: 0.05, vol: 0.25 }); tone({ f: 700, to: 500, dur: 0.06, type: "square", vol: 0.05 }); },
     trapOpen: () => { tone({ f: 500, to: 900, dur: 0.12, type: "square", vol: 0.07 }); noise({ filter: "highpass", f: 1800, dur: 0.06, vol: 0.25 }); },
     sinkOpen: () => { noise({ filter: "lowpass", f: 900, to: 200, dur: 0.5, vol: 0.4 }); tone({ f: 200, to: 90, dur: 0.4, type: "sine", vol: 0.12 }); },
     sinkSlip: () => noise({ filter: "bandpass", f: 700, to: 400, q: 1.5, dur: 0.18, vol: 0.25 }),

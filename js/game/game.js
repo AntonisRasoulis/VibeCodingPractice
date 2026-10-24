@@ -13,7 +13,7 @@ const Game = (() => {
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
     "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome",
-    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond"];
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -123,8 +123,35 @@ const Game = (() => {
     updateVultures(dt);
     checkOrbs();
     checkThinIce();
+    checkTrapRescue();
     levelSounds();
     checkFire();
+  }
+
+  // Running into someone stuck in a bear trap knocks them out of it... and you're caught in it instead
+  function checkTrapRescue() {
+    const { players, level } = world;
+    for (const p of players) {
+      if (p.trapped <= 0 || p.dead) continue;
+      const t = level.traps.find((tt) => tt.id === p.trapId);
+      if (!t) continue;
+      for (const q of players) {
+        if (q === p || q.dead || q.caught || q.held || q.trapped > 0 || q.rescueBlock > 0) continue;
+        if (Math.abs(q.vx) < 20 || !overlaps(p.x, p.y, HITBOX_W, HITBOX_H, q.x, q.y, HITBOX_W, HITBOX_H)) continue; // has to run into them
+        p.trapped = 0;
+        p.rescueBlock = 1; // (so they can't knock it straight back onto you)
+        p.showHit("FREED!", "#d6dbe2");
+        q.trapped = TRAP.wiggles[t.size];
+        q.trapId = t.id;
+        q.lastWiggle = q.facing;
+        q.wiggleHeld = q.facing;
+        q.vx = 0;
+        q.x = t.x - HITBOX_W / 2;
+        q.showHit("TRAPPED!", "#d6dbe2");
+        Sound.play("trapSnap");
+        return;
+      }
+    }
   }
 
   // Both players standing on the same thin ice at once: too heavy, it breaks

@@ -172,7 +172,7 @@ const SHOOTER = {
 // Prairie: bear traps lying in the grass, and bushes to hide in (some with a trap inside)
 const TRAP = {
   sizes: [4, 6, 8],  // jaw radius in pixels: small, medium, large
-  hold: [1, 2],      // seconds a small / medium trap holds you (a large one kills)
+  wiggles: [4, 8],   // small / medium: wiggles (left, right, left...) to get free (a large one kills)
   inBush: 0.18,      // chance to try hiding a trap in a bush (some have no room for one: about 10% end up with one)
 };
 const SCATTER = {   // traps and bushes sprinkled all over the prairie, not just in their own sections
