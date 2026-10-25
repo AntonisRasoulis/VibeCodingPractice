@@ -77,6 +77,7 @@ class Level {
     this.bearSpots = [];      // twice per snow biome: when the leader gets here, a bear charges in
     this.missileSpots = [];   // in the prairie: when the leader gets here, a missile comes
     this.quick = [];          // quick[x] = true where the ground's surface is quicksand
+    this.spikeKind = [];      // jungle: spikeKind[x] = "thorn" (a thorn bush) or a bamboo stake's height in pixels
     this.tumbleSpots = [];    // where tumbleweeds start rolling from
     this.cols = [];      // cols[x][row] = tile type
     this.platforms = []; // { kind: "static" | "move" | "fall", x, y, w }
@@ -259,6 +260,21 @@ class Level {
     return this.quick[col] === true;
   }
 
+  // The part of the spike in this tile that hurts: [x, y, w, h]. Spikes only hurt in their pointy
+  // part, not the whole tile. Ice spikes (in the snow) are taller and a little thinner; a cactus is
+  // tall, but only its trunk hurts; a bamboo stake is thin and very tall; a thorn bush fills its tile.
+  spikeBox(c, r) {
+    const biome = this.biomeAt(c);
+    if (biome === "desert") { const h = this.cactusHeight(c); return [c * TILE + 2, (r + 1) * TILE - h + 2, 4, h - 2]; }
+    if (biome === "snow") return [c * TILE + 1.5, r * TILE + 1, 5, 7];
+    if (biome === "jungle") {
+      const kind = this.spikeKind[c];
+      if (typeof kind === "number") return [c * TILE + 3, (r + 1) * TILE - kind + 1, 3, kind - 1];
+      return [c * TILE + 0.5, r * TILE + 1, 7, 7];
+    }
+    return [c * TILE + 1, r * TILE + 3, 6, 5];
+  }
+
   // How tall the cactus in this column is (cactuses are the desert's spikes)
   cactusHeight(col) {
     return DESERT.cactusHeights[Math.floor(hash(col, 77) * DESERT.cactusHeights.length)];
@@ -339,6 +355,11 @@ class Level {
     return list[Math.floor(this.rng() * list.length)];
   }
 
+  // [a, b] or [b, a], at random
+  shuffleTwo(a, b) {
+    return this.rng() < 0.5 ? [a, b] : [b, a];
+  }
+
   pickWeighted(weights) {
     const total = Object.values(weights).reduce((a, b) => a + b, 0);
     let roll = this.rng() * total;
@@ -355,6 +376,7 @@ class Level {
     this.colBiome.push(this.biome);
     this.ice.push(icy && groundRow !== null);
     this.quick.push(false);
+    this.spikeKind.push(null);
     this.cols.push(c);
     return c;
   }
@@ -367,8 +389,12 @@ class Level {
     for (let i = 0; i < n; i++) this.column(null);
   }
 
-  spikes(n) {
-    for (let i = 0; i < n; i++) this.column(this.groundRow, this.iceBias)[this.groundRow - 1] = T_SPIKE;
+  // In the jungle, spikes are thorn bushes unless `bamboo` gives each stake's height
+  spikes(n, bamboo = null) {
+    for (let i = 0; i < n; i++) {
+      this.column(this.groundRow, this.iceBias)[this.groundRow - 1] = T_SPIKE;
+      if (this.biome === "jungle") this.spikeKind[this.cols.length - 1] = bamboo ? bamboo[i] : "thorn";
+    }
   }
 
   addPlatform(kind, col, row, widthTiles, extra = {}) {
@@ -663,6 +689,19 @@ const SECTIONS = {
 
   spikes(d) {
     this.flat(2);
+    if (this.biome === "jungle") {
+      // Either a wide thorn bush (with a run-up to jump it), or one or two very tall bamboo stakes
+      if (this.rng() < 0.5) {
+        this.flat(2);
+        this.spikes(this.rand(JUNGLE.thornWidths[0], JUNGLE.thornWidths[1] - (d < 0.3 ? 1 : 0)));
+      } else {
+        const tall = this.pickFrom(JUNGLE.bambooHeights);
+        const pair = this.rng() < 0.4; // a shorter one next to it
+        this.spikes(pair ? 2 : 1, pair ? this.shuffleTwo(tall, this.pickFrom(JUNGLE.bambooHeights.slice(0, 2))) : [tall]);
+      }
+      this.flat(this.rand(8, 9), false); // room to land
+      return;
+    }
     const clusters = this.rand(1, 2);
     for (let i = 0; i < clusters; i++) {
       // Ice spikes come in longer rows: anywhere from 1 to 5 tiles, so you never know what's next

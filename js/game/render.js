@@ -60,6 +60,7 @@ const Renderer = (() => {
       b.globalAlpha = i === 0 ? 1 : amount;
       if (biome === "snow") drawSnowBackground(camX);
       else if (biome === "desert") drawDesertBackground(camX, world.time);
+      else if (biome === "jungle") drawJungleBackground(camX);
       else drawBackground(camX);
     });
     b.globalAlpha = 1;
@@ -130,6 +131,33 @@ const Renderer = (() => {
       mix[biome] = (mix[biome] || 0) + 1 / 11;
     }
     return mix;
+  }
+
+  // ---- Jungle biome ----
+
+  function drawJungleBackground(camX) {
+    b.fillStyle = "#d9f0b8";
+    b.fillRect(0, 0, VIEW_W, VIEW_H);
+    b.fillStyle = "#b8e09a";
+    b.fillRect(0, 0, VIEW_W, 60);
+    b.fillStyle = "#9fd08a";
+    b.fillRect(0, 0, VIEW_W, 22);
+    const layer = (img, speed) => {
+      const off = ((camX * speed) % img.width + img.width) % img.width;
+      for (let x = -Math.round(off); x < VIEW_W; x += img.width) b.drawImage(img, x, 0);
+    };
+    layer(sprites.jungle.far, 0.15);
+    // Sunlight slanting down through the canopy
+    const fade = b.globalAlpha;
+    b.globalAlpha = fade * 0.18;
+    b.fillStyle = "#fff8c0";
+    for (const x0 of [60, 150, 290]) {
+      const x = ((x0 - camX * 0.25) % 480 + 480) % 480 - 40;
+      for (let y = 20; y < 96; y += 2) b.fillRect(Math.round(x + (y - 20) * 0.5), y, 10, 2);
+    }
+    b.globalAlpha = fade;
+    layer(sprites.jungle.mid, 0.4);
+    layer(sprites.jungle.near, 0.6);
   }
 
   // ---- Desert biome ----
@@ -457,12 +485,27 @@ const Renderer = (() => {
         const biome = level.biomeAt(c);
         const snowy = biome === "snow";
         if (t === T_SPIKE) {
-          if (biome === "desert") {
+          if (biome === "jungle") {
+            const kind = level.spikeKind[c];
+            if (typeof kind === "number") b.drawImage(sprites.bamboo[kind], sx + 2, sy + TILE - kind);
+            else if (level.tile(c - 1, r) !== T_SPIKE || level.spikeKind[c - 1] !== "thorn") {
+              // a whole thorn bush, drawn once from its first tile
+              let n = 1;
+              while (n < 8 && level.tile(c + n, r) === T_SPIKE && level.spikeKind[c + n] === "thorn") n++;
+              const img = sprites.thorns[n - 1];
+              b.drawImage(img, sx - 3, sy + TILE - img.height);
+            }
+          } else if (biome === "desert") {
             const h = level.cactusHeight(c);
             b.drawImage(sprites.cactus[h][Math.floor(hash(c, 78) * 3)], sx - 2, sy + TILE - h);
           } else {
             b.drawImage(snowy ? sprites.iceSpikes[Math.floor(hash(c, 77) * sprites.iceSpikes.length)] : sprites.spike, sx, sy);
           }
+        } else if (t === T_GROUND && biome === "jungle") {
+          const variant = Math.floor(hash(c, r) * 4);
+          const above = level.tile(c, r - 1);
+          b.drawImage(above === T_GROUND ? sprites.soil[variant] : sprites.mossTop[variant], sx, sy);
+          if (above === T_EMPTY) drawJungleDecoration(c, sx, sy);
         } else if (t === T_GROUND && biome === "desert") {
           const variant = Math.floor(hash(c, r) * 4);
           const above = level.tile(c, r - 1);
@@ -483,6 +526,24 @@ const Renderer = (() => {
           }
         }
       }
+    }
+  }
+
+  // Sprouts and little red mushrooms in the jungle
+  function drawJungleDecoration(c, sx, sy) {
+    const n = hash(c, 99);
+    if (n < 0.25) {
+      b.fillStyle = "#5fb04f";
+      const fx = sx + 2 + Math.floor(hash(c, 5) * 3);
+      b.fillRect(fx, sy - 1, 1, 1);
+      b.fillRect(fx + 1, sy - 2, 1, 2);
+      b.fillRect(fx + 2, sy - 1, 1, 1);
+    } else if (n < 0.31) {
+      const fx = sx + 2 + Math.floor(hash(c, 3) * 3);
+      b.fillStyle = "#e8e0c8";
+      b.fillRect(fx + 1, sy - 2, 1, 2);
+      b.fillStyle = "#d04a3a";
+      b.fillRect(fx, sy - 3, 3, 1);
     }
   }
 
@@ -1826,7 +1887,7 @@ const Renderer = (() => {
       if (p.biomeBanner > 0) {
         ctx.globalAlpha = Math.min(1, p.biomeBanner * 2);
         const name = p.biome.toUpperCase();
-        const color = { snow: "#e8f6ff", desert: "#ffcc66" }[p.biome] || "#8be070";
+        const color = { snow: "#e8f6ff", desert: "#ffcc66", jungle: "#5fe07a" }[p.biome] || "#8be070";
         text(ctx, name, W / 2, top + 64, color, 18, "center");
         ctx.globalAlpha = 1;
       }

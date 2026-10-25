@@ -13,7 +13,7 @@ const soundButton = document.getElementById("sound-button");
 const wins = { RED: 0, BLUE: 0 };
 let gameLoaded = false;
 let lastMode = 2;
-let biomes = false; // snow and desert biomes: off until you turn them on (remembered by the browser)
+let biomes = false; // snow, desert and jungle biomes: off until you turn them on (remembered by the browser)
 try { biomes = localStorage.getItem("fire-run-biomes") === "1"; } catch (e) { /* storage blocked */ }
 let wild = false; // Wild mode (the hard one): off until you pick it (remembered by the browser)
 try { wild = localStorage.getItem("fire-run-mode") === "wild"; } catch (e) { /* storage blocked */ }

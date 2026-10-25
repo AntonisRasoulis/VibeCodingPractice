@@ -108,7 +108,7 @@ const MISSILE = {
 // Biomes: the course changes scenery (and some rules) as you go.
 // The first race after opening the website always starts in the prairie;
 // after that a race can start in any biome.
-const BIOMES = ["prairie", "snow", "desert"];
+const BIOMES = ["prairie", "snow", "desert", "jungle"];
 const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
 
 const SNOW = {
@@ -133,6 +133,13 @@ const WILD = {
   struggleFade: 3.2,    // ...and your presses wear off faster (normal 2.4)
   speedUp: 0.85,        // saws, maces and shooters: their swings / volleys take this much of the normal time
   bigOdds: { 0: 1, 1: 1, 2: 2 }, // traps and sinkholes: small / medium / large odds (normal: all even)
+};
+
+// The jungle's spikes come in two kinds: thin bamboo stakes, very tall (a jump lifts your feet
+// about 38 pixels), and low thorn bushes, really wide
+const JUNGLE = {
+  bambooHeights: [20, 24, 28, 32], // pixels (prairie spikes are 5, cactuses 14-18)
+  thornWidths: [2, 5],             // tiles: 5 is about the widest a full-speed jump clears
 };
 
 const DESERT = {

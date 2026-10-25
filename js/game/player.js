@@ -534,18 +534,8 @@ class Player {
     const r0 = Math.floor(this.y / TILE);
     const r1 = Math.floor((this.y + HITBOX_H - 0.01) / TILE);
     for (let c = c0; c <= c1; c++) {
-      for (let r = r0; r <= Math.min(r1 + 2, ROWS - 1); r++) { // (cactuses reach up past their own tile)
-        // Spikes only hurt in their pointy part, not the whole tile.
-        // Ice spikes (in the snow) are taller and a little thinner.
-        if (level.tile(c, r) === T_SPIKE) {
-          const biome = level.biomeAt(c);
-          const h = biome === "desert" ? level.cactusHeight(c) : 0; // a cactus: tall, but only its trunk hurts
-          if (biome === "desert" ? overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 2, (r + 1) * TILE - h + 2, 4, h - 2)
-              : biome === "snow" ? overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1.5, r * TILE + 1, 5, 7)
-              : overlaps(this.x, this.y, HITBOX_W, HITBOX_H, c * TILE + 1, r * TILE + 3, 6, 5)) {
-            return this.die();
-          }
-        }
+      for (let r = r0; r <= Math.min(r1 + 4, ROWS - 1); r++) { // (cactuses and bamboo reach up past their own tile)
+        if (level.tile(c, r) === T_SPIKE && overlaps(this.x, this.y, HITBOX_W, HITBOX_H, ...level.spikeBox(c, r))) return this.die();
       }
     }
 

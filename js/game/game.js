@@ -25,7 +25,7 @@ const Game = (() => {
   let nextBoltId = 1;
   let racesStarted = 0; // the first race after opening the website always starts in the prairie
   let solo = false;     // 1-player mode: one runner, one big view, WASD or the arrow keys
-  let biomes = false;   // snow and desert too? Off: the whole race is in the prairie
+  let biomes = false;   // snow, desert and jungle too? Off: the whole race is in the prairie
   let wild = false;     // Wild mode: the hard one
 
   function newWorld(startBiome = "prairie") {

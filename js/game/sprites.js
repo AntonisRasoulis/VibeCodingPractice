@@ -396,6 +396,13 @@ function makeSign(biome) {
     px(g, "#ffcc33", 9, 2, 2, 6);
     px(g, "#ffcc33", 7, 4, 6, 2);
     for (const [x, y] of [[6, 2], [13, 2], [6, 7], [13, 7], [10, 0], [10, 9], [5, 5], [14, 5]]) px(g, "#ffe28a", x, y);
+  } else if (biome === "jungle") {
+    // a big jungle leaf, and a vine wound round the post
+    for (const [x, y] of [[6, 3], [7, 2], [8, 2], [9, 3], [10, 3], [11, 4], [12, 5], [7, 3], [8, 3], [8, 4], [9, 4], [10, 4], [9, 5], [10, 5], [11, 5], [7, 4], [8, 5], [13, 6]]) px(g, "#4fb04a", x, y);
+    px(g, "#2d6b25", 8, 4);
+    px(g, "#2d6b25", 10, 5);
+    px(g, "#2d6b25", 12, 6);
+    for (const [x, y] of [[9, 12], [10, 13], [11, 14], [9, 15], [10, 16], [11, 17], [9, 18], [10, 19]]) px(g, "#3f8f2f", x, y);
   } else {
     // a little green sprout with a flower
     for (const [x, y] of [[10, 4], [10, 5], [10, 6], [10, 7], [9, 6], [11, 5]]) px(g, "#3e8948", x, y);
@@ -509,6 +516,124 @@ function makeTumbleweed() {
   // a few twigs poking out
   for (const [x, y] of [[0, r - 2], [d - 1, r + 1], [r + 1, 0], [r - 2, d - 1]]) px(g, "#7a5228", x, y);
   return c;
+}
+
+// ---- Jungle biome ----
+
+// Dark soil, with a mossy top if it's the surface
+function makeJungleTile(variant, top) {
+  const c = makeCanvas(TILE, TILE);
+  const g = c.getContext("2d");
+  px(g, "#4a2f22", 0, 0, TILE, TILE);
+  for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
+    const n = hash(x + variant * 31, y + variant * 17);
+    if (n < 0.1) px(g, "#36211a", x, y);
+    else if (n > 0.93) px(g, "#6a4632", x, y);
+  }
+  if (top) {
+    px(g, "#3f8f2f", 0, 0, TILE, 3);
+    px(g, "#2d6b25", 0, 3, TILE, 1);
+    for (let x = 0; x < TILE; x++) {
+      if (hash(x, variant + 3) < 0.45) px(g, "#2d6b25", x, 4);
+      if (hash(x, variant + 7) < 0.3) px(g, "#6bc24a", x, 0);
+    }
+  }
+  return c;
+}
+
+// A bamboo stake, h pixels tall, with a sharpened slanted top (one of the jungle's spikes)
+function makeBamboo(h) {
+  const c = makeCanvas(5, h);
+  const g = c.getContext("2d");
+  for (let y = 0; y < h; y++) {
+    if (y < 4) {
+      const w = y < 1 ? 1 : y < 2 ? 2 : 3;
+      px(g, y < 3 ? "#e8e2a0" : "#9fcf5a", 4 - w, y, w, 1);
+      if (y >= 2) px(g, "#5f8f2a", 4 - w, y);
+      continue;
+    }
+    px(g, "#7fbf3f", 1, y, 3, 1);
+    px(g, "#b7e07a", 1, y);
+    px(g, "#4f7f24", 3, y);
+    if ((h - y) % 7 === 3) { // the joints
+      px(g, "#3f6a1c", 1, y, 3, 1);
+      px(g, "#4f7f24", 0, y, 5, 1);
+    }
+  }
+  return c;
+}
+
+// A thorn bush `tiles` wide (the jungle's other spike): a low tangle of bramble with long thorns
+// sticking out all along its top and sides. It overhangs its tiles by 3 pixels each side.
+function makeThorns(tiles) {
+  const w = tiles * TILE, h = 9, pad = 3, W = w + pad * 2, H = h + pad + 1;
+  const c = makeCanvas(W, H);
+  const g = c.getContext("2d");
+  const top = (x) => pad + 2 + Math.round(1.5 * Math.sin(x * 0.9) + Math.sin(x * 0.37 + 1));
+  const body = [];
+  for (let x = pad; x < W - pad; x++) for (let y = top(x); y < H; y++) body.push([x, y]);
+  const inside = new Set(body.map(([x, y]) => x + "," + y));
+  for (const [x, y] of body) px(g, "#2c5428", x, y);
+  // twisted brown stems through the leaves
+  for (let k = 0; k < w / 4; k++) {
+    const x0 = pad + hash(k, 11) * w, x1 = x0 + (hash(k, 12) - 0.5) * 12, y1 = pad + 3 + hash(k, 13) * 3;
+    for (let u = 0; u <= 1; u += 0.05) {
+      const x = Math.round(x0 + (x1 - x0) * u), y = Math.round(H - 1 + (y1 - H + 1) * u);
+      if (inside.has(x + "," + y)) px(g, "#5a3a20", x, y);
+    }
+  }
+  for (let x = pad + 1; x < W - pad - 1; x++) if (hash(x, 4) < 0.3) px(g, "#3f7a34", x, top(x) + 2 + Math.floor(hash(x, 5) * 4));
+  // dark outline
+  for (const [x, y] of body) for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1]]) if (!inside.has(x + dx + "," + (y + dy))) px(g, "#122812", x + dx, y + dy);
+  const thorn = (x, y, dx, dy, len) => { for (let i = 1; i <= len; i++) px(g, i === len ? "#ffd8c8" : "#b82a2a", x + dx * i, y + dy * i); };
+  for (let x = pad; x < W - pad; x += 2) {
+    const r = hash(x, 21);
+    thorn(x, top(x), r < 0.33 ? -1 : r < 0.66 ? 0 : 1, -1, r > 0.8 ? 3 : 2);
+  }
+  for (let y = pad + 3; y < H - 1; y += 2) {
+    const up = y % 4 === 1 ? -1 : 0;
+    thorn(pad, y, -1, up, 2);
+    thorn(W - pad - 1, y, 1, up, 2);
+  }
+  return c;
+}
+
+// The jungle's background, in three layers that each repeat sideways (drawn with parallax):
+// far canopy, tree trunks with hanging vines, and ferns along the horizon with the canopy edge above
+function makeJungleLayers() {
+  const far = makeCanvas(400, VIEW_H);
+  let g = far.getContext("2d");
+  for (let x = 0; x < 400; x++) {
+    const h = 30 + 6 * Math.sin(x * Math.PI * 2 / 100) + 4 * Math.sin(x * Math.PI * 2 / 40 + 2);
+    px(g, "#5f9f5a", x, 0, 1, Math.round(h));
+    px(g, "#5f9f5a", x, 70 + Math.round(4 * Math.sin(x * Math.PI * 2 / 200)), 1, 60);
+  }
+  const mid = makeCanvas(480, VIEW_H);
+  g = mid.getContext("2d");
+  for (const [x, w] of [[30, 6], [118, 9], [205, 5], [260, 8], [350, 7], [430, 6]]) {
+    px(g, "#5a4030", x, 10, w, VIEW_H);
+    px(g, "#6e5240", x + 1, 10, 1, VIEW_H);
+  }
+  for (const x of [20, 70, 140, 190, 240, 320, 375, 450]) {
+    const len = 20 + Math.floor(hash(x, 2) * 30);
+    for (let y = 18; y < 18 + len; y++) px(g, "#3f7f3f", x + Math.round(Math.sin(y * 0.3 + x)), y);
+    for (let y = 22; y < 18 + len; y += 5) px(g, "#5fb04f", x + 1, y, 2, 1);
+  }
+  const near = makeCanvas(420, VIEW_H);
+  g = near.getContext("2d");
+  for (let x = 0; x < 420; x++) {
+    const h = 16 + 5 * Math.sin(x * Math.PI * 2 / 60 + 1) + 3 * Math.sin(x * Math.PI * 2 / 20);
+    px(g, "#3f7f3f", x, 0, 1, Math.round(h));
+  }
+  for (let x = 0; x < 420; x += 7) {
+    const fx = x + Math.floor(hash(x, 3) * 4);
+    for (let k = 0; k < 6; k++) {
+      px(g, "#3f7f3f", (fx - k + 420) % 420, 92 - k);
+      px(g, "#3f7f3f", (fx + k) % 420, 92 - k);
+      px(g, "#3f7f3f", fx % 420, 90 - k);
+    }
+  }
+  return { far, mid, near };
 }
 
 // ---- Vultures (desert) ----
@@ -676,13 +801,18 @@ function buildSprites() {
     iceSpikes: ICE_SPIKE_SHARDS.map(makeIceSpike),
     icicles: Object.fromEntries([10, 11, 12, 13].map((len) => [len, makeIcicle(len)])),
     snowballs: [2, 3, 4, 5, 6, 7, 8, 9].map(makeSnowball),
-    signs: { snow: makeSign("snow"), prairie: makeSign("prairie"), desert: makeSign("desert") },
+    signs: Object.fromEntries(BIOMES.map((biome) => [biome, makeSign(biome)])),
     pines: [12, 14, 16, 18].map((h, i) => makePine(h, i)),
     sandTop: [0, 1, 2, 3].map((v) => makeSandTile(v, true)),
     sandstone: [0, 1, 2, 3].map((v) => makeSandTile(v + 4, false)),
     quicksand: [0, 1, 2, 3].map((f) => [0, 1, 2, 3].map((v) => makeQuicksand(f, v))),
     cactus: Object.fromEntries(DESERT.cactusHeights.map((h) => [h, [0, 1, 2].map((a) => makeCactus(h, a))])),
     tumbleweed: makeTumbleweed(),
+    mossTop: [0, 1, 2, 3].map((v) => makeJungleTile(v, true)),
+    soil: [0, 1, 2, 3].map((v) => makeJungleTile(v + 4, false)),
+    bamboo: Object.fromEntries(JUNGLE.bambooHeights.map((h) => [h, makeBamboo(h)])),
+    thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
+    jungle: makeJungleLayers(),
     vultures: Object.fromEntries(Object.entries(VULTURE_PALETTES).map(([kind, pal]) =>
       [kind, Object.fromEntries(Object.entries(VULTURE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, pal)]))])),
     bears: Object.fromEntries(Object.entries(BEAR_PALETTES).map(([kind, pal]) => [kind, [0, 1, 2, 3].map((f) => makeBear(pal, f))])),
