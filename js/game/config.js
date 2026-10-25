@@ -207,7 +207,7 @@ const SINK = {
 // Snow: patches of thin ice over a frozen pond. Walk on it and it holds; jump on (or off) it,
 // or both stand on it at once, and it breaks: you're frozen in the icy water.
 const THIN_ICE = {
-  widths: [3, 5],    // how many tiles long a patch is (random in this range)
+  widths: [7, 12],   // how many tiles long a patch is (random in this range)
   perBiome: [2, 3],  // every snow biome gets at least this many patches (random in this range)
   crackGrow: 0.6,    // seconds a fresh crack takes to spread out
   breakTime: 0.8,    // seconds the ice takes to crack all over and break up when it gives way
