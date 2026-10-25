@@ -15,8 +15,16 @@ let gameLoaded = false;
 let lastMode = 2;
 let biomes = false; // snow and desert biomes: off until you turn them on (remembered by the browser)
 try { biomes = localStorage.getItem("fire-run-biomes") === "1"; } catch (e) { /* storage blocked */ }
-let best = 0; // best distance in 1-player mode (remembered by the browser)
-try { best = Number(localStorage.getItem("fire-run-best")) || 0; } catch (e) { /* storage blocked */ }
+let wild = false; // Wild mode (the hard one): off until you pick it (remembered by the browser)
+try { wild = localStorage.getItem("fire-run-mode") === "wild"; } catch (e) { /* storage blocked */ }
+// best distance in 1-player mode, one for each mode (remembered by the browser)
+const bestKey = () => (wild ? "fire-run-best-wild" : "fire-run-best");
+let best = 0;
+function loadBest() {
+  best = 0;
+  try { best = Number(localStorage.getItem(bestKey())) || 0; } catch (e) { /* storage blocked */ }
+}
+loadBest();
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
@@ -27,11 +35,11 @@ const gameCallbacks = {
       const record = winner.meters > best;
       if (record) {
         best = winner.meters;
-        try { localStorage.setItem("fire-run-best", String(best)); } catch (e) { /* storage blocked */ }
+        try { localStorage.setItem(bestKey(), String(best)); } catch (e) { /* storage blocked */ }
       }
       message.textContent = record ? `New record: ${winner.meters} m!` : `You reached ${winner.meters} m`;
       message.className = "game-message red";
-      scoreLine.textContent = `Best: ${best} m`;
+      scoreLine.textContent = `Best${wild ? " (Wild)" : ""}: ${best} m`;
       scoreLine.hidden = false;
       showOverlay();
       return;
@@ -85,7 +93,7 @@ function startGame(players) {
   startButton.blur();
   soloButton.blur();
   canvas.scrollIntoView({ behavior: "smooth", block: "center" });
-  Game.start(players, { biomes });
+  Game.start(players, { biomes, wild });
 }
 
 startButton.addEventListener("click", () => startGame(2));
@@ -101,6 +109,20 @@ biomesButton.addEventListener("click", () => {
   showBiomes();
 });
 showBiomes();
+
+const modeButton = document.getElementById("mode-button");
+function showMode() {
+  modeButton.textContent = `Mode: ${wild ? "Wild" : "Normal"}`;
+  modeButton.setAttribute("aria-pressed", String(wild));
+  modeButton.classList.toggle("wild", wild);
+}
+modeButton.addEventListener("click", () => {
+  wild = !wild;
+  try { localStorage.setItem("fire-run-mode", wild ? "wild" : "normal"); } catch (e) { /* storage blocked */ }
+  loadBest();
+  showMode();
+});
+showMode();
 soloButton.addEventListener("click", () => startGame(1));
 pauseButton.addEventListener("click", () => {
   Game.togglePause();

@@ -124,6 +124,17 @@ const SNOW = {
   snowballAhead: 230,  // a snowball starts rolling when you're this far from where it starts
 };
 
+// Wild mode: the hard mode. These change from normal while it's on.
+const WILD = {
+  missileEvery: [3, 8], // prairie: seconds between missiles at the leader (normal: about 2 per biome)
+  vultureGap: 0.6,      // desert: the next group comes this soon after the last one is gone
+  bearGap: 0.5,         // snow: the next bear charges in this soon after one gives up
+  sinkTime: 1.6,        // quicksand: seconds to sink all the way (normal 3): mash jump!
+  struggleFade: 3.2,    // ...and your presses wear off faster (normal 2.4)
+  speedUp: 0.85,        // saws, maces and shooters: their swings / volleys take this much of the normal time
+  bigOdds: { 0: 1, 1: 1, 2: 2 }, // traps and sinkholes: small / medium / large odds (normal: all even)
+};
+
 const DESERT = {
   sinkTime: 3,        // seconds to sink all the way into quicksand if you do nothing
   jumpsToEscape: 6,   // this many jump presses pull you out (each one also lifts you up a little)

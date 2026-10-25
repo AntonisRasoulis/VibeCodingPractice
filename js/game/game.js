@@ -26,9 +26,10 @@ const Game = (() => {
   let racesStarted = 0; // the first race after opening the website always starts in the prairie
   let solo = false;     // 1-player mode: one runner, one big view, WASD or the arrow keys
   let biomes = false;   // snow and desert too? Off: the whole race is in the prairie
+  let wild = false;     // Wild mode: the hard one
 
   function newWorld(startBiome = "prairie") {
-    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes });
+    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes, wild });
     level.ensure(VIEW_W * 2);
     const startX = 4 * TILE;
     const startY = level.groundRow * TILE - HITBOX_H;
@@ -51,6 +52,10 @@ const Game = (() => {
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
       drones: [],   // rescue drones: guarding a player, or flying to grab the leader
       nextVulture: null, // the leader's distance (meters) when the next group comes
+      wild,              // Wild mode (the hard one)
+      nextWildMissile: null, // Wild: when (world time) the next missile comes in the prairie
+      nextWildVulture: null, // Wild: when the next group of vultures comes in the desert
+      nextWildBear: null,    // Wild: when the next bear charges in, in the snow
       winner: null,
     };
     for (const p of world.players) {
@@ -430,7 +435,7 @@ const Game = (() => {
     const near = alive.reduce((a, b) => (b.x > a.x ? b : a));
     if (world.level.biomeAt(Math.floor((near.x + HITBOX_W / 2) / TILE)) !== "prairie") return;
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
-    const striped = leaderMeters > MISSILE.stripedAt && Math.random() < 0.5;
+    const striped = leaderMeters > (world.wild ? 0 : MISSILE.stripedAt) && Math.random() < 0.5;
     const side = Math.random() < 0.5 ? -1 : 1; // comes in on the left or the right of the player
     world.missiles.push(makeMissile(near, striped, side));
     Sound.play("glint");
@@ -488,10 +493,21 @@ const Game = (() => {
     // When the leader reaches one of the prairie's missile spots (past 400 m), a missile comes.
     // One at a time: if one is still in the air, the next waits for it.
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
-    for (const spot of level.missileSpots) {
-      if (spot.used || leaderMeters < spot.col || world.missiles.length) continue;
-      spot.used = true;
-      if (spot.col >= MISSILE.startAt) spawnMissile();
+    if (world.wild) {
+      // Wild: one at the leader every 3-8 seconds, the whole time they're in the prairie
+      const leader = players.filter((p) => !p.dead && !p.caught).sort((a, b) => b.x - a.x)[0];
+      if (!leader || level.biomeAt(Math.floor((leader.x + HITBOX_W / 2) / TILE)) !== "prairie") world.nextWildMissile = null;
+      else if (world.nextWildMissile === null) world.nextWildMissile = world.time + WILD.missileEvery[0] + Math.random() * (WILD.missileEvery[1] - WILD.missileEvery[0]);
+      else if (world.time >= world.nextWildMissile) {
+        spawnMissile();
+        world.nextWildMissile = null;
+      }
+    } else {
+      for (const spot of level.missileSpots) {
+        if (spot.used || leaderMeters < spot.col || world.missiles.length) continue;
+        spot.used = true;
+        if (spot.col >= MISSILE.startAt) spawnMissile();
+      }
     }
 
     // You died (to something else) before the missile coming for you got there: it carries on and
@@ -499,6 +515,7 @@ const Game = (() => {
     for (const p of players) if (!p.dead) p.missileDeath = false;
     for (const m of world.missiles) {
       const p = m.state === "approach" ? m.anchor : m.target;
+      if (world.wild) break; // (in Wild they keep coming anyway)
       if (!p || !p.dead || p.caught || p.missileDeath || m.state === "boom" || m.owedFor === p) continue;
       p.missileOwed = true;
       m.owedFor = p;
@@ -508,7 +525,7 @@ const Game = (() => {
       if (p.caught) { p.missileOwed = false; continue; }
       if (world.missiles.some((m) => !m.done && m.state !== "fly" && m.state !== "boom")) continue; // one at a time
       p.missileOwed = false;
-      const striped = p.x / TILE > MISSILE.stripedAt && Math.random() < 0.5;
+      const striped = p.x / TILE > (world.wild ? 0 : MISSILE.stripedAt) && Math.random() < 0.5;
       world.missiles.push(makeMissile(p, striped, Math.random() < 0.5 ? -1 : 1));
       Sound.play("glint");
       Sound.play("incoming");
@@ -618,35 +635,56 @@ const Game = (() => {
     const runners = players.filter((p) => !p.dead && !p.caught);
     if (runners.length) {
       const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
-      for (const spot of level.bearSpots) {
-        if (spot.used || leader.x / TILE < spot.col) continue;
-        if (world.bears.some((bb) => bb.state !== "leave")) continue; // one chase at a time: wait for the other bear
-        spot.used = true;
-        if (level.biomeAt(Math.floor(leader.x / TILE)) !== "snow") continue;
-        const meters = leader.x / TILE;
-        if (meters < THREATS.baseAt) continue; // no bears this early
-        let kindName = spot.kind;
-        if (kindName === "polar" && meters < THREATS.specialAt) kindName = Math.random() < 0.5 ? "brown" : "black"; // polar bears come later
-        const kind = BEAR[kindName];
-        const bear = { kind: kindName, target: leader, x: leader.x - BEAR.startBehind, y: leader.y + HITBOX_H,
-          state: "chase", t: 0, speed: kind.speed, chase: kind.chase, anim: 0, stepTimer: 0, lift: 0, trampled: new Set() };
-        // Never pop into view on the other player's screen: if they're close enough behind to see
-        // the spot, start just off the left of THEIR screen and charge through to the leader first.
-        for (const q of players) {
-          if (q === leader || q.dead || q.caught) continue;
-          const left = q.x - VIEW_W * 0.35;
-          if (bear.x - BEAR_W < left + VIEW_W && bear.x > left - 4) {
-            bear.x = Math.min(bear.x, left - 4);
-            bear.state = "approach";
-          }
+      let busy = world.bears.some((bb) => bb.state !== "leave"); // one chase at a time
+      const inSnow = level.biomeAt(Math.floor(leader.x / TILE)) === "snow";
+      if (world.wild) {
+        // Wild: always a bear after you in the snow: when one gives up, the next charges in
+        if (!inSnow || busy) world.nextWildBear = null;
+        else if (world.nextWildBear === null) world.nextWildBear = world.time + WILD.bearGap;
+        else if (world.time >= world.nextWildBear) {
+          world.nextWildBear = null;
+          spawnBear(leader, ["polar", "brown", "black"][Math.floor(Math.random() * 3)]);
         }
-        const g = bearGround(bear).top;
-        if (g !== null) bear.y = g;
-        world.bears.push(bear);
-        Sound.play("roar");
+      }
+      for (const spot of world.wild ? [] : level.bearSpots) {
+        if (spot.used || leader.x / TILE < spot.col) continue;
+        if (busy) continue; // wait for the other bear
+        spot.used = true;
+        if (!inSnow) continue;
+        const meters = leader.x / TILE;
+        if (meters < level.baseAt) continue; // no bears this early
+        let kindName = spot.kind;
+        if (kindName === "polar" && meters < level.specialAt) kindName = Math.random() < 0.5 ? "brown" : "black"; // polar bears come later
+        spawnBear(leader, kindName);
+        busy = true;
       }
     }
+    updateBearMoves(dt);
+  }
 
+  // A bear charges in from the left after the leader
+  function spawnBear(leader, kindName) {
+    const kind = BEAR[kindName];
+    const bear = { kind: kindName, target: leader, x: leader.x - BEAR.startBehind, y: leader.y + HITBOX_H,
+      state: "chase", t: 0, speed: kind.speed, chase: kind.chase, anim: 0, stepTimer: 0, lift: 0, trampled: new Set() };
+    // Never pop into view on the other player's screen: if they're close enough behind to see
+    // the spot, start just off the left of THEIR screen and charge through to the leader first.
+    for (const q of world.players) {
+      if (q === leader || q.dead || q.caught) continue;
+      const left = q.x - VIEW_W * 0.35;
+      if (bear.x - BEAR_W < left + VIEW_W && bear.x > left - 4) {
+        bear.x = Math.min(bear.x, left - 4);
+        bear.state = "approach";
+      }
+    }
+    const g = bearGround(bear).top;
+    if (g !== null) bear.y = g;
+    world.bears.push(bear);
+    Sound.play("roar");
+  }
+
+  function updateBearMoves(dt) {
+    const { level, players } = world;
     for (const bear of world.bears) {
       bear.t += dt;
       const p = bear.target;
@@ -883,7 +921,7 @@ const Game = (() => {
 
   function spawnVultures(leader) {
     const n = Number(pickWeighted(VULTURE.groupSizes));
-    const blackAllowed = leader.x / TILE >= THREATS.specialAt; // black vultures come later
+    const blackAllowed = leader.x / TILE >= world.level.specialAt; // black vultures come later
     for (let i = 0; i < n; i++) {
       const kind = blackAllowed && Math.random() < 0.5 ? "black" : "brown";
       world.vultures.push({ kind, target: leader, state: "wait", t: -i * VULTURE.stagger, x: leader.x + 270, y: -12, angle: Math.random() * 6.28, facing: -1 });
@@ -909,7 +947,16 @@ const Game = (() => {
     if (runners.length) {
       const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
       const meters = leader.x / TILE;
-      if (level.biomeAt(Math.floor(meters)) === "desert" && meters >= THREATS.baseAt) {
+      if (world.wild) {
+        // Wild: vultures the whole time in the desert: when a group is done, the next comes in
+        const busy = world.vultures.some((v) => v.state !== "leave");
+        if (level.biomeAt(Math.floor(meters)) !== "desert" || busy) world.nextWildVulture = null;
+        else if (world.nextWildVulture === null) world.nextWildVulture = world.time + WILD.vultureGap;
+        else if (world.time >= world.nextWildVulture) {
+          world.nextWildVulture = null;
+          spawnVultures(leader);
+        }
+      } else if (level.biomeAt(Math.floor(meters)) === "desert" && meters >= level.baseAt) {
         if (world.nextVulture === null) world.nextVulture = meters + rand(20, VULTURE.every[1]);
         if (meters >= world.nextVulture) {
           spawnVultures(leader);
@@ -1089,6 +1136,7 @@ const Game = (() => {
     start(players = 2, options = {}) {
       solo = players === 1;
       biomes = options.biomes === true;
+      wild = options.wild === true;
       canvas.height = (solo ? VIEW_H : VIEW_H * 2 + DIVIDER) * SCALE;
       canvas.style.aspectRatio = `auto ${canvas.width} / ${canvas.height}`;
       Sound.unlock(); // the Start click lets the browser play sound

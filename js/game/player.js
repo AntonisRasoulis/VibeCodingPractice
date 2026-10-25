@@ -285,8 +285,9 @@ class Player {
       input = { left: false, right: false, jump: false, jumpPressed: false };
     }
     const full = HITBOX_H;
-    this.sink += (full / DESERT.sinkTime) * dt;
-    this.struggle = Math.max(0, this.struggle - DESERT.struggleFade * dt); // slow pressing doesn't add up
+    const wild = level.wild; // (Wild: you sink much faster, and your presses wear off faster: mash!)
+    this.sink += (full / (wild ? WILD.sinkTime : DESERT.sinkTime)) * dt;
+    this.struggle = Math.max(0, this.struggle - (wild ? WILD.struggleFade : DESERT.struggleFade) * dt); // slow pressing doesn't add up
     if (input.jumpPressed) {
       this.struggle++;                                    // each press gets you closer to breaking free
       this.sink = Math.max(0.5, this.sink - full / 18);   // ...and pulls you up a bit

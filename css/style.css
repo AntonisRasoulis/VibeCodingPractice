@@ -293,6 +293,18 @@ kbd {
   font-size: 0.8rem;
 }
 
+.option-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.button.wild {
+  border-color: #ff6b3d;
+  color: #ffb08f;
+}
+
 .start-buttons {
   display: flex;
   gap: 12px;

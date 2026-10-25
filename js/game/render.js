@@ -1809,6 +1809,7 @@ const Renderer = (() => {
       const gapColor = gap < 10 ? "#ff4d3d" : gap < 25 ? "#ffb347" : "#ffffff";
       text(ctx, `${p.name} ${meters}m`, 12, top + 16, p.palette.c, 12);
       text(ctx, `FIRE ${gap}m`, W - 12, top + 16, gapColor, 12, "right");
+      if (world.wild) text(ctx, "WILD", W - 12, top + 36, "#ff6b3d", 10, "right");
       if (p.power) {
         const key = world.solo ? "S/DOWN" : i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing

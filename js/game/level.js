@@ -64,6 +64,10 @@ class Level {
   constructor(seed, startBiome = "prairie", options = {}) {
     this.rng = makeRng(seed);
     this.solo = options.solo === true; // 1 player: only orbs that help you on your own
+    this.wild = options.wild === true; // Wild mode: dangers from the start, faster obstacles, more big traps
+    this.baseAt = this.wild ? 0 : THREATS.baseAt;       // where the dangers start (meters)
+    this.specialAt = this.wild ? 0 : THREATS.specialAt; // ...and the worse ones
+    this.pace = this.wild ? WILD.speedUp : 1;           // obstacles' timing (smaller = faster)
     this.biome = startBiome;  // the biome new columns are built in
     this.colBiome = [];       // colBiome[x] = which biome each column is in
     this.ice = [];            // ice[x] = true where the ground's surface is slippery ice
@@ -212,9 +216,16 @@ class Level {
     return null;
   }
 
+  // How big a trap or sinkhole at column c is: small, medium or (past baseAt) large.
+  // Wild mode makes the large ones more likely.
+  bigSize(c) {
+    if (c < this.baseAt) return this.rand(0, 1);
+    return this.wild ? Number(this.pickWeighted(WILD.bigOdds)) : this.rand(0, 2);
+  }
+
   // A bear trap with its middle at column `col` (large ones only after 400 m)
   addTrap(col, bush) {
-    const size = this.col >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+    const size = this.bigSize(this.col);
     this.traps.push({ id: this.nextId++, x: Math.round(col * TILE) + 0.5, size, bush });
   }
 
@@ -493,13 +504,14 @@ class Level {
     const left = edge(-1), right = edge(1);
     if (left !== null && right !== null) {
       add();
-      let room = false;
-      for (let sx = left + 1; sx + HITBOX_W < right && !room; sx += 2) {
+      let run = 0; // safe spots in a row: a 2-pixel gap is too tight to stop in, so ask for a few
+      for (let sx = left + 1; sx + HITBOX_W < right && run < 4; sx += 2) {
         const sg = this.groundTop(sx);
-        room = sg !== null && sg === this.groundTop(sx + HITBOX_W - 1) && !this.isQuick(Math.floor(sx / TILE)) && !this.threatened(sx, sg - HITBOX_H);
+        const safe = sg !== null && sg === this.groundTop(sx + HITBOX_W - 1) && !this.isQuick(Math.floor(sx / TILE)) && !this.threatened(sx, sg - HITBOX_H);
+        run = safe ? run + 1 : 0;
       }
       remove();
-      if (!room) return false;
+      if (run < 4) return false;
     }
     return true;
   }
@@ -541,7 +553,7 @@ class Level {
   }
 
   trySink(c) {
-    let size = c >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+    let size = this.bigSize(c);
     if (size === 2 && !this.sinkFits(c, 2)) size = this.rand(0, 1); // too risky here for a deadly one
     if (!this.sinkFits(c, size)) return false;
     this.addSinkhole(c, size);
@@ -572,7 +584,7 @@ class Level {
 
   tryTrap(c, bush) {
     this.trapBush = bush; // (a trap may sit in its own bush)
-    let size = this.col >= THREATS.baseAt && c >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+    let size = this.bigSize(Math.min(c, this.col));
     if (size === 2 && !this.trapFits(c, 2)) size = this.rand(0, 1); // too risky here for a deadly one
     if (!this.trapFits(c, size)) return false;
     this.traps.push({ id: this.nextId++, x: c * TILE + TILE / 2 + 0.5, size, bush });
@@ -765,7 +777,7 @@ const SECTIONS = {
       row,
       x: col * TILE + TILE / 2,
       y: row * TILE + TILE / 2,
-      period: 2.1 + this.rng() * 0.7 - d * 0.4, // each shooter fires at its own pace
+      period: (2.1 + this.rng() * 0.7 - d * 0.4) * this.pace, // each shooter fires at its own pace
       phase: this.rng(),
     });
     this.flat(Math.max(6, height + 5));
@@ -787,19 +799,19 @@ const SECTIONS = {
         const len = this.rand(3, 8) * TILE; // how far it slides
         const x0 = this.col * TILE + r;
         this.flat(Math.ceil((len + 2 * r) / TILE) + 1, false);
-        Object.assign(saw, { x0, x1: x0 + len, y0: gy + 1, y1: gy + 1, period: 1.6 + this.rng() * 1.2 + len / 80 - d * 0.2 });
+        Object.assign(saw, { x0, x1: x0 + len, y0: gy + 1, y1: gy + 1, period: (1.6 + this.rng() * 1.2 + len / 80 - d * 0.2) * this.pace });
       } else if (kind === "rail") {
         // goes up and down a rail: from sunk in the ground (jump it) up high into the air (run under it).
         // On the way it sweeps right through where a jump takes you, so jumping isn't always safe.
         const x = this.col * TILE + TILE * 2;
         this.flat(4, false);
         const top = this.rand(Math.min(44, r + 30), 44); // how high its center rises above the ground
-        Object.assign(saw, { x0: x, x1: x, y0: gy + 1, y1: gy - top, period: 1.5 + this.rng() * 1.1 - d * 0.2 });
+        Object.assign(saw, { x0: x, x1: x, y0: gy + 1, y1: gy - top, period: (1.5 + this.rng() * 1.1 - d * 0.2) * this.pace });
       } else {
         // rises up out of a pit and sinks back down: jump across while it's down
         const x = this.col * TILE + TILE * 2;
         this.empty(4);
-        Object.assign(saw, { x0: x, x1: x, y0: VIEW_H + r + 2, y1: gy - 40, period: 2.2 + this.rng() * 1.0 - d * 0.2 });
+        Object.assign(saw, { x0: x, x1: x, y0: VIEW_H + r + 2, y1: gy - 40, period: (2.2 + this.rng() * 1.0 - d * 0.2) * this.pace });
       }
       this.saws.push(saw);
       this.flat(i + 1 < count ? 12 : 3, false); // room to stop safely between two saws
@@ -843,7 +855,7 @@ const SECTIONS = {
         y: this.groundRow * TILE - 9 - length,       // ball passes at body height
         length,
         amplitude: (55 + this.rng() * 20) * Math.PI / 180,
-        period: 1.9 + this.rng() * 1.3 - d * 0.1,   // each mace swings at its own speed
+        period: (1.9 + this.rng() * 1.3 - d * 0.1) * this.pace, // each mace swings at its own speed
         phase: this.rng(),
         spin: (this.rng() < 0.5 ? -1 : 1) * (3 + this.rng() * 4),
       });
@@ -893,7 +905,7 @@ const SECTIONS = {
     this.flat(SINK.gap + 6, false);
     const count = d > 0.4 && this.rng() < 0.4 ? 2 : 1;
     for (let i = 0; i < count; i++) {
-      const size = this.col >= THREATS.baseAt ? this.rand(0, 2) : this.rand(0, 1);
+      const size = this.bigSize(this.col);
       this.pending.push({ kind: "sink", c: this.col, size });
       this.flat(i + 1 < count ? 2 * SINK.gap + 9 : SINK.gap + 6, false);
     }
