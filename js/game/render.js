@@ -565,7 +565,7 @@ const Renderer = (() => {
   // (small and far away at first), with its shadow on the ground where it's going to land
   function drawJaguarBack(j, level, camX, time) {
     if (j.state === "eyes") drawEyes(j.kind, j.ex, j.ey, camX, Math.min(1, j.t / JAGUAR.fadeIn), j.t > JAGUAR.eyes - 0.5 ? "narrow" : "open");
-    if (j.state !== "leap") return;
+    if (j.state !== "leap" || j.lunging) return;
     const u = Math.min(1, j.t / JAGUAR[j.kind].leap);
     const tx = Math.round(j.toX - camX);
     b.fillStyle = `rgba(0, 0, 0, ${0.15 + u * 0.3})`;

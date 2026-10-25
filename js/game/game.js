@@ -1083,19 +1083,37 @@ const Game = (() => {
       if (j.state === "eyes") {
         // glowing in the trees (it can't be got at here), then it leaps out at where you'll be
         if (j.t >= JAGUAR.eyes) {
-          const aim = p.dead ? p.respawnX + HITBOX_W / 2 : pcx + p.vx * k.leap;
-          const land = jaguarGround(aim, p.y + HITBOX_H);
-          Object.assign(j, { state: "leap", t: 0, fromX: j.ex, fromY: j.ey + 6, toX: land.x, toY: land.y });
-          j.dir = land.x >= j.ex ? 1 : -1;
+          const side = Math.sign(j.ex - pcx) || 1; // the side it comes at you from
+          Object.assign(j, { state: "leap", t: 0, fromX: j.ex, fromY: j.ey + 6, side, toX: pcx, toY: p.y + HITBOX_H, lunging: false });
+          j.dir = -side;
           Sound.play("jaguarRoar");
         }
       } else if (j.state === "leap") {
-        const u = Math.min(1, j.t / k.leap);
-        j.x = j.fromX + (j.toX - j.fromX) * u;
-        j.y = j.fromY + (j.toY - j.fromY) * u - 26 * 4 * u * (1 - u);
-        j.scale = 0.45 + 0.55 * u;  // coming out of the background towards you
-        if (u > 0.7 && jaguarHits(j)) continue;
-        if (u >= 1) { j.state = j.attacks > 0 ? "run" : "leave"; j.t = 0; j.scale = 1; Sound.play("land"); }
+        // Out of the bush and through the air at you, following you wherever you go (changing speed
+        // won't help)...
+        const where = p.dead ? p.respawnX + HITBOX_W / 2 : pcx;
+        const ground = level.groundTop(where) ?? p.y + HITBOX_H;
+        if (j.t < k.leap) {
+          const u = j.t / k.leap;
+          j.toX = where;
+          j.toY = ground;
+          const tx = where + j.side * 30, ty = ground - 3; // ...coming in low, just short of you...
+          j.x = j.fromX + (tx - j.fromX) * u;
+          j.y = j.fromY + (ty - j.fromY) * u - 22 * 4 * u * (1 - u);
+          j.scale = 0.45 + 0.55 * u; // (coming out of the background towards you)
+        } else {
+          // ...then a low lunge straight through where you are: JUMP it
+          if (!j.lunging) {
+            const cross = where + p.vx * k.lunge * 0.5;
+            const land = jaguarGround(cross + (cross - j.x), ground);
+            Object.assign(j, { lunging: true, lx0: j.x, ly0: j.y, lx1: land.x, ly1: land.y, scale: 1 });
+          }
+          const u = Math.min(1, (j.t - k.leap) / k.lunge);
+          j.x = j.lx0 + (j.lx1 - j.lx0) * u;
+          j.y = j.ly0 + (j.ly1 - j.ly0) * u;
+          if (jaguarHits(j)) continue;
+          if (u >= 1) { j.state = j.attacks > 0 ? "run" : "leave"; j.t = 0; Sound.play("land"); }
+        }
       } else if (j.state === "run" || j.state === "wait") {
         if (p.dead) {
           // you died to something else: it goes to wait just in front of where you'll come back

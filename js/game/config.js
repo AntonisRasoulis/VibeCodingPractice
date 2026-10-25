@@ -194,14 +194,15 @@ const FLYTRAP = {
 
 // The jungle's special danger: once or twice per jungle biome a jaguar (or, from 500 m, a black
 // panther) comes for the player in the lead. Its eyes fade in, glowing, in a bush ahead, narrow, and it
-// leaps out at where you're going to be (its shadow shows where): change speed. If it misses it
+// leaps out at you, following you through the air, and lunges low right through you: jump it. Then it
 // runs at you and attacks again: crouched flat, it pounces low AT you (jump!); rear and tail up, it
 // leaps OVER you (keep going, don't jump). A jaguar attacks 3 times, a panther once but faster.
 const JAGUAR = {
   // leap: its first leap out of the trees (seconds); crouch: how long it shows you which attack is
   // coming; over / pounce: how long a leap over you and a low pounce at you take
-  jaguar: { leap: 0.8, attacks: 3, run: 140, crouch: 0.4, over: 0.5, pounce: 0.32 },
-  panther: { leap: 0.6, attacks: 1, run: 170, crouch: 0.32, over: 0.42, pounce: 0.28 },
+  // lunge: the end of that leap, low along the ground straight through where you are (jump it!)
+  jaguar: { leap: 0.6, lunge: 0.3, attacks: 3, run: 140, crouch: 0.4, over: 0.5, pounce: 0.32 },
+  panther: { leap: 0.45, lunge: 0.24, attacks: 1, run: 170, crouch: 0.32, over: 0.42, pounce: 0.28 },
   eyes: 1.8,          // seconds from when its eyes start to fade in (in a bush ahead) to when it leaps (narrowed for the last 0.5)
   fadeIn: 0.8,        // ...they take this long to fade in
   decoys: [4, 10],    // harmless eyes blink in some bush every 4-10 seconds while you're in the jungle (they never narrow)
