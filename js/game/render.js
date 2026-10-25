@@ -65,6 +65,7 @@ const Renderer = (() => {
     });
     b.globalAlpha = 1;
     for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
+    for (const j of world.jaguars) drawJaguarBack(j, world.level, camX, world.time); // eyes in the trees, leaping out
     drawTiles(world.level, camX);
     drawSawTracks(world.level, camX);
     drawPalms(world.level, player, camX);
@@ -73,6 +74,7 @@ const Renderer = (() => {
     drawSnowballs(player, camX);
     drawTumbleweeds(player, camX);
     for (const bear of world.bears) drawBear(bear, camX, world.time);
+    for (const j of world.jaguars) drawJaguar(j, camX);
     for (const v of world.vultures) drawVultureShadow(v, world.level, camX);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
@@ -533,6 +535,53 @@ const Renderer = (() => {
         }
       }
     }
+  }
+
+  // A jaguar still in the background: its eyes glowing in a dark thicket, then leaping out of it
+  // (small and far away at first), with its shadow on the ground where it's going to land
+  function drawJaguarBack(j, level, camX, time) {
+    if (j.state === "eyes" || (j.state === "leap" && j.t < 0.35)) {
+      const sx = Math.round(j.ex - camX);
+      if (sx > -40 && sx < VIEW_W + 40) {
+        b.drawImage(sprites.thicket, sx - 30, Math.round(j.ey) - 16);
+        if (j.state === "eyes") {
+          const eyes = sprites.catEyes[j.kind][j.t > JAGUAR.eyes - 0.5 ? "narrow" : "open"];
+          b.drawImage(eyes, sx - 11, Math.round(j.ey) - 5);
+        }
+      }
+    }
+    if (j.state !== "leap") return;
+    const u = Math.min(1, j.t / JAGUAR[j.kind].leap);
+    const tx = Math.round(j.toX - camX);
+    b.fillStyle = `rgba(0, 0, 0, ${0.15 + u * 0.3})`;
+    const w = 6 + Math.round(u * 18);
+    b.fillRect(tx - Math.floor(w / 2), Math.round(j.toY) - 1, w, 2);
+    if (u >= 0.6) return; // (in front of the course from here: drawJaguar)
+    const img = sprites.cats[j.kind].leap, s = j.scale;
+    b.save();
+    b.globalAlpha = 0.6 + u * 0.6;
+    b.translate(Math.round(j.x - camX), Math.round(j.y));
+    b.scale(j.dir * s, s);
+    b.drawImage(img, -23, -22);
+    b.restore();
+  }
+
+  // A jaguar on the course: running, crouched to attack, leaping, slinking off
+  function drawJaguar(j, camX) {
+    if (j.state === "eyes" || (j.state === "leap" && j.t / JAGUAR[j.kind].leap < 0.6)) return;
+    const sx = Math.round(j.x - camX);
+    if (sx < -40 || sx > VIEW_W + 40) return;
+    const frames = sprites.cats[j.kind];
+    const img = j.state === "crouch" ? (j.high ? frames.crouchHigh : frames.crouchLow)
+      : j.state === "attack" || j.state === "leap" ? frames.leap
+      : j.state === "wait" ? frames.run1
+      : Math.floor(j.anim * 9) % 2 ? frames.run2 : frames.run1;
+    const shake = j.state === "crouch" ? (Math.floor(j.t * 30) % 2) : 0;
+    b.save();
+    b.translate(sx + shake, Math.round(j.y));
+    b.scale(j.dir, 1);
+    b.drawImage(img, -23, -22);
+    b.restore();
   }
 
   // Giant flytraps: open, rearing back, snapping, chewing (with someone's legs kicking out the top), opening

@@ -235,6 +235,9 @@ const Sound = (() => {
     flytrapChomp: () => { noise({ filter: "lowpass", f: 1500, dur: 0.1, vol: 0.6 }); tone({ f: 220, to: 90, dur: 0.25, type: "square", vol: 0.14 }); tone({ f: 180, to: 140, dur: 0.12, type: "sawtooth", vol: 0.08, at: 0.25 }); tone({ f: 170, to: 130, dur: 0.12, type: "sawtooth", vol: 0.08, at: 0.55 }); },
     flytrapSpit: () => { noise({ filter: "bandpass", f: 900, to: 2400, q: 1, dur: 0.2, vol: 0.4 }); tone({ f: 300, to: 700, dur: 0.18, type: "sine", vol: 0.12 }); },
     flytrapGulp: () => { tone({ f: 160, to: 70, dur: 0.35, type: "sine", vol: 0.22 }); tone({ f: 120, to: 60, dur: 0.3, type: "sine", vol: 0.15, at: 0.2 }); },
+    jaguarGrowl: () => tone({ f: 95, to: 70, dur: 0.7, type: "sawtooth", vol: 0.14, attack: 0.15, vibrato: 22 }),
+    jaguarSnarl: () => { noise({ filter: "bandpass", f: 1200, to: 700, q: 1.2, dur: 0.35, vol: 0.3, attack: 0.03 }); tone({ f: 140, to: 90, dur: 0.35, type: "sawtooth", vol: 0.12, vibrato: 30 }); },
+    jaguarRoar: () => { tone({ f: 180, to: 90, dur: 0.6, type: "sawtooth", vol: 0.2, attack: 0.04, vibrato: 25 }); noise({ f: 1000, to: 300, dur: 0.5, vol: 0.35, attack: 0.04 }); },
     rustle: () => noise({ filter: "bandpass", f: 2200, to: 1400, q: 1.2, dur: 0.25, vol: 0.22, attack: 0.03 }),
 
     // Level dangers

@@ -49,6 +49,7 @@ const Game = (() => {
       hands: [], // mystic hands flying, grabbing or swatting
       missiles: [], // missiles zooming in, locking on, flying or exploding
       bears: [],    // bears chasing a player (snow only)
+      jaguars: [],  // jaguars and black panthers hunting the leader (jungle only)
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
       drones: [],   // rescue drones: guarding a player, or flying to grab the leader
       nextVulture: null, // the leader's distance (meters) when the next group comes
@@ -56,6 +57,7 @@ const Game = (() => {
       nextWildMissile: null, // Wild: when (world time) the next missile comes in the prairie
       nextWildVulture: null, // Wild: when the next group of vultures comes in the desert
       nextWildBear: null,    // Wild: when the next bear charges in, in the snow
+      nextWildJaguar: null,  // Wild: when the next jaguar comes, in the jungle
       winner: null,
     };
     for (const p of world.players) {
@@ -127,6 +129,7 @@ const Game = (() => {
     updateBears(dt);
     updateVultures(dt);
     updateFlytraps(dt);
+    updateJaguars(dt);
     checkOrbs();
     checkThinIce();
     checkTrapRescue();
@@ -997,6 +1000,165 @@ const Game = (() => {
         f.t = 0;
       }
     }
+  }
+
+  // ---- Jaguars (jungle) ----
+
+  // Its box: [x, y, w, h], with (j.x, j.y) the middle of its feet
+  const jaguarBox = (j) => [j.x - 12, j.y - 13, 24, 12];
+
+  function spawnJaguar(leader, kindName) {
+    const { level } = world;
+    let ex = leader.x + rand(JAGUAR.ahead[0], JAGUAR.ahead[1]);
+    const g = level.groundTop(ex) ?? leader.y + HITBOX_H;
+    world.jaguars.push({ kind: kindName, target: leader, state: "eyes", t: 0, ex, ey: g - 26, x: ex, y: g - 20, dir: -1, attacks: JAGUAR[kindName].attacks, anim: 0 });
+    Sound.play("jaguarGrowl");
+  }
+
+  // Where it lands near x: the nearest firm ground (never in a pit or a river)
+  function jaguarGround(x, fallbackY) {
+    const { level } = world;
+    for (let d = 0; d < 80; d += 4) for (const s of [1, -1]) {
+      const g = level.groundTop(x + s * d);
+      if (g !== null && !level.riverAt(x + s * d)) return { x: x + s * d, y: g };
+    }
+    return { x, y: fallbackY };
+  }
+
+  function updateJaguars(dt) {
+    const { level, players } = world;
+    const runners = players.filter((p) => !p.dead && !p.caught);
+    if (runners.length) {
+      const leader = runners.reduce((a, b) => (b.x > a.x ? b : a));
+      const busy = world.jaguars.some((j) => j.state !== "leave");
+      const inJungle = level.biomeAt(Math.floor(leader.x / TILE)) === "jungle";
+      const pick = (meters) => (meters >= level.specialAt && Math.random() < 0.5 ? "panther" : "jaguar"); // black panthers come later
+      if (world.wild) {
+        // Wild: always one hunting you in the jungle: when one gives up, the next comes
+        if (!inJungle || busy) world.nextWildJaguar = null;
+        else if (world.nextWildJaguar === null) world.nextWildJaguar = world.time + WILD.jaguarGap;
+        else if (world.time >= world.nextWildJaguar) {
+          world.nextWildJaguar = null;
+          spawnJaguar(leader, pick(leader.x / TILE));
+        }
+      }
+      let taken = busy;
+      for (const spot of world.wild ? [] : level.jaguarSpots) {
+        if (spot.used || leader.x / TILE < spot.col || taken) continue;
+        spot.used = true;
+        if (!inJungle || leader.x / TILE < level.baseAt) continue;
+        spawnJaguar(leader, pick(leader.x / TILE));
+        taken = true;
+      }
+    }
+
+    for (const j of world.jaguars) {
+      const k = JAGUAR[j.kind], p = j.target;
+      j.t += dt;
+      const pcx = p.x + HITBOX_W / 2;
+      if (p.caught && j.state !== "leave") { j.state = "leave"; j.t = 0; }
+      if (j.state === "eyes") {
+        // glowing in the trees (it can't be got at here), then it leaps out at where you'll be
+        if (j.t >= JAGUAR.eyes) {
+          const aim = p.dead ? p.respawnX + HITBOX_W / 2 : pcx + p.vx * k.leap;
+          const land = jaguarGround(aim, p.y + HITBOX_H);
+          Object.assign(j, { state: "leap", t: 0, fromX: j.ex, fromY: j.ey + 6, toX: land.x, toY: land.y });
+          j.dir = land.x >= j.ex ? 1 : -1;
+          Sound.play("jaguarRoar");
+        }
+      } else if (j.state === "leap") {
+        const u = Math.min(1, j.t / k.leap);
+        j.x = j.fromX + (j.toX - j.fromX) * u;
+        j.y = j.fromY + (j.toY - j.fromY) * u - 26 * 4 * u * (1 - u);
+        j.scale = 0.45 + 0.55 * u;  // coming out of the background towards you
+        if (u > 0.7 && jaguarHits(j)) continue;
+        if (u >= 1) { j.state = j.attacks > 0 ? "run" : "leave"; j.t = 0; j.scale = 1; Sound.play("land"); }
+      } else if (j.state === "run" || j.state === "wait") {
+        if (p.dead) {
+          // you died to something else: it goes to wait just in front of where you'll come back
+          const spot = jaguarGround(p.respawnX + HITBOX_W / 2 + JAGUAR.waitAhead, j.y);
+          const d = spot.x - j.x;
+          j.dir = Math.sign(d) || j.dir;
+          if (Math.abs(d) > 2) { j.x += j.dir * Math.min(Math.abs(d), k.run * dt); j.anim += dt; }
+          else j.dir = -1;
+          const g = level.groundTop(j.x);
+          if (g !== null) j.y = g;
+          j.state = "wait";
+          continue;
+        }
+        j.state = "run";
+        const d = pcx - j.x;
+        j.dir = Math.sign(d) || j.dir;
+        // How far apart you'd be when it springs, if it crouched now. Too close (you're running at it,
+        // or it landed right by you): it backs off first, so you always get a fair look at its crouch.
+        const gap = Math.abs(d + p.vx * k.crouch);
+        let move = 0;
+        if (gap < JAGUAR.room) move = -j.dir;
+        else if (Math.abs(d) < JAGUAR.strike || gap < JAGUAR.strike) {
+          j.state = "crouch";
+          j.t = 0;
+          j.high = Math.random() < 0.5; // leap over you, or pounce at you
+          Sound.play(j.high ? "jaguarGrowl" : "jaguarSnarl");
+        } else move = j.dir;
+        if (move) {
+          j.x += move * k.run * dt;
+          j.anim += dt;
+          j.backing = move !== j.dir;
+          const g = level.groundTop(j.x);
+          if (g !== null) j.y = g;
+        }
+      } else if (j.state === "crouch") {
+        // you're running right into it: it breaks off and backs away (then crouches again)
+        if (Math.abs(pcx - j.x + p.vx * Math.max(0, k.crouch - j.t)) < JAGUAR.room - 6) { j.state = "run"; continue; }
+        if (j.t >= k.crouch) {
+          // spring: it passes over (or through) where you'll be 55% of the way through, and lands past you
+          j.dur = j.high ? k.over : k.pounce;
+          const cross = pcx + p.vx * j.dur * 0.55;
+          const dir = Math.sign(cross - j.x) || j.dir;
+          const far = Math.max(Math.abs(cross - j.x) / 0.55, Math.abs(cross - j.x) + JAGUAR.overshoot);
+          const land = jaguarGround(j.x + dir * far, j.y);
+          const under = level.groundTop(cross) ?? j.y;
+          const mid = j.y + (land.y - j.y) * 0.55;
+          const lift = j.high ? Math.max(JAGUAR.over, mid - (under - JAGUAR.over)) / 0.99 : 3;
+          Object.assign(j, { state: "attack", t: 0, fromX: j.x, fromY: j.y, toX: land.x, toY: land.y, lift, crossX: cross });
+          j.dir = land.x >= j.x ? 1 : -1;
+          Sound.play("jaguarRoar");
+        }
+      } else if (j.state === "attack") {
+        const u = Math.min(1, j.t / j.dur);
+        j.x = j.fromX + (j.toX - j.fromX) * u;
+        j.y = j.fromY + (j.toY - j.fromY) * u - j.lift * 4 * u * (1 - u);
+        if (jaguarHits(j)) continue;
+        if (u >= 1) {
+          j.attacks--;
+          j.state = j.attacks > 0 ? "run" : "leave";
+          j.t = 0;
+          Sound.play("land");
+        }
+      } else if (j.state === "leave") {
+        // gives up and slinks off, away from you (gone once nobody can see it)
+        j.dir = j.x >= pcx ? 1 : -1;
+        j.x += j.dir * k.run * dt;
+        j.anim += dt;
+        const g = level.groundTop(j.x);
+        if (g !== null) j.y = g;
+        if (j.t > 8 || players.every((q) => Math.abs(j.x - (q.x + HITBOX_W / 2)) > VIEW_W)) j.done = true;
+      }
+    }
+    world.jaguars = world.jaguars.filter((j) => !j.done);
+  }
+
+  // Did it get the player it's after? (Only them: it ignores anyone else.)
+  function jaguarHits(j) {
+    const p = j.target;
+    if (p.dead || p.caught || p.held || p.eatenBy || p.inRiver) return false;
+    if (!overlaps(p.x, p.y, HITBOX_W, HITBOX_H, ...jaguarBox(j))) return false;
+    p.showHit("POUNCED!", "#ff4d3d");
+    p.die();
+    Sound.play("maul");
+    j.state = "leave"; // got you: it's done
+    j.t = 0;
+    return true;
   }
 
   // ---- Vultures (desert) ----

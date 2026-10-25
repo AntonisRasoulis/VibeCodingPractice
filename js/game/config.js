@@ -135,6 +135,7 @@ const WILD = {
   bigOdds: { 0: 1, 1: 1, 2: 2 }, // traps, sinkholes and flytraps: small / medium / large odds (normal: all even)
   flytrapWindup: 0.28,  // flytraps snap quicker (normal 0.35)...$
   flytrapChewNothing: 0.9, // ...and get over a miss quicker (normal 1.2)
+  jaguarGap: 0.6,       // jungle: the next jaguar comes this soon after the last one gives up
 };
 
 // The jungle's spikes come in two kinds: thin bamboo stakes, very tall (a jump lifts your feet
@@ -159,12 +160,12 @@ const RIVER = {
   hop: 4,            // tiles: the longest hop a river ever asks for (a full-speed jump is about 7)
 };
 
-// Jungle palm trees, all hung with coconuts. Most never fall, but about one palm in three has one
+// Jungle palm trees, all hung with coconuts. Most never fall, but about one palm in five has one
 // that does when you run towards it: it wobbles (its shadow shows where it'll land), then drops.
 // Like the icicles, each player gets their own coconuts.
 const COCONUT = {
   every: [8, 22],     // tiles between palm trees (they're common)
-  dropChance: 0.33,   // share of palms with a coconut that falls
+  dropChance: 0.6,    // share of palms with a coconut that falls (where it's safe to: about a third of them)
   trigger: 72,        // it starts wobbling when you're this close (pixels) to running under it
   shake: 0.35,        // seconds it wobbles before it drops
   gravity: 600,       // how fast it falls
@@ -185,6 +186,25 @@ const FLYTRAP = {
   open: 0.35,         // seconds it takes to open up again
   spit: [120, 170],   // the small one spits you back this fast (sideways, up): about 5 tiles
   spitStun: 0.8,      // ...and you're dazed this long
+};
+
+// The jungle's special danger: once or twice per jungle biome a jaguar (or, from 500 m, a black
+// panther) comes for the player in the lead. Its eyes glow in a dark thicket ahead, narrow, and it
+// leaps out at where you're going to be (its shadow shows where): change speed. If it misses it
+// runs at you and attacks again: crouched flat, it pounces low AT you (jump!); rear and tail up, it
+// leaps OVER you (keep going, don't jump). A jaguar attacks 3 times, a panther once but faster.
+const JAGUAR = {
+  // leap: its first leap out of the trees (seconds); crouch: how long it shows you which attack is
+  // coming; over / pounce: how long a leap over you and a low pounce at you take
+  jaguar: { leap: 0.8, attacks: 3, run: 140, crouch: 0.4, over: 0.5, pounce: 0.32 },
+  panther: { leap: 0.6, attacks: 1, run: 170, crouch: 0.32, over: 0.42, pounce: 0.28 },
+  eyes: 1.4,          // seconds its eyes glow in the trees before it leaps (narrowed for the last 0.5)
+  ahead: [170, 210],  // how far ahead of the leader its eyes appear (pixels)
+  strike: 46,         // it crouches to attack when it's this close to you
+  room: 36,           // ...but never closer than this when it springs (if you're running at it, it backs off first)
+  overshoot: 34,      // an attack carries it this far past you
+  over: 17,           // leaping over you, its feet clear the ground under you by this much (you're 11 tall)
+  waitAhead: 70,      // if you die, it waits this far in front of where you'll come back
 };
 
 const DESERT = {

@@ -80,6 +80,7 @@ class Level {
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
     this.bearSpots = [];      // twice per snow biome: when the leader gets here, a bear charges in
+    this.jaguarSpots = [];    // once or twice per jungle biome: when the leader gets here, a jaguar's eyes appear
     this.missileSpots = [];   // in the prairie: when the leader gets here, a missile comes
     this.quick = [];          // quick[x] = true where the ground's surface is quicksand
     this.spikeKind = [];      // jungle: spikeKind[x] = "thorn" (a thorn bush) or a bamboo stake's height in pixels
@@ -650,7 +651,15 @@ class Level {
     if (this.rng() < COCONUT.dropChance) {
       drop = nuts.pop();
       const lx = x + drop[0];
-      for (let k = -16; k <= 16; k += 4) if (this.threatened(lx - HITBOX_W / 2 + k, g - HITBOX_H)) { nuts.push(drop); drop = null; break; }
+      let risky = false;
+      for (let k = -16; k <= 16; k += 4) if (this.threatened(lx - HITBOX_W / 2 + k, g - HITBOX_H)) risky = true;
+      // bonked in the middle of a jump, you drop straight down: so no spikes, pits or rivers anywhere near
+      for (let k = -8; k <= 8; k++) {
+        const gk = this.groundTop((c + k) * TILE);
+        if (gk === null || this.tile(c + k, gk / TILE - 1) === T_SPIKE) risky = true;
+      }
+      if (this.rivers.some((r) => x > r.x0 - 9 * TILE && x < r.x1 + 9 * TILE)) risky = true;
+      if (risky) { nuts.push(drop); drop = null; }
     }
     this.palms.push({ id: this.nextId++, x, gy: g, h, nuts, drop });
     this.lastPalm = c;
@@ -811,6 +820,11 @@ class Level {
       const n = Number(this.pickWeighted(MISSILE.perBiome));
       const part = length / n;
       for (let i = 0; i < n; i++) this.missileSpots.push({ col: this.col + Math.round(part * (i + 0.25 + this.rng() * 0.5)), used: false });
+      return;
+    }
+    if (this.biome === "jungle") {
+      const n = this.rand(1, 2), part = (length - 80) / n;
+      for (let i = 0; i < n; i++) this.jaguarSpots.push({ col: this.col + 30 + Math.round(part * (i + 0.2 + this.rng() * 0.6)), used: false });
       return;
     }
     if (this.biome !== "snow") return;

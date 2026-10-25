@@ -748,6 +748,112 @@ function makeFlytrapFrames(big) {
   };
 }
 
+// ---- Jaguars and black panthers (jungle) ----
+
+const JAGUAR_W = 46, JAGUAR_H = 24; // sprite size; its feet are on the bottom row but one, its middle at x = 23
+const CAT_PALETTES = {
+  jaguar: { out: "#1e1206", body: "#d8962e", shade: "#a8661a", belly: "#f2d49a", spot: "#2a1606", spot2: "#7a4410", eye: "#ffd21a", glow: "#ff9a1a", mouth: "#5a0a0a" },
+  panther: { out: "#000000", body: "#24202c", shade: "#16131c", belly: "#302b39", spot: "#19161f", spot2: "#1d1a24", eye: "#b6ff3a", glow: "#6aff2a", mouth: "#3a0612" },
+};
+
+// Big, muscular and snarling, facing right. Poses: run1, run2, crouchLow (flat to the ground: about
+// to pounce AT you), crouchHigh (rear and tail up: about to leap OVER you), leap.
+function makeCat(kind, pose) {
+  const C = CAT_PALETTES[kind];
+  const W = JAGUAR_W, H = JAGUAR_H, base = H - 2;
+  const grid = new Map();
+  const set = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < W && y < H) grid.set(x + "," + y, col); };
+  const get = (x, y) => grid.get(x + "," + y);
+  const ell = (cx, cy, rx, ry, col) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const dx = (x - cx) / rx, dy = (y - cy) / ry; if (dx * dx + dy * dy <= 1.05) set(x, y, col); } };
+  const line = (x0, y0, x1, y1, t, col) => { const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2) + 1; for (let k = 0; k <= n; k++) { const u = k / n; for (let j = 0; j < t; j++) for (let i = 0; i < t; i++) set(x0 + (x1 - x0) * u + i - (t - 1) / 2, y0 + (y1 - y0) * u + j - (t - 1) / 2, col); } };
+  let bx = 20, by = 12, hx = 35, hy = 10, legs, tail, rear = 0, flat = 0, jaw = 1.5;
+  if (pose === "run1") { legs = [[13, 14, 8, base], [16, 14, 18, base - 1], [26, 14, 30, base - 1], [28, 14, 33, base]]; tail = [[10, 10], [5, 8], [2, 5], [1, 3]]; }
+  if (pose === "run2") { by = 13; hy = 11; legs = [[13, 15, 15, base], [16, 15, 12, base], [26, 15, 26, base], [28, 15, 24, base]]; tail = [[10, 11], [5, 11], [2, 10], [0, 8]]; }
+  if (pose === "crouchLow") { by = 15.5; hy = 15; hx = 36; flat = 1; jaw = 2.5; legs = [[13, 16, 9, base], [16, 16, 13, base], [26, 17, 30, base], [29, 17, 34, base]]; tail = [[10, 16], [5, 17], [2, 18], [0, 17]]; }
+  if (pose === "crouchHigh") { by = 13; hy = 14; rear = 1; legs = [[13, 12, 12, base], [16, 12, 15, base], [27, 15, 29, base], [29, 15, 32, base]]; tail = [[10, 8], [7, 4], [7, 1], [9, 0]]; }
+  if (pose === "leap") { by = 10; hx = 37; hy = 8; jaw = 3; legs = [[11, 11, 4, 14], [13, 12, 6, 16], [29, 11, 40, 15], [30, 12, 41, 12]]; tail = [[8, 10], [4, 12], [1, 15], [0, 18]]; }
+  let [tx, ty] = [bx - 9, by - 1];
+  for (const [x, y] of tail) { line(tx, ty, x, y, 2, C.body); [tx, ty] = [x, y]; }
+  set(tx, ty, C.spot);
+  set(tx + 1, ty, C.spot);
+  for (const [x0, y0, x1, y1] of legs) { line(x0, y0, x1, y1, 3, C.body); for (let j = 0; j < 2; j++) for (let i = -1; i <= 1; i++) set(x1 + i, y1 - 1 + j, C.body); }
+  ell(bx, by, 11, flat ? 3.6 : 4.6, C.body);
+  ell(bx - 7, by - (rear ? 3 : 0.5), 5, rear ? 5 : 4.5, C.body);
+  ell(bx + 7, by - 0.5, 5.5, flat ? 4 : 5.2, C.body);
+  ell(bx + 1, by + (flat ? 2.5 : 3.5), 8, 1.2, C.belly);
+  ell(hx, hy, 5.2, 4.4, C.body);
+  set(hx - 4, hy - 4, C.body);
+  set(hx - 5, hy - 4, C.body);
+  set(hx - 3, hy - 4.6, C.body);
+  ell(hx + 4.5, hy + 0.5, 2.6, 2, C.belly);
+  for (let j = 0; j < Math.ceil(jaw); j++) for (let i = 0; i < 6; i++) set(hx + 2 + i, hy + 2 + j, C.mouth);
+  ell(hx + 4, hy + 2.5 + jaw, 3, 1.1, C.body);
+  for (let k = 0; k < 26; k++) {
+    const x = Math.round(bx - 15 + hash(k, 3) * 30), y = Math.round(by - 4 + hash(k, 4) * 7);
+    if (get(x, y) === C.body && get(x + 1, y) === C.body && get(x, y + 1) === C.body) { set(x, y, C.spot); set(x + 1, y, C.spot); set(x, y + 1, C.spot); set(x + 1, y + 1, C.spot2); }
+  }
+  for (let x = bx - 12; x < bx + 12; x++) if (get(x, Math.round(by - 4)) === C.body && hash(x, 9) < 0.5) set(x, Math.round(by - 4), C.shade);
+  const c = makeCanvas(W, H);
+  const g = c.getContext("2d");
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = get(x, y);
+    if (v) px(g, v, x, y);
+    else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => get(x + dx, y + dy))) px(g, C.out, x, y);
+  }
+  // an angry slanted eye with a slit pupil, the nose, fangs, and claws out when it attacks
+  const X = Math.round(hx), Y = Math.round(hy);
+  for (const [x, y] of [[-1, -3], [0, -3], [1, -2], [2, -2], [3, -1]]) px(g, C.out, X + x, Y + y);
+  px(g, C.eye, X, Y - 2);
+  px(g, C.eye, X + 1, Y - 1, 2, 1);
+  px(g, "#000000", X + 1, Y - 1);
+  px(g, C.out, X + 7, Y, 2, 1);
+  px(g, "#ffffff", X + 3, Y + 2, 1, 2);
+  px(g, "#ffffff", X + 6, Y + 2, 1, 2);
+  px(g, "#ffffff", X + 4, Y + 1 + Math.ceil(jaw));
+  px(g, "#ffffff", X + 6, Y + 1 + Math.ceil(jaw));
+  if (pose === "leap" || pose === "crouchLow") for (const [, , x1, y1] of legs.slice(2)) { px(g, "#ffffff", x1 + 2, y1 - 1); px(g, "#ffffff", x1 + 2, y1 + 1); px(g, "#ffffff", x1 + 3, y1); }
+  return c;
+}
+
+// Its eyes glowing in a dark thicket: slanted, angry almonds with slit pupils and a soft glow.
+// `narrow`: about to leap.
+const EYE_ROWS = { open: ["EEE...", "EEEPBB", ".EEPEEB", "..EEEE"], narrow: ["......", "EEBB..", ".EEPBBB", "..EEEE"] };
+function makeCatEyes(kind, narrow) {
+  const C = CAT_PALETTES[kind];
+  const W = 23, H = 11;
+  const c = makeCanvas(W, H);
+  const g = c.getContext("2d");
+  for (const ex of [5, 17]) {
+    const gr = g.createRadialGradient(ex, 5.5, 0, ex, 5.5, 6.5);
+    gr.addColorStop(0, C.glow + "aa");
+    gr.addColorStop(1, C.glow + "00");
+    g.fillStyle = gr;
+    g.fillRect(ex - 7, 0, 14, H);
+  }
+  EYE_ROWS[narrow ? "narrow" : "open"].forEach((row, y) => [...row].forEach((ch, x) => {
+    const col = { E: C.eye, P: "#000000", B: "#000000" }[ch];
+    if (!col) return;
+    px(g, col, 2 + x, 3 + y);
+    px(g, col, W - 3 - x, 3 + y);
+  }));
+  px(g, "#ffffff", 3, 4);
+  px(g, "#ffffff", W - 4, 4);
+  return c;
+}
+
+// The dark thicket it hides in (in the background)
+function makeThicket() {
+  const c = makeCanvas(60, 34);
+  const g = c.getContext("2d");
+  for (const [cx, cy, rx, ry] of [[30, 22, 22, 12], [16, 25, 12, 9], [46, 24, 13, 10], [32, 13, 14, 9]]) {
+    for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
+      if ((x / rx) ** 2 + (y / ry) ** 2 > 1 || hash(cx + x, y + cy) < 0.06) continue;
+      px(g, (x + y) % 5 === 0 ? "#2a5a2c" : "#1d4322", cx + x, cy + y);
+    }
+  }
+  return c;
+}
+
 // The jungle's background, in three layers that each repeat sideways (drawn with parallax):
 // far canopy, tree trunks with hanging vines, and ferns along the horizon with the canopy edge above
 function makeJungleLayers() {
@@ -964,6 +1070,9 @@ function buildSprites() {
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
+    cats: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, Object.fromEntries(["run1", "run2", "crouchLow", "crouchHigh", "leap"].map((pose) => [pose, makeCat(kind, pose)]))])),
+    catEyes: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, { open: makeCatEyes(kind, false), narrow: makeCatEyes(kind, true) }])),
+    thicket: makeThicket(),
     palms: Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h)])),
     coconut: makeCoconut(false),
     coconutHalf: makeCoconut(true),
