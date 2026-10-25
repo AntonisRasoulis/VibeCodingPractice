@@ -494,6 +494,26 @@ const Game = (() => {
       if (spot.col >= MISSILE.startAt) spawnMissile();
     }
 
+    // You died before the missile coming for you got there: it gives up, and a fresh one comes
+    // for you once you're back
+    for (const m of world.missiles) {
+      const p = m.state === "approach" ? m.anchor : m.target;
+      if (!p || !p.dead || p.caught || m.state === "boom" || m.owedFor === p) continue;
+      p.missileOwed = true;
+      m.owedFor = p;
+      if (m.state !== "fly") m.done = true; // still on its way in: it gives up (one already fired keeps going)
+    }
+    for (const p of players) {
+      if (!p.missileOwed || p.dead) continue;
+      if (p.caught) { p.missileOwed = false; continue; }
+      if (world.missiles.some((m) => !m.done && m.state !== "fly" && m.state !== "boom")) continue; // one at a time
+      p.missileOwed = false;
+      const striped = p.x / TILE > MISSILE.stripedAt && Math.random() < 0.5;
+      world.missiles.push(makeMissile(p, striped, Math.random() < 0.5 ? -1 : 1));
+      Sound.play("glint");
+      Sound.play("incoming");
+    }
+
     for (const m of world.missiles) {
       m.t += dt;
       if (m.state === "approach") {
