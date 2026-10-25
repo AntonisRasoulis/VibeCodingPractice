@@ -48,6 +48,8 @@ class Player {
     this.safeSpots = [{ x, y }]; // recent places we stood safely, used for respawning
     this.fallState = new Map();  // crumbling platforms *this* player has stepped on
     this.icicleState = new Map(); // icicles *this* player has set off (each player gets their own, like the platforms)
+    this.coconutState = new Map(); // jungle coconuts *this* player has set off (the same)
+    this.dizzy = 0;               // seconds of stars round your head (bonked by a coconut)
     this.trapState = new Set();   // bear traps that have snapped on *this* player
     this.rescueBlock = 0;         // just got knocked free of a trap: can't knock anyone else in for a moment
     this.trapped = 0;             // wiggles (left, right, left...) still needed to get out of a bear trap
@@ -89,6 +91,8 @@ class Player {
     this.updateParticles(dt);
     this.updateFallingPlatforms(dt);
     this.updateSnow(dt, level);
+    this.updateCoconuts(dt, level);
+    if (this.dizzy > 0) this.dizzy -= dt;
     if (this.biomeBanner > 0) this.biomeBanner -= dt;
     if (this.rescueBlock > 0) this.rescueBlock -= dt;
     if (this.honey > 0) this.honey -= dt;
@@ -340,6 +344,48 @@ class Player {
       return;
     }
     this.checkHazards(level);
+  }
+
+  // ---- Jungle: coconuts ----
+
+  // A coconut that can fall starts wobbling when you run towards it, then drops. Bonk: you're dizzy.
+  updateCoconuts(dt, level) {
+    const cx = this.x + HITBOX_W / 2;
+    for (const palm of level.palms) {
+      if (!palm.drop || Math.abs(palm.x - cx) > VIEW_W) continue;
+      const nx = palm.x + palm.drop[0];
+      let s = this.coconutState.get(palm.id);
+      if (!s) {
+        const ahead = nx - cx;
+        if (!this.dead && !this.caught && ahead > -4 && ahead < COCONUT.trigger) {
+          this.coconutState.set(palm.id, { t: 0, y: palm.gy - palm.h + 9 + palm.drop[1], vy: 0, landed: false, landT: 0 });
+          Sound.play("coconutWobble");
+        }
+        continue;
+      }
+      s.t += dt;
+      if (s.landed) { s.landT += dt; continue; }
+      if (s.t < COCONUT.shake) continue;
+      s.vy += COCONUT.gravity * dt;
+      s.y += s.vy * dt;
+      if (s.y + 5 >= palm.gy) {
+        s.y = palm.gy - 5;
+        s.landed = true;
+        if (Math.abs(nx - cx) < VIEW_W * 0.7) Sound.play("coconutCrack");
+      } else if (!this.dead && !this.held && !this.inRiver && this.dizzy <= 0 && overlaps(this.x, this.y, HITBOX_W, HITBOX_H, nx - 2.5, s.y, 5, 5)) {
+        s.landed = true; // it bounces off and splits
+        s.y = palm.gy - 5;
+        this.bonk();
+      }
+    }
+  }
+
+  bonk() {
+    this.stun = COCONUT.stun;
+    this.dizzy = COCONUT.stun;
+    this.vx = 0;
+    this.showHit("BONK!", "#c99a5a");
+    Sound.play("bonk");
   }
 
   // ---- Jungle: swept along a river ----
@@ -901,6 +947,8 @@ class Player {
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
     this.icicleState.clear(); // ...and so do icicles
+    this.coconutState.clear(); // ...and coconuts
+    this.dizzy = 0;
     this.trapState.clear();
     this.trapped = 0;
     this.hiddenIn = null;

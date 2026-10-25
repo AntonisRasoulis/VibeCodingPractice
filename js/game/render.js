@@ -67,6 +67,7 @@ const Renderer = (() => {
     for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
     drawTiles(world.level, camX);
     drawSawTracks(world.level, camX);
+    drawPalms(world.level, player, camX);
     drawSigns(world.level, camX);
     drawIcicles(world.level, player, camX, world.time);
     drawSnowballs(player, camX);
@@ -106,6 +107,8 @@ const Renderer = (() => {
     drawIceBlocks(world.level, camX); // anyone frozen in a pond, in their block of ice
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawRiverFronts(world.level, camX, world.time); // ...and anyone in a river is up to their neck
+    drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
+    for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
@@ -529,6 +532,59 @@ const Renderer = (() => {
         }
       }
     }
+  }
+
+  // Palm trees, with the coconuts that never fall (each player's falling ones: drawCoconuts)
+  function drawPalms(level, player, camX) {
+    for (const palm of level.palms) {
+      const sx = Math.round(palm.x - camX);
+      if (sx < -30 || sx > VIEW_W + 30) continue;
+      const img = sprites.palms[palm.h];
+      const left = sx - PALM_BASE_X, top = palm.gy - img.height + 2;
+      b.drawImage(img, left, top);
+      const nuts = palm.drop && !player.coconutState.has(palm.id) ? [...palm.nuts, palm.drop] : palm.nuts;
+      for (const [dx, dy] of nuts) b.drawImage(sprites.coconut, sx + dx - 2, top + PALM_CROWN_Y + dy);
+    }
+  }
+
+  // This player's coconut that's wobbling or falling (its shadow growing on the ground), or split open
+  function drawCoconuts(level, player, camX, time) {
+    for (const palm of level.palms) {
+      if (!palm.drop) continue;
+      const s = player.coconutState.get(palm.id);
+      if (!s) continue;
+      const sx = Math.round(palm.x + palm.drop[0] - camX);
+      if (sx < -10 || sx > VIEW_W + 10) continue;
+      if (s.landed) {
+        if (s.landT > 4) continue;
+        b.drawImage(sprites.coconutHalf, sx - 5, palm.gy - 3);
+        b.drawImage(sprites.coconutHalf, sx + 1, palm.gy - 3);
+        continue;
+      }
+      // the shadow: a faint dot that grows and darkens as it falls
+      const fall = clamp((s.y - (palm.gy - palm.h)) / palm.h, 0, 1);
+      const w = 2 + Math.round(fall * 5);
+      b.fillStyle = `rgba(0, 0, 0, ${0.2 + fall * 0.35})`;
+      b.fillRect(sx - Math.floor(w / 2), palm.gy - 1, w, 1);
+      const wobble = s.t < COCONUT.shake ? (Math.floor(time * 30) % 2 ? 1 : -1) : 0;
+      b.drawImage(sprites.coconut, sx - 2 + wobble, Math.round(s.y));
+    }
+  }
+
+  // Stars spinning round the head of someone bonked by a coconut
+  function drawDizzy(p, camX, time, ghost) {
+    b.globalAlpha = ghost ? 0.35 : 1;
+    const hx = p.x + HITBOX_W / 2 - camX, hy = p.y - 2;
+    for (let k = 0; k < 3; k++) {
+      const a = time * 7 + (k * Math.PI * 2) / 3;
+      const x = Math.round(hx + Math.cos(a) * 6), y = Math.round(hy + Math.sin(a) * 2);
+      b.fillStyle = "#fff27a";
+      b.fillRect(x, y - 1, 1, 3);
+      b.fillRect(x - 1, y, 3, 1);
+      b.fillStyle = "#ffffff";
+      b.fillRect(x, y, 1, 1);
+    }
+    b.globalAlpha = 1;
   }
 
   // Jungle rivers: the water, rippling left with the current, and the logs on it

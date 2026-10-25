@@ -12,7 +12,7 @@ const Game = (() => {
   const GAME_KEYS = new Set(CONTROLS.flatMap((c) => Object.values(c)));
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
-    "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome",
+    "portalCooldown", "safeSpots", "fallState", "icicleState", "coconutState", "snowballs", "snowballStarted", "onIce", "biome",
     "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond", "inRiver"];
 
   let canvas, ctx, callbacks;

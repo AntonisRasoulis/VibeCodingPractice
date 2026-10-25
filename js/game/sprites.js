@@ -619,6 +619,59 @@ function makeLog(tiles) {
   return c;
 }
 
+// A palm tree h pixels tall (without its coconuts): a gently curving ringed trunk and a crown of
+// drooping fronds. Its base is at (PALM_BASE_X, bottom); the crown at (PALM_CROWN_X, PALM_CROWN_Y).
+const PALM_BASE_X = 20, PALM_CROWN_X = 24, PALM_CROWN_Y = 9;
+function makePalm(h) {
+  const c = makeCanvas(40, h + 2);
+  const g = c.getContext("2d");
+  for (let y = 8; y < h + 2; y++) {
+    const x = 18 + Math.round(4 * Math.sin(((h - y) / h) * 1.6));
+    px(g, "#8a5a32", x, y, 4, 1);
+    px(g, "#b07a48", x, y);
+    if (y % 4 === 0) px(g, "#5e3a1e", x, y, 4, 1);
+  }
+  const tx = PALM_CROWN_X - 2, ty = PALM_CROWN_Y;
+  const frond = (dx, dy, len) => {
+    for (let k = 0; k < len; k++) {
+      const u = k / len;
+      const x = Math.round(tx + 2 + dx * k), y = Math.round(ty + dy * k + u * u * len * 0.6);
+      px(g, "#2f8a3a", x, y, 2, 1);
+      if (k % 2) {
+        px(g, "#4fb04a", x, y + 1);
+        px(g, "#1f6a2a", x + 1, y + 2);
+      }
+    }
+  };
+  frond(1, -0.3, 16);
+  frond(-1, -0.3, 16);
+  frond(0.8, 0.15, 13);
+  frond(-0.8, 0.15, 13);
+  frond(0.3, -0.7, 9);
+  frond(-0.3, -0.7, 9);
+  return c;
+}
+
+// A coconut (5x5), and its two halves once it has cracked open on the ground
+function makeCoconut(half) {
+  const c = makeCanvas(5, 5);
+  const g = c.getContext("2d");
+  for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) {
+    const dx = x - 2, dy = y - 2;
+    if (dx * dx + dy * dy > 5) continue;
+    if (half && y < 2) continue;
+    px(g, "#6a4024", x, y);
+  }
+  if (half) {
+    px(g, "#f4eedc", 1, 2, 3, 1); // the white inside
+  } else {
+    px(g, "#9a6a3e", 1, 1);
+    px(g, "#8a5a32", 2, 1);
+    px(g, "#4a2a16", 3, 3);
+  }
+  return c;
+}
+
 // The jungle's background, in three layers that each repeat sideways (drawn with parallax):
 // far canopy, tree trunks with hanging vines, and ferns along the horizon with the canopy edge above
 function makeJungleLayers() {
@@ -834,6 +887,9 @@ function buildSprites() {
     bamboo: Object.fromEntries(JUNGLE.bambooHeights.map((h) => [h, makeBamboo(h)])),
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
+    palms: Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h)])),
+    coconut: makeCoconut(false),
+    coconutHalf: makeCoconut(true),
     logs: Object.fromEntries([3, 4, 5].map((t) => [t * TILE, makeLog(t)])), // by width in pixels
     vultures: Object.fromEntries(Object.entries(VULTURE_PALETTES).map(([kind, pal]) =>
       [kind, Object.fromEntries(Object.entries(VULTURE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, pal)]))])),

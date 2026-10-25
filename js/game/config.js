@@ -157,6 +157,18 @@ const RIVER = {
   hop: 4,            // tiles: the longest hop a river ever asks for (a full-speed jump is about 7)
 };
 
+// Jungle palm trees, all hung with coconuts. Most never fall, but about one palm in three has one
+// that does when you run towards it: it wobbles (its shadow shows where it'll land), then drops.
+// Like the icicles, each player gets their own coconuts.
+const COCONUT = {
+  every: [8, 22],     // tiles between palm trees (they're common)
+  dropChance: 0.33,   // share of palms with a coconut that falls
+  trigger: 72,        // it starts wobbling when you're this close (pixels) to running under it
+  shake: 0.35,        // seconds it wobbles before it drops
+  gravity: 600,       // how fast it falls
+  stun: 1,            // seconds you're dizzy (can't move) if it bonks you
+};
+
 const DESERT = {
   sinkTime: 3,        // seconds to sink all the way into quicksand if you do nothing
   jumpsToEscape: 6,   // this many jump presses pull you out (each one also lifts you up a little)

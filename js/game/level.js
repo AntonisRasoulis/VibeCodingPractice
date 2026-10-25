@@ -98,6 +98,8 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.palms = [];      // jungle: palm trees { id, x (trunk), gy, h, nuts: [[dx, dy]], drop: [dx, dy] (the one that falls) or null }
+    this.lastPalm = 0;
     this.rivers = [];     // jungle: { id, x0, x1 (pixels), gy (the banks' top), wy (the water's surface) }; its logs are platforms
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
@@ -497,6 +499,10 @@ class Level {
       this.tryTrap(Math.floor((bush.x0 + bush.w / 2) / TILE), bush);
     }
     for (let c = Math.max(this.scatterFrom, 61); c < until; c++) {
+      if (this.colBiome[c] === "jungle") {
+        if (c - this.lastPalm >= COCONUT.every[0] && this.rng() < 3 / (COCONUT.every[1] - COCONUT.every[0])) this.tryPalm(c);
+        continue;
+      }
       if (this.colBiome[c] === "snow") {
         if (this.rng() < SCATTER.pond) this.tryPond(c);
         continue;
@@ -574,6 +580,33 @@ class Level {
       remove();
       if (run < 4) return false;
     }
+    return true;
+  }
+
+  // A palm tree at column c: on flat, firm jungle ground with open sky above (for its crown, and for
+  // a coconut to fall through). A coconut that falls only goes where being stunned can't leave you
+  // in another danger's reach.
+  tryPalm(c) {
+    const g = this.groundTop(c * TILE);
+    if (g === null) return false;
+    for (let k = -1; k <= 1; k++) {
+      if (!this.cols[c + k] || this.groundTop((c + k) * TILE) !== g || this.colBiome[c + k] !== "jungle") return false;
+      for (let r = 0; r < g / TILE; r++) if (this.tile(c + k, r) !== T_EMPTY) return false; // spikes, ledges, shooters
+    }
+    const x = c * TILE + TILE / 2;
+    if (this.rivers.some((r) => x > r.x0 - 2 * TILE && x < r.x1 + 2 * TILE)) return false;
+    if (this.platforms.some((p) => x + 3 * TILE > p.x && x - 3 * TILE < p.x + p.w)) return false;
+    if (this.portals.some((p) => x > p.x - 4 * TILE && x < p.toX + 4 * TILE)) return false;
+    const h = this.pickFrom([48, 54, 60]);
+    const nuts = [[-3, 1], [2, 2], [-1, 4], [3, 0]].slice(0, this.rand(2, 4));
+    let drop = null;
+    if (this.rng() < COCONUT.dropChance) {
+      drop = nuts.pop();
+      const lx = x + drop[0];
+      for (let k = -16; k <= 16; k += 4) if (this.threatened(lx - HITBOX_W / 2 + k, g - HITBOX_H)) { nuts.push(drop); drop = null; break; }
+    }
+    this.palms.push({ id: this.nextId++, x, gy: g, h, nuts, drop });
+    this.lastPalm = c;
     return true;
   }
 
