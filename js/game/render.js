@@ -619,11 +619,10 @@ const Renderer = (() => {
     for (const palm of level.palms) {
       const sx = Math.round(palm.x - camX);
       if (sx < -30 || sx > VIEW_W + 30) continue;
-      const img = sprites.palms[palm.h];
-      const left = sx - PALM_BASE_X, top = palm.gy - img.height + 2;
-      b.drawImage(img, left, top);
+      const img = sprites.palms[palm.kind][palm.h];
+      b.drawImage(img, sx - img.footX, palm.gy - img.height);
       const nuts = palm.drop && !player.coconutState.has(palm.id) ? [...palm.nuts, palm.drop] : palm.nuts;
-      for (const [dx, dy] of nuts) b.drawImage(sprites.coconut, sx + dx - 2, top + PALM_CROWN_Y + dy);
+      for (const [dx, dy] of nuts) b.drawImage(sprites.coconut, Math.round(palm.cx - camX) + dx - 2, palm.cy + dy);
     }
   }
 
@@ -633,7 +632,7 @@ const Renderer = (() => {
       if (!palm.drop) continue;
       const s = player.coconutState.get(palm.id);
       if (!s) continue;
-      const sx = Math.round(palm.x + palm.drop[0] - camX);
+      const sx = Math.round(palm.cx + palm.drop[0] - camX);
       if (sx < -10 || sx > VIEW_W + 10) continue;
       if (s.landed) {
         if (s.landT > 4) continue;
@@ -642,7 +641,7 @@ const Renderer = (() => {
         continue;
       }
       // the shadow: a faint dot that grows and darkens as it falls
-      const fall = clamp((s.y - (palm.gy - palm.h)) / palm.h, 0, 1);
+      const fall = clamp((s.y - palm.cy) / (palm.gy - palm.cy), 0, 1);
       const w = 2 + Math.round(fall * 5);
       b.fillStyle = `rgba(0, 0, 0, ${0.2 + fall * 0.35})`;
       b.fillRect(sx - Math.floor(w / 2), palm.gy - 1, w, 1);

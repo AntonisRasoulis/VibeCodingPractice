@@ -619,36 +619,77 @@ function makeLog(tiles) {
   return c;
 }
 
-// A palm tree h pixels tall (without its coconuts): a gently curving ringed trunk and a crown of
-// drooping fronds. Its base is at (PALM_BASE_X, bottom); the crown at (PALM_CROWN_X, PALM_CROWN_Y).
-const PALM_BASE_X = 20, PALM_CROWN_X = 24, PALM_CROWN_Y = 9;
-function makePalm(h) {
-  const c = makeCanvas(40, h + 2);
+// Palm trees (without their coconuts), in the 5 kinds of PALMS: a classic one curving gently, one
+// leaning hard with a pale crosshatched trunk, a tall straight royal palm with a green crownshaft
+// and fronds arching up, a short fat fan palm with a shaggy skirt of dead fronds, and a windswept
+// one with an S-bent trunk and every frond blown one way. The trunk's foot is at (PALM_FOOT_X,
+// bottom) and its crown (where the coconuts hang) at (PALM_FOOT_X + lean, PALM_CROWN_Y).
+const PALM_FOOT_X = 28, PALM_CROWN_Y = 24;
+function makePalm(h, kind) {
+  const P = PALMS[kind];
+  const T = Math.round(h * P.tall) - 9; // trunk height
+  const W = 56, H = T + PALM_CROWN_Y;
+  const c = makeCanvas(W, H);
   const g = c.getContext("2d");
-  for (let y = 8; y < h + 2; y++) {
-    const x = 18 + Math.round(4 * Math.sin(((h - y) / h) * 1.6));
-    px(g, "#8a5a32", x, y, 4, 1);
-    px(g, "#b07a48", x, y);
-    if (y % 4 === 0) px(g, "#5e3a1e", x, y, 4, 1);
+  const cx = PALM_FOOT_X + P.lean, cy = PALM_CROWN_Y;
+  // the trunk: x at height u (0 = foot, 1 = crown)
+  const trunkX = [
+    (u) => P.lean * Math.sin((u * Math.PI) / 2),
+    (u) => P.lean * u * u,
+    () => 0,
+    (u) => P.lean * u,
+    (u) => P.lean * u + 4 * Math.sin(u * Math.PI * 2),
+  ][kind];
+  const width = [4, 4, 4, 6, 4][kind];
+  const bark = [
+    ["#8a5a32", "#b07a48", "#5e3a1e"],
+    ["#b08a5a", "#d4b07a", "#7a5a34"],
+    ["#a89c84", "#cfc4aa", "#7e7462"],
+    ["#5e3a1e", "#7a4e2a", "#3e2414"],
+    ["#8a4a32", "#b06a48", "#5e2a1e"],
+  ][kind];
+  for (let y = cy; y < H; y++) {
+    const u = (H - 1 - y) / (H - 1 - cy);
+    const x = Math.round(PALM_FOOT_X + trunkX(u) - width / 2);
+    px(g, bark[0], x, y, width, 1);
+    px(g, bark[1], x, y);
+    px(g, bark[2], x + width - 1, y);
+    if (kind === 1) { if ((y + x) % 3 === 0) px(g, bark[2], x + 1 + (y % 2), y); } // crosshatch
+    else if (kind === 2) { // smooth and pale, faint rings, a green crownshaft at the top
+      if (y < cy + 9) { px(g, y < cy + 8 ? "#5f9a3a" : "#3f6a2a", x, y, width, 1); px(g, "#7fba5a", x, y); }
+      else if (y % 6 === 0) px(g, bark[2], x, y, width, 1);
+    }
+    else if (y % (kind === 3 ? 3 : 4) === 0) px(g, bark[2], x, y, width, 1); // rings
   }
-  const tx = PALM_CROWN_X - 2, ty = PALM_CROWN_Y;
-  const frond = (dx, dy, len) => {
+  // a frond: out from the crown at angle a (degrees, 0 = right, -90 = up), drooping as it goes
+  const frond = (a, len, droop, cols, thick = 1) => {
+    const r = (a * Math.PI) / 180;
     for (let k = 0; k < len; k++) {
       const u = k / len;
-      const x = Math.round(tx + 2 + dx * k), y = Math.round(ty + dy * k + u * u * len * 0.6);
-      px(g, "#2f8a3a", x, y, 2, 1);
-      if (k % 2) {
-        px(g, "#4fb04a", x, y + 1);
-        px(g, "#1f6a2a", x + 1, y + 2);
-      }
+      const x = Math.round(cx + Math.cos(r) * k), y = Math.round(cy + Math.sin(r) * k + droop * u * u * len);
+      px(g, cols[0], x, y, 1 + thick, 1);
+      if (k % 2 && k > 1) { px(g, cols[1], x, y + 1); px(g, cols[2], x + 1, y + 2); }
     }
   };
-  frond(1, -0.3, 16);
-  frond(-1, -0.3, 16);
-  frond(0.8, 0.15, 13);
-  frond(-0.8, 0.15, 13);
-  frond(0.3, -0.7, 9);
-  frond(-0.3, -0.7, 9);
+  const green = ["#2f8a3a", "#4fb04a", "#1f6a2a"], dark = ["#1f6a3a", "#3f8f4a", "#154a22"];
+  const light = ["#5fae3a", "#8fd05a", "#3f7a24"], dead = ["#8a6a3a", "#b08a4a", "#5e4424"];
+  if (kind === 0) for (const [a, l, d] of [[-15, 16, 0.6], [195, 16, 0.6], [10, 13, 0.6], [170, 13, 0.6], [-70, 9, 0.6], [-110, 9, 0.6]]) frond(a, l, d, green);
+  if (kind === 1) for (const [a, l, d] of [[-5, 20, 0.85], [185, 19, 0.85], [20, 15, 0.8], [160, 15, 0.8], [-60, 12, 0.9], [-120, 12, 0.9], [60, 10, 0.5]]) frond(a, l, d, dark);
+  if (kind === 2) for (const [a, l, d] of [[-30, 20, 0.5], [-150, 20, 0.5], [-5, 18, 0.65], [-175, 18, 0.65], [-55, 17, 0.4], [-125, 17, 0.4], [-78, 14, 0.25], [-102, 14, 0.25], [15, 13, 0.8], [165, 13, 0.8]]) frond(a, l, d, green);
+  if (kind === 3) {
+    // a skirt of dead fronds hanging under the crown, then round fans of stiff leaves
+    for (let k = -6; k <= 6; k++) for (let y = 0; y < 13 - Math.abs(k); y++) {
+      if (k % 2 && y > 2) continue; // hanging in strands
+      px(g, y > 8 ? dead[2] : y > 4 ? dead[0] : dead[1], cx + k, cy + 1 + y);
+    }
+    for (const [fa, l] of [[-160, 12], [-20, 12], [-90, 11], [-125, 11], [-55, 11]]) for (let ray = -24; ray <= 24; ray += 12) frond(fa + ray, l - Math.abs(ray) / 10, 0.04, light, 0);
+  }
+  if (kind === 4) {
+    for (const [a, l, d] of [[-10, 18, 0.5], [10, 17, 0.6], [30, 14, 0.8], [-35, 15, 0.45], [-60, 11, 0.6], [160, 9, 0.9]]) frond(a, l, d, green);
+    frond(100, 10, 0.2, dead); // a couple of dead ones hanging down
+    frond(80, 8, 0.2, dead);
+  }
+  c.footX = PALM_FOOT_X;
   return c;
 }
 
@@ -1073,7 +1114,7 @@ function buildSprites() {
     cats: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, Object.fromEntries(["run1", "run2", "crouchLow", "crouchHigh", "leap"].map((pose) => [pose, makeCat(kind, pose)]))])),
     catEyes: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, { open: makeCatEyes(kind, false), narrow: makeCatEyes(kind, true) }])),
     thicket: makeThicket(),
-    palms: Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h)])),
+    palms: PALMS.map((_, kind) => Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h, kind)]))), // palms[kind][height]
     coconut: makeCoconut(false),
     coconutHalf: makeCoconut(true),
     logs: Object.fromEntries([3, 4, 5].map((t) => [t * TILE, makeLog(t)])), // by width in pixels

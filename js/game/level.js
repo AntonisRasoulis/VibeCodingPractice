@@ -100,7 +100,7 @@ class Level {
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
-    this.palms = [];      // jungle: palm trees { id, x (trunk), gy, h, nuts: [[dx, dy]], drop: [dx, dy] (the one that falls) or null }
+    this.palms = [];      // jungle: palm trees { id, x (trunk's foot), gy, h, kind, cx, cy (its crown), nuts: [[dx, dy]] (from the crown), drop: [dx, dy] (the one that falls) or null }
     this.lastPalm = 0;
     this.rivers = [];     // jungle: { id, x0, x1 (pixels), gy (the banks' top), wy (the water's surface) }; its logs are platforms
     this.time = 0;
@@ -338,7 +338,7 @@ class Level {
     const x = c * TILE + TILE / 2;
     if (this.flytraps.some((f) => Math.abs(f.x - x) < 24 * TILE)) return false;
     if (this.rivers.some((r) => x > r.x0 - 12 * TILE && x < r.x1 + 12 * TILE)) return false;
-    if (this.palms.some((p) => p.drop && Math.abs(p.x + p.drop[0] - x) < 9 * TILE)) return false;
+    if (this.palms.some((p) => p.drop && Math.abs(p.cx + p.drop[0] - x) < 9 * TILE)) return false;
     for (let k = -9; k <= 9; k++) for (let r = this.groundTop(x) / TILE - 6; r < this.groundTop(x) / TILE; r++) if (this.tile(c + k, r) !== T_EMPTY) return false;
     // nothing else dangerous anywhere you might bait it from or be spat out onto
     for (let k = -9; k <= 9; k++) if (this.threatened(x - HITBOX_W / 2 + k * TILE, this.groundTop(x) - HITBOX_H)) return false;
@@ -637,7 +637,9 @@ class Level {
   tryPalm(c) {
     const g = this.groundTop(c * TILE);
     if (g === null) return false;
-    for (let k = -1; k <= 1; k++) {
+    const id = this.nextId; // (its kind comes from its id, so the course is the same whatever kinds there are)
+    const kind = Math.floor(hash(id, 7) * PALMS.length), lean = PALMS[kind].lean;
+    for (let k = Math.min(-1, Math.floor(lean / TILE) - 1); k <= Math.max(1, Math.ceil(lean / TILE) + 1); k++) {
       if (!this.cols[c + k] || this.groundTop((c + k) * TILE) !== g || this.colBiome[c + k] !== "jungle") return false;
       for (let r = 0; r < g / TILE; r++) if (this.tile(c + k, r) !== T_EMPTY) return false; // spikes, ledges, shooters
     }
@@ -646,11 +648,12 @@ class Level {
     if (this.platforms.some((p) => x + 3 * TILE > p.x && x - 3 * TILE < p.x + p.w)) return false;
     if (this.portals.some((p) => x > p.x - 4 * TILE && x < p.toX + 4 * TILE)) return false;
     const h = this.pickFrom([48, 54, 60]);
+    const cx = x + lean, cy = g - Math.round(h * PALMS[kind].tall) + 9;
     const nuts = [[-3, 1], [2, 2], [-1, 4], [3, 0]].slice(0, this.rand(2, 4));
     let drop = null;
     if (this.rng() < COCONUT.dropChance) {
       drop = nuts.pop();
-      const lx = x + drop[0];
+      const lx = cx + drop[0];
       let risky = false;
       for (let k = -16; k <= 16; k += 4) if (this.threatened(lx - HITBOX_W / 2 + k, g - HITBOX_H)) risky = true;
       // bonked in the middle of a jump, you drop straight down: so no spikes, pits or rivers anywhere near
@@ -661,7 +664,7 @@ class Level {
       if (this.rivers.some((r) => x > r.x0 - 9 * TILE && x < r.x1 + 9 * TILE)) risky = true;
       if (risky) { nuts.push(drop); drop = null; }
     }
-    this.palms.push({ id: this.nextId++, x, gy: g, h, nuts, drop });
+    this.palms.push({ id: this.nextId++, x, gy: g, h, kind, cx, cy, nuts, drop });
     this.lastPalm = c;
     return true;
   }

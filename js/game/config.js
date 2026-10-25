@@ -171,6 +171,9 @@ const COCONUT = {
   gravity: 600,       // how fast it falls
   stun: 1,            // seconds you're dizzy (can't move) if it bonks you
 };
+// The 5 kinds of palm tree: how far (pixels) its crown is from the foot of its trunk, and how tall it
+// is (times its height): classic, leaning, royal, fan, windswept
+const PALMS = [{ lean: 4, tall: 1 }, { lean: -9, tall: 0.95 }, { lean: 0, tall: 1.15 }, { lean: 2, tall: 0.62 }, { lean: 7, tall: 0.95 }];
 
 // The jungle's trap: a giant flytrap. It never closes on its own: get close and it rears back,
 // then snaps at everything in its bite (even high in the air: you can't jump it). Fake it out:

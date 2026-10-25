@@ -360,12 +360,12 @@ class Player {
     const cx = this.x + HITBOX_W / 2;
     for (const palm of level.palms) {
       if (!palm.drop || Math.abs(palm.x - cx) > VIEW_W) continue;
-      const nx = palm.x + palm.drop[0];
+      const nx = palm.cx + palm.drop[0];
       let s = this.coconutState.get(palm.id);
       if (!s) {
         const ahead = nx - cx;
         if (!this.dead && !this.caught && ahead > -4 && ahead < COCONUT.trigger) {
-          this.coconutState.set(palm.id, { t: 0, y: palm.gy - palm.h + 9 + palm.drop[1], vy: 0, landed: false, landT: 0 });
+          this.coconutState.set(palm.id, { t: 0, y: palm.cy + palm.drop[1], vy: 0, landed: false, landT: 0 });
           Sound.play("coconutWobble");
         }
         continue;
