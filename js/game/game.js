@@ -463,6 +463,11 @@ const Game = (() => {
     };
   }
 
+  // Where a missile's player is, or will be once they respawn
+  function anchorX(p) {
+    return p.dead ? p.respawnX : p.x;
+  }
+
   function missileAim(m, target) {
     const tx = target.x + HITBOX_W / 2;
     const ty = target.y + HITBOX_H / 2;
@@ -494,14 +499,12 @@ const Game = (() => {
       if (spot.col >= MISSILE.startAt) spawnMissile();
     }
 
-    // You died before the missile coming for you got there: it gives up, and a fresh one comes
-    // for you once you're back
+    // You died after the missile coming for you had already fired: it can't turn round, so a fresh
+    // one comes for you once you're back. (One still coming in or aiming just waits for you instead.)
     for (const m of world.missiles) {
-      const p = m.state === "approach" ? m.anchor : m.target;
-      if (!p || !p.dead || p.caught || m.state === "boom" || m.owedFor === p) continue;
-      p.missileOwed = true;
-      m.owedFor = p;
-      if (m.state !== "fly") m.done = true; // still on its way in: it gives up (one already fired keeps going)
+      if (m.state !== "fly" || !m.target || !m.target.dead || m.target.caught || m.owedFor === m.target) continue;
+      m.target.missileOwed = true;
+      m.owedFor = m.target;
     }
     for (const p of players) {
       if (!p.missileOwed || p.dead) continue;
@@ -517,18 +520,22 @@ const Game = (() => {
     for (const m of world.missiles) {
       m.t += dt;
       if (m.state === "approach") {
+        // (if they've died it heads for where they'll come back, and waits there in the sky for them)
+        const waiting = m.anchor.dead && !m.anchor.caught;
+        if (waiting && m.t >= MISSILE.approach) m.t = MISSILE.approach - 0.001;
+        const ax = anchorX(m.anchor);
         const e = Math.min(1, m.t / MISSILE.approach) ** 2; // slow at first, rushing in at the end
-        m.x = m.anchor.x + m.sx + (m.ox - m.sx) * e;
+        m.x = ax + m.sx + (m.ox - m.sx) * e;
         m.y = m.sy + (m.oy - m.sy) * e;
         m.scale = 0.15 + 0.85 * e;
         m.angle = Math.atan2(m.oy - m.sy, m.ox - m.sx);
         // drop a puff of smoke every few frames; it's thicker the closer (bigger) the missile is
         if ((m.smokeTimer = (m.smokeTimer || 0) + dt) > 0.025) {
           m.smokeTimer = 0;
-          m.smoke.push({ rx: m.x - m.anchor.x, y: m.y, s: m.scale, t: world.time });
+          m.smoke.push({ rx: m.x - ax, y: m.y, s: m.scale, t: world.time });
         }
         if (m.t >= MISSILE.approach) {
-          m.smokeAnchorX = m.anchor.x; // from here the trail stays put in the world
+          m.smokeAnchorX = ax; // from here the trail stays put in the world
           m.state = "lock";
           m.t = 0;
           Sound.play("lockOn");
@@ -539,6 +546,8 @@ const Game = (() => {
             Math.hypot(p.x - m.x, p.y - m.y) < Math.hypot(best.x - m.x, best.y - m.y) ? p : best);
         }
       } else if (m.state === "lock") {
+        if (m.target.dead && !m.target.caught) { m.t = 0; continue; } // they died while it aimed: wait, then aim again
+        if (m.target.caught) { m.done = true; continue; }
         m.aim = missileAim(m, m.target);
         m.angle = Math.atan2(m.aim.y - m.y, m.aim.x - m.x);
         if (m.t >= MISSILE.lock) {
