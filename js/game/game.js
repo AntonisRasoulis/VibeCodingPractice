@@ -900,16 +900,20 @@ const Game = (() => {
       const lost = p.dead || p.caught;
       if (v.state === "wait") {
         if (v.t < 0) continue;
+        if (p.dead && !p.caught) { v.t = 0; continue; } // not here yet: wait for them to come back
         v.t = 0;
         if (v.kind === "brown") { v.state = "circle"; Sound.play("vultureCry"); }
         else { v.state = "diving"; v.sx = p.x + 260; v.sy = 8; v.facing = -1; Sound.play("vultureScreech"); }
       }
-      if (lost && v.state !== "leave" && v.state !== "carry") { v.state = "leave"; v.t = 0; }
+      // Circling vultures don't give up when you die: they find where you come back and carry on.
+      // (The fire getting you, or dying mid-dive, sends them off.)
+      if ((p.caught || (p.dead && v.state !== "circle")) && v.state !== "leave" && v.state !== "carry" && v.state !== "wait") { v.state = "leave"; v.t = 0; }
 
       if (v.state === "circle") {
         // Glides in from the top right, then circles above the leader
         v.angle += dt * 3;
-        const cx = p.x + 50 + Math.cos(v.angle) * 34;
+        if (p.dead) v.t -= dt; // the clock waits while they're gone
+        const cx = (p.dead ? p.respawnX : p.x) + 50 + Math.cos(v.angle) * 34;
         const cy = 24 + Math.sin(v.angle) * 9;
         const ease = Math.min(1, v.t / 0.6);
         const px = v.x;
