@@ -132,7 +132,9 @@ const WILD = {
   sinkTime: 1.6,        // quicksand: seconds to sink all the way (normal 3): mash jump!
   struggleFade: 3.2,    // ...and your presses wear off faster (normal 2.4)
   speedUp: 0.85,        // saws, maces and shooters: their swings / volleys take this much of the normal time
-  bigOdds: { 0: 1, 1: 1, 2: 2 }, // traps and sinkholes: small / medium / large odds (normal: all even)
+  bigOdds: { 0: 1, 1: 1, 2: 2 }, // traps, sinkholes and flytraps: small / medium / large odds (normal: all even)
+  flytrapWindup: 0.28,  // flytraps snap quicker (normal 0.35)...$
+  flytrapChewNothing: 0.9, // ...and get over a miss quicker (normal 1.2)
 };
 
 // The jungle's spikes come in two kinds: thin bamboo stakes, very tall (a jump lifts your feet
@@ -167,6 +169,22 @@ const COCONUT = {
   shake: 0.35,        // seconds it wobbles before it drops
   gravity: 600,       // how fast it falls
   stun: 1,            // seconds you're dizzy (can't move) if it bonks you
+};
+
+// The jungle's trap: a giant flytrap. It never closes on its own: get close and it rears back,
+// then snaps at everything in its bite (even high in the air: you can't jump it). Fake it out:
+// step into its range and back off, and it snaps on nothing and chews air for a moment. Run past then.
+// If it gets you, it chews you for a bit, then the small (green) one spits you back; the big
+// (purple) one, only after 400 m, swallows you.
+const FLYTRAP = {
+  windup: 0.35,       // seconds it rears back before it snaps (Wild: WILD.flytrapWindup)
+  reach: [12, 16],    // its bite: this far each side of its middle (small, big), in pixels
+  lunge: 44,          // ...and this high up (higher than any jump)
+  chew: 1.5,          // seconds it chews someone it caught
+  chewNothing: 1.2,   // seconds it chews on nothing after a miss (Wild: WILD.flytrapChewNothing)
+  open: 0.35,         // seconds it takes to open up again
+  spit: [120, 170],   // the small one spits you back this fast (sideways, up): about 5 tiles
+  spitStun: 0.8,      // ...and you're dazed this long
 };
 
 const DESERT = {
@@ -225,6 +243,7 @@ const SCATTER = {   // traps and bushes sprinkled all over the prairie, not just
   bush: 0.03,       // ...and a bush
   sink: 0.05,       // desert: chance per column to try a sinkhole there
   pond: 0.04,       // snow: ...and thin ice
+  flytrap: 0.02,    // jungle: ...and a flytrap
   behind: 24,       // done this many tiles behind the newest section, once its neighbours are built
 };
 // Desert: little holes in the sand. Step too close and it spins open and pulls you in.

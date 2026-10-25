@@ -672,6 +672,82 @@ function makeCoconut(half) {
   return c;
 }
 
+// A giant flytrap: two jaws hinged at the bottom (red insides, teeth along the rims) on a stem with
+// leaves. `angle`: how far each jaw tips out from upright (0 = shut into a pod). `lift`: how much
+// higher its head is (lunging). `chew`: squashed wide (chewing). `gulp`: a lump going down the stem.
+// The canvas is FLYTRAP_H tall with the ground at the bottom; .mouthY is the top of its head.
+const FLYTRAP_H = 50;
+function makeFlytrap(big, angle, lift = 0, chew = false, gulp = false) {
+  const C = big
+    ? { out: "#3a0c2a", back: "#7a2a6a", hi: "#a24a92", inner: "#e8304e", inner2: "#ff8aa0", tooth: "#f8e8f0", stem: "#4a1a3a", leaf: "#6a2a5a" }
+    : { out: "#1a3412", back: "#4f9a2f", hi: "#86c85a", inner: "#d8364a", inner2: "#ff8a9a", tooth: "#f0f6c8", stem: "#3f7a24", leaf: "#4f9a2f" };
+  const shut = angle === 0;
+  const L = big ? 12 : 8.5, T = (big ? 7 : 5) * (shut ? 1.15 : 1);
+  const W = big ? 36 : 26, H = FLYTRAP_H;
+  const hinge = H - (big ? 12 : 9) - lift;
+  const cx = W / 2;
+  const sqL = chew ? 0.85 : 1, sqT = chew ? 1.22 : 1;
+  const grid = new Map();
+  const set = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < W && y < H) grid.set(x + "," + y, col); };
+  const ell = (ex, ey, rx, ry, ang, col) => {
+    const ca = Math.cos(ang), sa = Math.sin(ang), R = Math.max(rx, ry) + 1;
+    for (let y = Math.floor(ey - R); y <= ey + R; y++) for (let x = Math.floor(ex - R); x <= ex + R; x++) {
+      const u = ((x - ex) * ca + (y - ey) * sa) / rx, v = (-(x - ex) * sa + (y - ey) * ca) / ry;
+      if (u * u + v * v <= 1.05) set(x, y, col);
+    }
+  };
+  // leaves and the stem
+  for (const sd of [-1, 1]) ell(cx + sd * (big ? 6 : 4.5), H - 2, big ? 6 : 4.5, 1.6, sd * 0.25, C.leaf);
+  for (let y = hinge; y < H; y++) for (let k = 0; k < (big ? 3 : 2); k++) set(cx - 1 + k, y, C.stem);
+  if (gulp) ell(cx, (hinge + H) / 2 + 1, big ? 3 : 2.5, big ? 3 : 2.5, 0, C.stem);
+  // the jaws
+  const teeth = [];
+  for (const sd of [-1, 1]) {
+    const ux = sd * Math.sin(angle), uy = -Math.cos(angle), nx = sd * Math.cos(angle), ny = Math.sin(angle);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const rx = x + 0.5 - cx, ry = y + 0.5 - hinge;
+      const a = (rx * ux + ry * uy) / sqL, d = rx * nx + ry * ny + (shut ? 0.5 : 0);
+      if (a < 0 || a > L) continue;
+      const th = T * Math.pow(Math.sin(Math.PI * Math.min(1, (a / L) * 0.85 + 0.12)), 0.45) * sqT;
+      if (d < 0 || d > th) continue;
+      const u = d / th;
+      set(x, y, !shut && u < 0.32 ? (a > L * 0.3 && a < L * 0.75 && u < 0.16 ? C.inner2 : C.inner)
+        : u > 0.45 && u < 0.7 && a > L * 0.25 && a < L * 0.8 ? C.hi : C.back);
+    }
+    const n = big ? 6 : 4;
+    for (let k = 1; k <= n; k++) {
+      const a = L * (0.18 + (0.8 * k) / n) * sqL;
+      teeth.push([cx + ux * a, hinge + uy * a, -nx, -ny, sd, k]);
+    }
+  }
+  const c = makeCanvas(W, H);
+  const g = c.getContext("2d");
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = grid.get(x + "," + y);
+    if (v) px(g, v, x, y);
+    else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => grid.has(x + dx + "," + (y + dy)))) px(g, C.out, x, y);
+  }
+  for (const [bx, by, dx, dy, sd, k] of teeth) {
+    const len = shut ? 1.5 : 2.5, off = shut ? (k % 2 ? 0.5 : -0.5) * sd : 0; // (shut, they interlock)
+    for (let i = 1; i <= len; i++) px(g, C.tooth, Math.floor(bx + dx * i - dx * 0.5), Math.floor(by + dy * i + off));
+  }
+  if (shut) px(g, C.out, Math.floor(cx), Math.round(hinge - L * sqL), 1, Math.round(L * sqL)); // the seam
+  c.mouthY = Math.round(hinge - L * sqL - 1);
+  return c;
+}
+
+function makeFlytrapFrames(big) {
+  return {
+    open: makeFlytrap(big, 0.62),
+    windup: makeFlytrap(big, 1.05, -2),   // rearing back, jaws wide
+    lunge: makeFlytrap(big, 0.25, 26),    // snapping: up high, nearly shut
+    shut: makeFlytrap(big, 0),
+    chew: makeFlytrap(big, 0, 0, true),
+    gulp: makeFlytrap(big, 0, 0, false, true),
+    half: makeFlytrap(big, 0.3),          // opening up again
+  };
+}
+
 // The jungle's background, in three layers that each repeat sideways (drawn with parallax):
 // far canopy, tree trunks with hanging vines, and ferns along the horizon with the canopy edge above
 function makeJungleLayers() {
@@ -887,6 +963,7 @@ function buildSprites() {
     bamboo: Object.fromEntries(JUNGLE.bambooHeights.map((h) => [h, makeBamboo(h)])),
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
+    flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     palms: Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h)])),
     coconut: makeCoconut(false),
     coconutHalf: makeCoconut(true),

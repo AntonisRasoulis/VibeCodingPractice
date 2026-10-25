@@ -81,15 +81,16 @@ const Renderer = (() => {
     drawSinkholes(world.level, camX, world.time);
     drawPonds(world.level, world.players, camX, world.time);
     drawRivers(world.level, camX, world.time);
+    drawFlytraps(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
     // (someone hiding in a bush can't be seen, on either screen)
-    if (other && !other.dead && !other.caught && !other.hiddenIn) {
+    if (other && !other.dead && !other.caught && !other.hiddenIn && !other.eatenBy) {
       b.globalAlpha = 0.35; // the other runner shows as a ghost
       drawRunner(other, camX);
       b.globalAlpha = 1;
     }
-    if (!player.dead && !player.caught && !player.hiddenIn && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
+    if (!player.dead && !player.caught && !player.hiddenIn && !player.eatenBy && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
       drawDashEffects(player, camX, world.time);
       drawRunner(player, camX);
       if (player.frozen > 0) drawIce(player, camX);
@@ -529,6 +530,36 @@ const Renderer = (() => {
             b.drawImage(sprites.grass[variant], sx, sy);
             if (above === T_EMPTY) drawDecoration(c, sx, sy);
           }
+        }
+      }
+    }
+  }
+
+  // Giant flytraps: open, rearing back, snapping, chewing (with someone's legs kicking out the top), opening
+  function drawFlytraps(level, camX, time) {
+    for (const f of level.flytraps) {
+      const sx = Math.round(f.x - camX);
+      if (sx < -30 || sx > VIEW_W + 30) continue;
+      const fr = sprites.flytraps[f.big ? 1 : 0];
+      let img = fr.open, dx = 0;
+      if (f.state === "windup") { img = fr.windup; dx = Math.floor(time * 40) % 2 ? 1 : -1; }
+      else if (f.state === "chew" || f.state === "chewNothing") {
+        if (f.t < 0.12) img = fr.lunge;
+        else if (f.gulped) img = fr.gulp;
+        else img = Math.floor(f.t * (f.state === "chew" ? 6.5 : 4)) % 2 ? fr.chew : fr.shut;
+      } else if (f.state === "opening") img = fr.half;
+      const left = sx - img.width / 2 + dx, top = f.gy - FLYTRAP_H;
+      b.drawImage(img, left, top);
+      const v = f.victim;
+      if (f.state === "chew" && v && v.eatenBy === f && !f.gulped && f.t >= 0.12) {
+        // their legs, kicking
+        const kick = Math.floor(f.t * 8) % 2;
+        for (const [lx, up] of [[-1, kick], [1, 1 - kick]]) {
+          const x = sx + lx - (lx < 0 ? 1 : 0), y = top + img.mouthY;
+          b.fillStyle = v.palette.p;
+          b.fillRect(x, y - 2 - up, 1, 3 + up);
+          b.fillStyle = v.palette.k;
+          b.fillRect(x + (lx < 0 ? -1 : 0), y - 3 - up, 2, 1);
         }
       }
     }

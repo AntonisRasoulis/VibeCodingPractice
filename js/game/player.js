@@ -72,6 +72,7 @@ class Player {
     this.honey = 0;               // seconds left slowed down by a black bear's honey
     this.inQuick = false;         // stuck in quicksand
     this.inRiver = null;          // fell in a jungle river: the current is carrying us back to its near bank
+    this.eatenBy = null;          // inside a jungle flytrap that's chewing us
     this.sink = 0;                // how deep (pixels) we've sunk into it
     this.quickSurface = 0;        // the quicksand's surface (y)
     this.noCut = 0;               // a jump out of quicksand isn't cut short when you let go
@@ -100,7 +101,13 @@ class Player {
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
     if (this.caught) return;
-    if (this.held) { this.trapped = 0; return; } // being carried by a hand (it pulls you out of a trap)
+    if (this.held) { this.trapped = 0; this.eatenBy = null; return; } // being carried by a hand (it pulls you out of a trap, or a flytrap)
+    if (this.eatenBy && !this.dead) { // being chewed: stuck inside it, can't do a thing
+      this.x = this.eatenBy.x - HITBOX_W / 2;
+      this.y = this.eatenBy.gy - HITBOX_H;
+      this.vx = this.vy = 0;
+      return;
+    }
 
     if (this.dead) {
       this.deadTimer -= dt;
@@ -955,6 +962,7 @@ class Player {
     this.honey = 0;
     this.inQuick = false;
     this.inRiver = null;
+    this.eatenBy = null;
     this.tumbleweeds = [];
     this.tumbleStarted.clear();
     this.snowballs = [];

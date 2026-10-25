@@ -13,7 +13,7 @@ const Game = (() => {
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
     "portalCooldown", "safeSpots", "fallState", "icicleState", "coconutState", "snowballs", "snowballStarted", "onIce", "biome",
-    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond", "inRiver"];
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond", "inRiver", "eatenBy"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -126,6 +126,7 @@ const Game = (() => {
     updateMissiles(dt);
     updateBears(dt);
     updateVultures(dt);
+    updateFlytraps(dt);
     checkOrbs();
     checkThinIce();
     checkTrapRescue();
@@ -236,6 +237,7 @@ const Game = (() => {
           for (const f of SWAP_FIELDS) [a[f], b[f]] = [b[f], a[f]];
           // (a pond remembers who's frozen in it: that moves with the swap too)
           for (const pond of world.level.ponds) pond.frozen = pond.frozen.map((q) => (q === a ? b : q === b ? a : q));
+          for (const f of world.level.flytraps) f.victim = f.victim === a ? b : f.victim === b ? a : f.victim; // (and a flytrap, who it's chewing)
           Renderer.swapCameras();
           world.swapFlash = 1;
           Sound.play("swap");
@@ -919,6 +921,82 @@ const Game = (() => {
       }
     }
     world.drones = world.drones.filter((d) => !d.done);
+  }
+
+  // ---- Flytraps (jungle) ----
+
+  // A flytrap is shared: it rears back when anyone comes close, then snaps at everyone in its bite.
+  // It eats the nearest; while it's chewing (someone, or nothing after a miss) it ignores everybody.
+  function updateFlytraps(dt) {
+    const { level, players } = world;
+    const free = (p) => !p.dead && !p.caught && !p.held && !p.eatenBy && !p.inRiver;
+    const inBite = (f, p) => {
+      const reach = level.flytrapReach(f);
+      return free(p) && p.x + HITBOX_W > f.x - reach && p.x < f.x + reach && p.y + HITBOX_H > f.gy - FLYTRAP.lunge && p.y < f.gy;
+    };
+    const snap = (f) => {
+      const victim = players.filter((p) => inBite(f, p)).sort((p, q) => Math.abs(p.x - f.x) - Math.abs(q.x - f.x))[0];
+      f.t = 0;
+      if (victim) {
+        f.state = "chew";
+        f.victim = victim;
+        victim.eatenBy = f;
+        victim.vx = victim.vy = 0;
+        victim.from = victim.x + HITBOX_W / 2 < f.x ? -1 : 1; // spat back out the way they came
+        victim.showHit("CHOMP!", "#ff6a8a");
+        Sound.play("flytrapChomp");
+      } else {
+        f.state = "chewNothing";
+        Sound.play("flytrapSnap");
+      }
+    };
+    for (const f of level.flytraps) {
+      if (!players.some((p) => Math.abs(p.x - f.x) < VIEW_W * 1.5)) continue;
+      f.t += dt;
+      if (f.state === "open") {
+        if (players.some((p) => inBite(f, p))) snap(f); // (right in front of it as it opens: no warning)
+        else if (players.some((p) => free(p) && Math.abs(p.x + HITBOX_W / 2 - f.x) < level.flytrapSense(f) && p.y + HITBOX_H > f.gy - 60)) {
+          f.state = "windup";
+          f.t = 0;
+          Sound.play("flytrapHiss");
+        }
+      } else if (f.state === "windup") {
+        if (f.t >= level.flytrapWindup()) snap(f);
+      } else if (f.state === "chew") {
+        const v = f.victim;
+        if (v && v.eatenBy === f && f.t > FLYTRAP.chew - 0.4 && f.big && !f.gulped) { f.gulped = true; Sound.play("flytrapGulp"); }
+        if (f.t >= FLYTRAP.chew) {
+          if (v && v.eatenBy === f) {
+            v.eatenBy = null;
+            if (f.big) {
+              v.showHit("EATEN!", "#ff4d3d");
+              v.die();
+            } else {
+              // spat out, back the way they came
+              const dir = v.from || -1;
+              v.x = f.x + dir * (level.flytrapReach(f) + 2) - HITBOX_W / 2;
+              v.y = f.gy - HITBOX_H - 12;
+              v.vx = dir * FLYTRAP.spit[0];
+              v.vy = -FLYTRAP.spit[1];
+              v.onGround = false;
+              v.stun = FLYTRAP.spitStun;
+              v.noCut = 0.5;
+              v.showHit("SPAT OUT!", "#9be07a");
+              Sound.play("flytrapSpit");
+            }
+          }
+          f.victim = null;
+          f.gulped = false;
+          f.state = "opening";
+          f.t = 0;
+        }
+      } else if (f.state === "chewNothing") {
+        if (f.t >= (level.wild ? WILD.flytrapChewNothing : FLYTRAP.chewNothing)) { f.state = "opening"; f.t = 0; }
+      } else if (f.state === "opening" && f.t >= FLYTRAP.open) {
+        f.state = "open";
+        f.t = 0;
+      }
+    }
   }
 
   // ---- Vultures (desert) ----

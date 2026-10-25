@@ -230,6 +230,11 @@ const Sound = (() => {
     coconutWobble: () => noise({ filter: "bandpass", f: 1600, to: 2400, q: 2, dur: 0.3, vol: 0.18, attack: 0.05 }),
     coconutCrack: () => { tone({ f: 420, to: 220, dur: 0.1, type: "triangle", vol: 0.12 }); noise({ filter: "highpass", f: 1500, dur: 0.06, vol: 0.25 }); },
     bonk: () => { tone({ f: 700, to: 260, dur: 0.14, type: "square", vol: 0.13 }); tone({ f: 1400, to: 900, dur: 0.5, type: "sine", vol: 0.06, at: 0.08, vibrato: 30 }); },
+    flytrapHiss: () => noise({ filter: "bandpass", f: 2600, to: 1800, q: 1.5, dur: 0.3, vol: 0.25, attack: 0.04 }),
+    flytrapSnap: () => { noise({ filter: "lowpass", f: 1800, dur: 0.08, vol: 0.55 }); tone({ f: 260, to: 120, dur: 0.12, type: "square", vol: 0.12 }); },
+    flytrapChomp: () => { noise({ filter: "lowpass", f: 1500, dur: 0.1, vol: 0.6 }); tone({ f: 220, to: 90, dur: 0.25, type: "square", vol: 0.14 }); tone({ f: 180, to: 140, dur: 0.12, type: "sawtooth", vol: 0.08, at: 0.25 }); tone({ f: 170, to: 130, dur: 0.12, type: "sawtooth", vol: 0.08, at: 0.55 }); },
+    flytrapSpit: () => { noise({ filter: "bandpass", f: 900, to: 2400, q: 1, dur: 0.2, vol: 0.4 }); tone({ f: 300, to: 700, dur: 0.18, type: "sine", vol: 0.12 }); },
+    flytrapGulp: () => { tone({ f: 160, to: 70, dur: 0.35, type: "sine", vol: 0.22 }); tone({ f: 120, to: 60, dur: 0.3, type: "sine", vol: 0.15, at: 0.2 }); },
     rustle: () => noise({ filter: "bandpass", f: 2200, to: 1400, q: 1.2, dur: 0.25, vol: 0.22, attack: 0.03 }),
 
     // Level dangers

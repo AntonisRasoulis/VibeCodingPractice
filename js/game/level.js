@@ -98,6 +98,7 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
     this.palms = [];      // jungle: palm trees { id, x (trunk), gy, h, nuts: [[dx, dy]], drop: [dx, dy] (the one that falls) or null }
     this.lastPalm = 0;
     this.rivers = [];     // jungle: { id, x0, x1 (pixels), gy (the banks' top), wy (the water's surface) }; its logs are platforms
@@ -273,6 +274,7 @@ class Level {
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
     if (!ignoreTraps && this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
     if (!ignoreTraps && this.ponds.some((p) => x + HITBOX_W > p.x0 - 2 && x < p.x1 + 2)) return true;
+    if (!ignoreTraps && this.flytraps.some((f) => Math.abs(f.x - (x + HITBOX_W / 2)) < this.flytrapReach(f) + HITBOX_W / 2 + 2)) return true;
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
@@ -309,6 +311,47 @@ class Level {
       return [c * TILE + 0.5, r * TILE + 1, 7, 7];
     }
     return [c * TILE + 1, r * TILE + 3, 6, 5];
+  }
+
+  // ---- Flytraps ----
+
+  flytrapReach(f) {
+    return FLYTRAP.reach[f.big ? 1 : 0];
+  }
+
+  // How long it rears back before snapping, and how close (to its middle) you set it off: just far
+  // enough that someone running straight in at full speed is in its bite when it snaps
+  flytrapWindup() {
+    return this.wild ? WILD.flytrapWindup : FLYTRAP.windup;
+  }
+
+  flytrapSense(f) {
+    return PHYSICS.runSpeed * this.flytrapWindup() + this.flytrapReach(f) + HITBOX_W / 2 - 4;
+  }
+
+  // A flytrap needs flat, open ground all round: room to bait it and back off on one side, room to be
+  // spat out onto on both, and nothing else dangerous in reach while you do
+  flytrapFits(c) {
+    const add = () => this.flytraps.push({ x: c * TILE + TILE / 2, big: true }), remove = () => this.flytraps.pop();
+    if (!this.spotFits(c, 9, true, "jungle", 0, add, remove)) return false;
+    const x = c * TILE + TILE / 2;
+    if (this.flytraps.some((f) => Math.abs(f.x - x) < 24 * TILE)) return false;
+    if (this.rivers.some((r) => x > r.x0 - 12 * TILE && x < r.x1 + 12 * TILE)) return false;
+    if (this.palms.some((p) => p.drop && Math.abs(p.x + p.drop[0] - x) < 9 * TILE)) return false;
+    for (let k = -9; k <= 9; k++) for (let r = this.groundTop(x) / TILE - 6; r < this.groundTop(x) / TILE; r++) if (this.tile(c + k, r) !== T_EMPTY) return false;
+    // nothing else dangerous anywhere you might bait it from or be spat out onto
+    for (let k = -9; k <= 9; k++) if (this.threatened(x - HITBOX_W / 2 + k * TILE, this.groundTop(x) - HITBOX_H)) return false;
+    return true;
+  }
+
+  addFlytrap(c) {
+    this.flytraps.push({ id: this.nextId++, x: c * TILE + TILE / 2, gy: this.groundTop(c * TILE), big: this.bigSize(c) === 2, state: "open", t: 0, victim: null });
+  }
+
+  tryFlytrap(c) {
+    if (!this.flytrapFits(c)) return false;
+    this.addFlytrap(c);
+    return true;
   }
 
   // How tall the cactus in this column is (cactuses are the desert's spikes)
@@ -464,6 +507,7 @@ class Level {
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
+    if (this.biome === "jungle" && this.col > 60) weights.flytrap = 7;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -486,6 +530,8 @@ class Level {
       if (want.kind === "pond") {
         const mid = want.c + Math.floor(want.tiles / 2), half = Math.ceil(want.tiles / 2) + 5;
         if (this.spotFits(mid, half, false, "snow", 0, () => this.ponds.push({ x0: want.c * TILE, x1: (want.c + want.tiles) * TILE, state: "ice" }), () => this.ponds.pop())) this.addPond(want.c, want.tiles);
+      } else if (want.kind === "flytrap") {
+        if (this.flytrapFits(want.c)) this.addFlytrap(want.c);
       } else {
         let size = want.size;
         if (size === 2 && !this.sinkFits(want.c, 2)) size = this.rand(0, 1);
@@ -500,6 +546,7 @@ class Level {
     }
     for (let c = Math.max(this.scatterFrom, 61); c < until; c++) {
       if (this.colBiome[c] === "jungle") {
+        if (this.rng() < SCATTER.flytrap) this.tryFlytrap(c);
         if (c - this.lastPalm >= COCONUT.every[0] && this.rng() < 3 / (COCONUT.every[1] - COCONUT.every[0])) this.tryPalm(c);
         continue;
       }
@@ -1049,6 +1096,14 @@ const SECTIONS = {
       this.pending.push({ kind: "sink", c: this.col, size });
       this.flat(i + 1 < count ? 2 * SINK.gap + 9 : SINK.gap + 6, false);
     }
+  },
+
+  // Jungle: a giant flytrap in the open, with room in front to bait it and room behind to land
+  flytrap() {
+    this.iceBias = false;
+    this.flat(11, false);
+    this.pending.push({ kind: "flytrap", c: this.col });
+    this.flat(11, false);
   },
 
   // Jungle: a river too wide to jump. Hop across on the drifting logs, or the current carries you back.
