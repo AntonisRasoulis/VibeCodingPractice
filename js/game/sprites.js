@@ -856,41 +856,43 @@ function makeCat(kind, pose) {
   return c;
 }
 
-// Its eyes glowing in a dark thicket: slanted, angry almonds with slit pupils and a soft glow.
-// `narrow`: about to leap.
-const EYE_ROWS = { open: ["EEE...", "EEEPBB", ".EEPEEB", "..EEEE"], narrow: ["......", "EEBB..", ".EEPBBB", "..EEEE"] };
+// Its eyes, small and glowing softly in a bush: two slanted, angry eyes. `narrow`: about to leap.
+const EYE_ROWS = { open: ["EE.", "EEE", ".EE"], narrow: ["...", "EEB", ".EE"] };
 function makeCatEyes(kind, narrow) {
   const C = CAT_PALETTES[kind];
-  const W = 23, H = 11;
+  const W = 15, H = 9;
   const c = makeCanvas(W, H);
   const g = c.getContext("2d");
-  for (const ex of [5, 17]) {
-    const gr = g.createRadialGradient(ex, 5.5, 0, ex, 5.5, 6.5);
-    gr.addColorStop(0, C.glow + "aa");
+  for (const ex of [5, 10]) {
+    const gr = g.createRadialGradient(ex, 4.5, 0, ex, 4.5, 4);
+    gr.addColorStop(0, C.glow + "66");
     gr.addColorStop(1, C.glow + "00");
     g.fillStyle = gr;
-    g.fillRect(ex - 7, 0, 14, H);
+    g.fillRect(ex - 5, 0, 10, H);
   }
   EYE_ROWS[narrow ? "narrow" : "open"].forEach((row, y) => [...row].forEach((ch, x) => {
-    const col = { E: C.eye, P: "#000000", B: "#000000" }[ch];
+    const col = { E: C.eye, B: "#000000" }[ch];
     if (!col) return;
-    px(g, col, 2 + x, 3 + y);
-    px(g, col, W - 3 - x, 3 + y);
+    px(g, col, 3 + x, 3 + y);         // left eye (slanting down towards the nose)
+    px(g, col, W - 4 - x, 3 + y);     // right eye, mirrored
   }));
-  px(g, "#ffffff", 3, 4);
-  px(g, "#ffffff", W - 4, 4);
+  if (!narrow) { px(g, "#000000", 5, 4); px(g, "#000000", W - 6, 4); } // slit pupils
   return c;
 }
 
-// The dark thicket it hides in (in the background)
-function makeThicket() {
-  const c = makeCanvas(60, 34);
+// Low jungle bushes in the background (all along the jungle): something could be hiding in any of them
+function makeBackBush(v) {
+  const [w, h] = JUNGLE.backBushes[v];
+  const c = makeCanvas(w, h);
   const g = c.getContext("2d");
-  for (const [cx, cy, rx, ry] of [[30, 22, 22, 12], [16, 25, 12, 9], [46, 24, 13, 10], [32, 13, 14, 9]]) {
-    for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
-      if ((x / rx) ** 2 + (y / ry) ** 2 > 1 || hash(cx + x, y + cy) < 0.06) continue;
-      px(g, (x + y) % 5 === 0 ? "#2a5a2c" : "#1d4322", cx + x, cy + y);
-    }
+  const lumps = [[0.3, 0.55, 0.3], [0.65, 0.5, 0.33], [0.5, 0.3, 0.28], [0.15, 0.75, 0.18], [0.85, 0.72, 0.18]];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let inside = false;
+    for (const [lx, ly, r] of lumps) { const dx = (x - lx * w) / (r * w), dy = (y - ly * h) / (r * w * 0.8); if (dx * dx + dy * dy < 1) inside = true; }
+    if (y > h * 0.6 && x > 1 && x < w - 2) inside = true;
+    if (!inside) continue;
+    const n = hash(x + v * 50, y + v * 7);
+    px(g, n < 0.15 ? "#2a5e30" : n > 0.9 ? "#4a8a44" : "#356f38", x, y);
   }
   return c;
 }
@@ -1113,7 +1115,7 @@ function buildSprites() {
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     cats: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, Object.fromEntries(["run1", "run2", "crouchLow", "crouchHigh", "leap"].map((pose) => [pose, makeCat(kind, pose)]))])),
     catEyes: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, { open: makeCatEyes(kind, false), narrow: makeCatEyes(kind, true) }])),
-    thicket: makeThicket(),
+    backBushes: [0, 1, 2, 3].map(makeBackBush),
     palms: PALMS.map((_, kind) => Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h, kind)]))), // palms[kind][height]
     coconut: makeCoconut(false),
     coconutHalf: makeCoconut(true),

@@ -314,6 +314,23 @@ class Level {
     return [c * TILE + 1, r * TILE + 3, 6, 5];
   }
 
+  // ---- Bushes in the jungle's background (where a jaguar hides) ----
+
+  // The background bushes between x0 and x1: about one every 8 tiles, worked out from where they
+  // are (not stored), sitting on the ground behind the course. { x (middle), y (bottom), v (look) }
+  backBushes(x0, x1) {
+    const out = [];
+    for (let k = Math.floor(x0 / (8 * TILE)) - 1; k <= Math.floor(x1 / (8 * TILE)) + 1; k++) {
+      if (k < 0 || hash(k, 311) > 0.72) continue;
+      const x = (k * 8 + 1 + hash(k, 312) * 6) * TILE;
+      if (this.biomeAt(Math.floor(x / TILE)) !== "jungle") continue;
+      const g = this.groundTop(x);
+      if (g === null || this.groundTop(x - 12) !== g || this.groundTop(x + 12) !== g) continue;
+      out.push({ x, y: g + 1, v: Math.floor(hash(k, 313) * 4) });
+    }
+    return out;
+  }
+
   // ---- Flytraps ----
 
   flytrapReach(f) {

@@ -50,6 +50,8 @@ const Game = (() => {
       missiles: [], // missiles zooming in, locking on, flying or exploding
       bears: [],    // bears chasing a player (snow only)
       jaguars: [],  // jaguars and black panthers hunting the leader (jungle only)
+      decoys: [],   // harmless eyes blinking in the jungle's bushes
+      nextDecoy: null,
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
       drones: [],   // rescue drones: guarding a player, or flying to grab the leader
       nextVulture: null, // the leader's distance (meters) when the next group comes
@@ -130,6 +132,7 @@ const Game = (() => {
     updateVultures(dt);
     updateFlytraps(dt);
     updateJaguars(dt);
+    updateDecoys(dt);
     checkOrbs();
     checkThinIce();
     checkTrapRescue();
@@ -1007,12 +1010,37 @@ const Game = (() => {
   // Its box: [x, y, w, h], with (j.x, j.y) the middle of its feet
   const jaguarBox = (j) => [j.x - 12, j.y - 13, 24, 12];
 
+  // It hides in one of the background bushes ahead (false: there isn't one there yet)
   function spawnJaguar(leader, kindName) {
-    const { level } = world;
-    let ex = leader.x + rand(JAGUAR.ahead[0], JAGUAR.ahead[1]);
-    const g = level.groundTop(ex) ?? leader.y + HITBOX_H;
-    world.jaguars.push({ kind: kindName, target: leader, state: "eyes", t: 0, ex, ey: g - 26, x: ex, y: g - 20, dir: -1, attacks: JAGUAR[kindName].attacks, anim: 0 });
-    Sound.play("jaguarGrowl");
+    const bush = hidingBush(leader.x + JAGUAR.ahead[0], leader.x + JAGUAR.ahead[1]);
+    if (!bush) return false;
+    const ey = bush.y - Math.round(JUNGLE.backBushes[bush.v][1] * 0.6);
+    world.jaguars.push({ kind: kindName, target: leader, state: "eyes", t: 0, ex: bush.x, ey, x: bush.x, y: bush.y - 6, dir: -1, attacks: JAGUAR[kindName].attacks, anim: 0 });
+    return true;
+  }
+
+  // A background bush between x0 and x1 that nothing is peering out of already
+  function hidingBush(x0, x1) {
+    const taken = [...world.jaguars, ...world.decoys].map((e) => e.ex);
+    const bushes = world.level.backBushes(x0, x1).filter((bu) => bu.x >= x0 && bu.x <= x1 && !taken.some((x) => Math.abs(x - bu.x) < 20));
+    return bushes.length ? bushes[Math.floor(Math.random() * bushes.length)] : null;
+  }
+
+  // Harmless eyes that blink in a bush now and then, so you can never be sure (they never narrow)
+  function updateDecoys(dt) {
+    const runners = world.players.filter((p) => !p.dead && !p.caught);
+    for (const d of world.decoys) d.t += dt;
+    world.decoys = world.decoys.filter((d) => d.t < d.life);
+    if (!runners.length) return;
+    const p = runners[Math.floor(Math.random() * runners.length)];
+    if (world.level.biomeAt(Math.floor(p.x / TILE)) !== "jungle") { world.nextDecoy = null; return; }
+    if (world.nextDecoy === null) world.nextDecoy = world.time + rand(JAGUAR.decoys[0], JAGUAR.decoys[1]);
+    if (world.time < world.nextDecoy) return;
+    world.nextDecoy = null;
+    const bush = hidingBush(p.x + 60, p.x + 240);
+    if (!bush) return;
+    const kinds = world.level.wild || p.x / TILE >= world.level.specialAt ? ["jaguar", "panther"] : ["jaguar"];
+    world.decoys.push({ kind: kinds[Math.floor(Math.random() * kinds.length)], ex: bush.x, ey: bush.y - Math.round(JUNGLE.backBushes[bush.v][1] * 0.6), t: 0, life: rand(1.6, 2.8), blink: rand(0.6, 1.2) });
   }
 
   // Where it lands near x: the nearest firm ground (never in a pit or a river)
@@ -1037,18 +1065,13 @@ const Game = (() => {
         // Wild: always one hunting you in the jungle: when one gives up, the next comes
         if (!inJungle || busy) world.nextWildJaguar = null;
         else if (world.nextWildJaguar === null) world.nextWildJaguar = world.time + WILD.jaguarGap;
-        else if (world.time >= world.nextWildJaguar) {
-          world.nextWildJaguar = null;
-          spawnJaguar(leader, pick(leader.x / TILE));
-        }
+        else if (world.time >= world.nextWildJaguar && spawnJaguar(leader, pick(leader.x / TILE))) world.nextWildJaguar = null;
       }
       let taken = busy;
       for (const spot of world.wild ? [] : level.jaguarSpots) {
         if (spot.used || leader.x / TILE < spot.col || taken) continue;
-        spot.used = true;
-        if (!inJungle || leader.x / TILE < level.baseAt) continue;
-        spawnJaguar(leader, pick(leader.x / TILE));
-        taken = true;
+        if (!inJungle || leader.x / TILE < level.baseAt) { spot.used = true; continue; }
+        if (spawnJaguar(leader, pick(leader.x / TILE))) { spot.used = true; taken = true; } // (else: the next bush ahead)
       }
     }
 

@@ -65,7 +65,9 @@ const Renderer = (() => {
     });
     b.globalAlpha = 1;
     for (const m of world.missiles) if (m.state === "approach") drawMissile(m, world, camX); // still far away, behind the course
-    for (const j of world.jaguars) drawJaguarBack(j, world.level, camX, world.time); // eyes in the trees, leaping out
+    drawBackBushes(world.level, camX);
+    for (const d of world.decoys) drawEyes(d.kind, d.ex, d.ey, camX, decoyOpacity(d), d.t > d.blink && d.t < d.blink + 0.12 ? "shut" : "open");
+    for (const j of world.jaguars) drawJaguarBack(j, world.level, camX, world.time); // eyes in a bush, leaping out
     drawTiles(world.level, camX);
     drawSawTracks(world.level, camX);
     drawPalms(world.level, player, camX);
@@ -537,19 +539,32 @@ const Renderer = (() => {
     }
   }
 
-  // A jaguar still in the background: its eyes glowing in a dark thicket, then leaping out of it
+  // The low bushes all through the jungle's background (where a jaguar might be hiding)
+  function drawBackBushes(level, camX) {
+    for (const bu of level.backBushes(camX - 40, camX + VIEW_W + 40)) {
+      const img = sprites.backBushes[bu.v];
+      b.drawImage(img, Math.round(bu.x - camX - img.width / 2), bu.y - img.height);
+    }
+  }
+
+  // A pair of eyes glowing in a bush (fading in or out), open, narrowed, or blinking shut
+  function drawEyes(kind, x, y, camX, alpha, look) {
+    if (alpha <= 0 || look === "shut") return;
+    const img = sprites.catEyes[kind][look];
+    const fade = b.globalAlpha;
+    b.globalAlpha = fade * alpha;
+    b.drawImage(img, Math.round(x - camX) - 7, Math.round(y) - 4);
+    b.globalAlpha = fade;
+  }
+
+  function decoyOpacity(d) {
+    return Math.min(1, d.t / JAGUAR.fadeIn, (d.life - d.t) / 0.5);
+  }
+
+  // A jaguar still in the background: its eyes fading in in a bush, narrowing, then it leaps out
   // (small and far away at first), with its shadow on the ground where it's going to land
   function drawJaguarBack(j, level, camX, time) {
-    if (j.state === "eyes" || (j.state === "leap" && j.t < 0.35)) {
-      const sx = Math.round(j.ex - camX);
-      if (sx > -40 && sx < VIEW_W + 40) {
-        b.drawImage(sprites.thicket, sx - 30, Math.round(j.ey) - 16);
-        if (j.state === "eyes") {
-          const eyes = sprites.catEyes[j.kind][j.t > JAGUAR.eyes - 0.5 ? "narrow" : "open"];
-          b.drawImage(eyes, sx - 11, Math.round(j.ey) - 5);
-        }
-      }
-    }
+    if (j.state === "eyes") drawEyes(j.kind, j.ex, j.ey, camX, Math.min(1, j.t / JAGUAR.fadeIn), j.t > JAGUAR.eyes - 0.5 ? "narrow" : "open");
     if (j.state !== "leap") return;
     const u = Math.min(1, j.t / JAGUAR[j.kind].leap);
     const tx = Math.round(j.toX - camX);

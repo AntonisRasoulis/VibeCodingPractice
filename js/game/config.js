@@ -143,6 +143,7 @@ const WILD = {
 const JUNGLE = {
   bambooHeights: [20, 24, 28, 32], // pixels (prairie spikes are 5, cactuses 14-18)
   thornWidths: [2, 5],             // tiles: 5 is about the widest a full-speed jump clears
+  backBushes: [[26, 13], [32, 15], [38, 17], [30, 12]], // the low bushes in the background: [width, height]
 };
 
 // Jungle rivers: too wide to jump, with logs drifting along them. The current runs left (back the
@@ -192,7 +193,7 @@ const FLYTRAP = {
 };
 
 // The jungle's special danger: once or twice per jungle biome a jaguar (or, from 500 m, a black
-// panther) comes for the player in the lead. Its eyes glow in a dark thicket ahead, narrow, and it
+// panther) comes for the player in the lead. Its eyes fade in, glowing, in a bush ahead, narrow, and it
 // leaps out at where you're going to be (its shadow shows where): change speed. If it misses it
 // runs at you and attacks again: crouched flat, it pounces low AT you (jump!); rear and tail up, it
 // leaps OVER you (keep going, don't jump). A jaguar attacks 3 times, a panther once but faster.
@@ -201,7 +202,9 @@ const JAGUAR = {
   // coming; over / pounce: how long a leap over you and a low pounce at you take
   jaguar: { leap: 0.8, attacks: 3, run: 140, crouch: 0.4, over: 0.5, pounce: 0.32 },
   panther: { leap: 0.6, attacks: 1, run: 170, crouch: 0.32, over: 0.42, pounce: 0.28 },
-  eyes: 1.4,          // seconds its eyes glow in the trees before it leaps (narrowed for the last 0.5)
+  eyes: 1.8,          // seconds from when its eyes start to fade in (in a bush ahead) to when it leaps (narrowed for the last 0.5)
+  fadeIn: 0.8,        // ...they take this long to fade in
+  decoys: [4, 10],    // harmless eyes blink in some bush every 4-10 seconds while you're in the jungle (they never narrow)
   ahead: [170, 210],  // how far ahead of the leader its eyes appear (pixels)
   strike: 46,         // it crouches to attack when it's this close to you
   room: 36,           // ...but never closer than this when it springs (if you're running at it, it backs off first)
