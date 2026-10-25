@@ -860,7 +860,7 @@ const Renderer = (() => {
     }
     // Smoke trail from the zoom-in: thin far away, thicker as the missile gets closer
     if (m.smoke && m.smoke.length) {
-      const baseX = m.state === "approach" ? (m.anchor.dead ? m.anchor.respawnX : m.anchor.x) : m.smokeAnchorX;
+      const baseX = m.state === "approach" ? m.anchor.x : m.smokeAnchorX;
       for (const puff of m.smoke) {
         const age = time - puff.t;
         const fade = Math.max(0, 1 - age / 1.6);
@@ -876,7 +876,7 @@ const Renderer = (() => {
     // A glint where it first appears, like sunlight catching it far away
     if (m.state === "approach" && m.t < 0.45) {
       const k = Math.sin((Math.PI * m.t) / 0.45);
-      const gx = Math.round((m.anchor.dead ? m.anchor.respawnX : m.anchor.x) + m.sx - camX);
+      const gx = Math.round(m.anchor.x + m.sx - camX);
       const gy = Math.round(m.sy);
       const arm = Math.round(2 + 7 * k);
       const diag = Math.round(1 + 3 * k);
