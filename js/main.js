@@ -15,6 +15,12 @@ let gameLoaded = false;
 let lastMode = 2;
 let biomes = false; // snow, desert and jungle biomes: off until you turn them on (remembered by the browser)
 try { biomes = localStorage.getItem("fire-run-biomes") === "1"; } catch (e) { /* storage blocked */ }
+let biomeList = BIOMES.slice(); // ...and which ones you get with them on (picked with the arrow next to the button)
+try {
+  const saved = JSON.parse(localStorage.getItem("fire-run-biome-list"));
+  const known = Array.isArray(saved) ? saved.filter((b) => BIOMES.includes(b)) : [];
+  if (known.length) biomeList = known;
+} catch (e) { /* storage blocked, or nothing saved */ }
 let wild = false; // Wild mode (the hard one): off until you pick it (remembered by the browser)
 try { wild = localStorage.getItem("fire-run-mode") === "wild"; } catch (e) { /* storage blocked */ }
 // best distance in 1-player mode, one for each mode (remembered by the browser)
@@ -93,21 +99,49 @@ function startGame(players) {
   startButton.blur();
   soloButton.blur();
   canvas.scrollIntoView({ behavior: "smooth", block: "center" });
-  Game.start(players, { biomes, wild });
+  Game.start(players, { biomes, biomeList, wild });
 }
 
 startButton.addEventListener("click", () => startGame(2));
 
 const biomesButton = document.getElementById("biomes-button");
+const biomeArrow = document.getElementById("biome-arrow");
+const biomePanel = document.getElementById("biome-panel");
 function showBiomes() {
   biomesButton.textContent = `Biomes: ${biomes ? "on" : "off"}`;
   biomesButton.setAttribute("aria-pressed", String(biomes));
+  biomeArrow.hidden = !biomes; // the arrow to pick which biomes is only there with them on
+  if (!biomes) openBiomePanel(false);
+  for (const chip of biomePanel.querySelectorAll(".biome-choice")) {
+    const on = biomeList.includes(chip.dataset.biome);
+    chip.setAttribute("aria-pressed", String(on));
+    chip.title = on && biomeList.length === 1 ? "At least one biome has to be on" : "";
+  }
+}
+function openBiomePanel(open) {
+  biomePanel.hidden = !open;
+  biomeArrow.setAttribute("aria-expanded", String(open));
 }
 biomesButton.addEventListener("click", () => {
   biomes = !biomes;
   try { localStorage.setItem("fire-run-biomes", biomes ? "1" : "0"); } catch (e) { /* storage blocked */ }
   showBiomes();
 });
+biomeArrow.addEventListener("click", () => openBiomePanel(biomePanel.hidden));
+biomePanel.addEventListener("click", (e) => {
+  const chip = e.target.closest(".biome-choice");
+  if (!chip) return;
+  const biome = chip.dataset.biome;
+  if (biomeList.includes(biome)) {
+    if (biomeList.length === 1) return; // always at least one
+    biomeList = biomeList.filter((b) => b !== biome);
+  } else biomeList = BIOMES.filter((b) => b === biome || biomeList.includes(b));
+  try { localStorage.setItem("fire-run-biome-list", JSON.stringify(biomeList)); } catch (e) { /* storage blocked */ }
+  showBiomes();
+});
+// click anywhere else (or press Escape) to close it
+document.addEventListener("click", (e) => { if (!biomePanel.hidden && !e.target.closest(".biome-picker")) openBiomePanel(false); });
+document.addEventListener("keydown", (e) => { if (e.code === "Escape") openBiomePanel(false); });
 showBiomes();
 
 const modeButton = document.getElementById("mode-button");

@@ -108,6 +108,7 @@ class Level {
     this.lastOrbCol = 0;
     this.nextId = 1;
     this.biomes = options.biomes !== false; // off: the whole course stays in the starting biome
+    this.biomeList = options.biomeList || BIOMES; // the biomes it can change to
     this.biomeEnd = this.biomes ? this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]) : Infinity;
     this.biomeStart = 0;
     this.pondTarget = this.rand(THIN_ICE.perBiome[0], THIN_ICE.perBiome[1]); // thin ice patches this snow biome gets (at least)
@@ -823,7 +824,7 @@ class Level {
   newBiome() {
     this.iceBias = false;
     this.flat(4);
-    this.biome = this.pickFrom(BIOMES.filter((b) => b !== this.biome));
+    this.biome = this.pickFrom(this.biomeList.filter((b) => b !== this.biome));
     this.signs.push({ x: this.col * TILE + 2, biome: this.biome });
     this.flat(8);
     const length = this.rand(BIOME_LENGTH[0], BIOME_LENGTH[1]);

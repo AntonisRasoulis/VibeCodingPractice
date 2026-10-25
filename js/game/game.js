@@ -25,11 +25,11 @@ const Game = (() => {
   let nextBoltId = 1;
   let racesStarted = 0; // the first race after opening the website always starts in the prairie
   let solo = false;     // 1-player mode: one runner, one big view, WASD or the arrow keys
-  let biomes = false;   // snow, desert and jungle too? Off: the whole race is in the prairie
+  let biomeList = ["prairie"]; // the biomes this race goes through (biomes off: just the prairie)
   let wild = false;     // Wild mode: the hard one
 
   function newWorld(startBiome = "prairie") {
-    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes, wild });
+    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes: biomeList.length > 1, biomeList, wild });
     level.ensure(VIEW_W * 2);
     const startX = 4 * TILE;
     const startY = level.groundRow * TILE - HITBOX_H;
@@ -1421,12 +1421,15 @@ const Game = (() => {
     // mode: 1 or 2 players
     start(players = 2, options = {}) {
       solo = players === 1;
-      biomes = options.biomes === true;
+      const picked = (options.biomeList || BIOMES).filter((b) => BIOMES.includes(b));
+      biomeList = options.biomes === true && picked.length ? picked : ["prairie"];
       wild = options.wild === true;
       canvas.height = (solo ? VIEW_H : VIEW_H * 2 + DIVIDER) * SCALE;
       canvas.style.aspectRatio = `auto ${canvas.width} / ${canvas.height}`;
       Sound.unlock(); // the Start click lets the browser play sound
-      newWorld(racesStarted++ === 0 || !biomes ? "prairie" : BIOMES[Math.floor(Math.random() * BIOMES.length)]);
+      // the first race after opening the website starts in the prairie (if it's one of them)
+      const first = racesStarted++ === 0 && biomeList.includes("prairie");
+      newWorld(first ? "prairie" : biomeList[Math.floor(Math.random() * biomeList.length)]);
       world.state = "countdown";
       Sound.play("beep");
       accumulator = 0;
