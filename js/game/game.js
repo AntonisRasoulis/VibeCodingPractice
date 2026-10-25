@@ -13,7 +13,7 @@ const Game = (() => {
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
     "portalCooldown", "safeSpots", "fallState", "icicleState", "snowballs", "snowballStarted", "onIce", "biome",
-    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond"];
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond", "inRiver"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -366,6 +366,7 @@ const Game = (() => {
           h.ty = target.y;
           target.held = true;
           target.inQuick = false;
+          target.inRiver = null;
           target.vx = target.vy = 0;
           target.dashHold = target.dashTime = target.windTime = 0;
           target.standingOn = null;
@@ -713,6 +714,7 @@ const Game = (() => {
           if (overlaps(q.x, q.y, HITBOX_W, HITBOX_H, bear.x - BEAR_W + 6, bear.y - 16, BEAR_W - 6, 16)) {
             bear.trampled.add(q);
             q.inQuick = false;
+            q.inRiver = null;
             q.vy = -BEAR.tramplePop;
             q.onGround = false;
             q.standingOn = null;
@@ -856,6 +858,7 @@ const Game = (() => {
             d.spot = spot;
             p.held = true;
             p.inQuick = false;
+            p.inRiver = null;
             p.vx = p.vy = 0;
             p.showHit("SAVED!", "#4fc0ff");
             Sound.play("droneGrab");
@@ -876,6 +879,7 @@ const Game = (() => {
           d.fromX = q.x; // where they were grabbed: they always end up behind this
           q.held = true;
           q.inQuick = false;
+          q.inRiver = null;
           q.vx = q.vy = 0;
           q.showHit("PULLED BACK!", "#4fc0ff");
           Sound.play("droneGrab");
@@ -1020,6 +1024,7 @@ const Game = (() => {
           Sound.play("vultureCry");
           p.held = true;
           p.inQuick = false;
+          p.inRiver = null;
           p.vx = p.vy = 0;
           v.state = "carry";
         }

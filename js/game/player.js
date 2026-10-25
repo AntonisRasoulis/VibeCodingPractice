@@ -69,6 +69,7 @@ class Player {
     this.biomeBanner = 0;         // seconds left showing the new biome's name
     this.honey = 0;               // seconds left slowed down by a black bear's honey
     this.inQuick = false;         // stuck in quicksand
+    this.inRiver = null;          // fell in a jungle river: the current is carrying us back to its near bank
     this.sink = 0;                // how deep (pixels) we've sunk into it
     this.quickSurface = 0;        // the quicksand's surface (y)
     this.noCut = 0;               // a jump out of quicksand isn't cut short when you let go
@@ -150,6 +151,7 @@ class Player {
 
     // Stuck in quicksand: sinking, unless you keep pressing jump
     if (this.inQuick) return this.updateQuicksand(dt, input, level);
+    if (this.inRiver) return this.updateRiver(dt, level);
     if (this.inSink) return this.updateSink(dt, input, level);
     if (this.inPond) return this.updatePond(dt, input, level);
 
@@ -240,6 +242,18 @@ class Player {
       this.vx = 0;
       Sound.play("sandSink");
     }
+    // Fell in a river: the current takes you
+    if (!this.onGround) {
+      const river = level.riverAt(this.x + HITBOX_W / 2);
+      if (river && this.y + HITBOX_H > river.wy + 3) {
+        this.inRiver = river;
+        this.vx = this.vy = 0;
+        this.sparkle("#bfe9ff");
+        this.sparkle("#5fc0d0");
+        Sound.play("splash");
+        return;
+      }
+    }
     if (this.onGround && !wasOnGround && fallSpeed > 120) Sound.play(this.onIce ? "iceLand" : "land");
     // Thin ice: it cracks the first time anyone walks on it, and the cracks stay. Land a jump on it,
     // or step back onto it once it's cracked, and it gives way.
@@ -326,6 +340,33 @@ class Player {
       return;
     }
     this.checkHazards(level);
+  }
+
+  // ---- Jungle: swept along a river ----
+
+  // No control: the current carries you back to the near bank, where you climb out
+  updateRiver(dt, level) {
+    const r = this.inRiver;
+    if (this.x + HITBOX_W / 2 >= r.x1) { this.inRiver = null; return; } // (thrown out of it somehow)
+    this.riverT = (this.riverT || 0) + dt;
+    this.stun = 0;
+    this.frozen = 0;
+    this.facing = -1;
+    this.vx = -RIVER.sweep;
+    this.vy = 0;
+    this.x += this.vx * dt;
+    this.y = r.wy - HITBOX_H + 6 + Math.round(Math.sin(this.riverT * 9)); // bobbing, head above water
+    this.animDist += RIVER.sweep * dt * 0.3;
+    if (Math.random() < dt * 10) this.sparkle("#bfe9ff");
+    if (this.x + HITBOX_W / 2 < r.x0) {
+      this.inRiver = null;
+      this.x = r.x0 - HITBOX_W - 1;
+      this.y = r.gy - HITBOX_H;
+      this.vx = 0;
+      this.onGround = true;
+      this.sparkle("#bfe9ff");
+      Sound.play("land");
+    }
   }
 
   // ---- Snow: icicles and snowballs (each player has their own) ----
@@ -510,6 +551,7 @@ class Player {
   // Each player has their own copy of the crumbling platforms, so what falls
   // under one player is still there for the other.
   platformTop(p) {
+    if (p.kind === "log") return logTop(p);
     if (p.kind !== "fall") return p.y;
     const s = this.fallState.get(p.id);
     if (!s) return p.y;
@@ -864,6 +906,7 @@ class Player {
     this.hiddenIn = null;
     this.honey = 0;
     this.inQuick = false;
+    this.inRiver = null;
     this.tumbleweeds = [];
     this.tumbleStarted.clear();
     this.snowballs = [];

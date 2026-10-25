@@ -79,6 +79,7 @@ const Renderer = (() => {
     drawTraps(world.level, player, other, camX);
     drawSinkholes(world.level, camX, world.time);
     drawPonds(world.level, world.players, camX, world.time);
+    drawRivers(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
     // (someone hiding in a bush can't be seen, on either screen)
@@ -104,6 +105,7 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && p.inSink && !p.dead) drawSinkPile(p.inSink, camX); // sand round their legs
     drawIceBlocks(world.level, camX); // anyone frozen in a pond, in their block of ice
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
+    drawRiverFronts(world.level, camX, world.time); // ...and anyone in a river is up to their neck
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
@@ -529,6 +531,52 @@ const Renderer = (() => {
     }
   }
 
+  // Jungle rivers: the water, rippling left with the current, and the logs on it
+  function drawRivers(level, camX, time) {
+    for (const r of level.rivers) {
+      const x0 = Math.round(r.x0 - camX), w = r.x1 - r.x0;
+      if (x0 > VIEW_W || x0 + w < 0) continue;
+      b.fillStyle = "#2a7f8f";
+      b.fillRect(x0, r.wy, w, VIEW_H - r.wy);
+      b.fillStyle = "#1f6676";
+      b.fillRect(x0, r.wy + 5, w, VIEW_H - r.wy - 5);
+      b.fillStyle = "#3fa0a8";
+      b.fillRect(x0, r.wy, w, 2);
+    }
+    for (const p of level.platforms) {
+      if (p.kind !== "log" || p.hidden) continue;
+      const sx = Math.round(p.x - camX);
+      if (sx > VIEW_W || sx + p.w < 0) continue;
+      b.drawImage(sprites.logs[p.w], sx, Math.round(p.y + p.sinkY));
+    }
+  }
+
+  // The water in front: covers the bottom of the logs, and anyone being swept along up to the neck
+  function drawRiverFronts(level, camX, time) {
+    for (const r of level.rivers) {
+      const x0 = Math.round(r.x0 - camX), w = r.x1 - r.x0;
+      if (x0 > VIEW_W || x0 + w < 0) continue;
+      b.globalAlpha = 0.85;
+      b.fillStyle = "#2a7f8f";
+      b.fillRect(x0, r.wy + 2, w, 3);
+      b.fillStyle = "#1f6676";
+      b.fillRect(x0, r.wy + 5, w, VIEW_H - r.wy - 5);
+      b.globalAlpha = 1;
+      // ripples drifting left with the current
+      const drift = time * 30;
+      b.fillStyle = "#7fd6d0";
+      for (let k = 0; k < w / 12; k++) {
+        const x = ((k * 12 + hash(r.id, k) * 8 - drift) % w + w) % w;
+        b.fillRect(x0 + Math.round(x), r.wy + (k % 2 ? 1 : 3), 3, 1);
+      }
+      b.fillStyle = "#5fc0c0";
+      for (let k = 0; k < w / 17; k++) {
+        const x = ((k * 17 + hash(r.id, k + 50) * 9 - drift * 0.7) % w + w) % w;
+        b.fillRect(x0 + Math.round(x), r.wy + 7 + (k % 3) * 4, 2, 1);
+      }
+    }
+  }
+
   // Sprouts and little red mushrooms in the jungle
   function drawJungleDecoration(c, sx, sy) {
     const n = hash(c, 99);
@@ -597,6 +645,7 @@ const Renderer = (() => {
 
   function drawPlatforms(level, player, camX, time) {
     for (const p of level.platforms) {
+      if (p.kind === "log") continue; // (drawn with their river)
       const sx = Math.round(p.x - camX);
       if (sx > VIEW_W || sx + p.w < 0) continue;
 

@@ -142,6 +142,21 @@ const JUNGLE = {
   thornWidths: [2, 5],             // tiles: 5 is about the widest a full-speed jump clears
 };
 
+// Jungle rivers: too wide to jump, with logs drifting along them. The current runs left (back the
+// way you came): logs bob up at the far bank, drift left and sink at the near bank. They're evenly
+// spaced, so the hop from one log to the next is always the same easy gap.
+const RIVER = {
+  widths: { small: [8, 12], medium: [13, 19], big: [20, 28] }, // tiles of water
+  logTiles: [3, 5],  // how long each log is
+  gap: [2, 3],       // tiles of water between one log and the next
+  speed: [16, 26],   // how fast the logs drift left (pixels per second; normal running is 96)
+  rise: 0.5,         // seconds a new log takes to bob up at the far bank
+  sink: 0.9,         // seconds a log takes to sink at the near bank (you can still stand on it for the first half)
+  sweep: 110,        // fall in, and the current carries you back to the near bank this fast
+  surface: 3,        // the water is this many pixels below the banks
+  hop: 4,            // tiles: the longest hop a river ever asks for (a full-speed jump is about 7)
+};
+
 const DESERT = {
   sinkTime: 3,        // seconds to sink all the way into quicksand if you do nothing
   jumpsToEscape: 6,   // this many jump presses pull you out (each one also lifts you up a little)

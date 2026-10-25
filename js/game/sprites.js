@@ -598,6 +598,27 @@ function makeThorns(tiles) {
   return c;
 }
 
+// A log floating down a jungle river, `tiles` long: bark, cut ends, a little moss
+function makeLog(tiles) {
+  const w = tiles * TILE;
+  const c = makeCanvas(w, 7);
+  const g = c.getContext("2d");
+  px(g, "#3a2414", 0, 0, w, 7);
+  px(g, "#7a4e2a", 1, 1, w - 2, 5);
+  px(g, "#9a6a3a", 1, 1, w - 2, 1);
+  px(g, "#5e3a1e", 1, 4, w - 2, 1);
+  for (let x = 4; x < w - 4; x += 5) px(g, "#5e3a1e", x + (x % 3), 2, 2, 1); // bark
+  px(g, "#c99a5a", w - 3, 1, 2, 5); // cut ends with rings
+  px(g, "#9a6a3a", w - 2, 3);
+  px(g, "#c99a5a", 1, 1, 2, 5);
+  px(g, "#9a6a3a", 1, 3);
+  if (tiles > 3) {
+    px(g, "#3f8f2f", Math.floor(w * 0.4), 0, 3, 1);
+    px(g, "#6bc24a", Math.floor(w * 0.4) + 1, 0);
+  }
+  return c;
+}
+
 // The jungle's background, in three layers that each repeat sideways (drawn with parallax):
 // far canopy, tree trunks with hanging vines, and ferns along the horizon with the canopy edge above
 function makeJungleLayers() {
@@ -813,6 +834,7 @@ function buildSprites() {
     bamboo: Object.fromEntries(JUNGLE.bambooHeights.map((h) => [h, makeBamboo(h)])),
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
+    logs: Object.fromEntries([3, 4, 5].map((t) => [t * TILE, makeLog(t)])), // by width in pixels
     vultures: Object.fromEntries(Object.entries(VULTURE_PALETTES).map(([kind, pal]) =>
       [kind, Object.fromEntries(Object.entries(VULTURE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, pal)]))])),
     bears: Object.fromEntries(Object.entries(BEAR_PALETTES).map(([kind, pal]) => [kind, [0, 1, 2, 3].map((f) => makeBear(pal, f))])),

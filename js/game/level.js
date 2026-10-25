@@ -60,6 +60,11 @@ function bushTops(w, h, seed) {
   return tops;
 }
 
+// Where you stand on a river log (null: it's under water, or too far under to hold you)
+function logTop(p) {
+  return p.hidden || p.sinkY > 3 ? null : p.y + p.sinkY;
+}
+
 class Level {
   constructor(seed, startBiome = "prairie", options = {}) {
     this.rng = makeRng(seed);
@@ -93,6 +98,7 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.rivers = [];     // jungle: { id, x0, x1 (pixels), gy (the banks' top), wy (the water's surface) }; its logs are platforms
     this.time = 0;
     this.groundRow = MAX_GROUND_ROW;
     this.lastOrbCol = 0;
@@ -129,12 +135,40 @@ class Level {
   update(time) {
     this.time = time;
     for (const p of this.platforms) {
+      if (p.kind === "log") { this.moveLog(p, time); continue; }
       if (p.kind !== "move") continue;
       const t = 0.5 - 0.5 * Math.cos(2 * Math.PI * (time / p.period + p.phase));
       const newX = p.x0 + (p.x1 - p.x0) * t;
       p.dx = newX - p.x;
       p.x = newX;
     }
+  }
+
+  // A log on a river: worked out from the clock (like the moving platforms), so both players see the
+  // same one. u = how far it has drifted since it bobbed up at the far bank.
+  moveLog(p, time) {
+    const r = p.river;
+    const u = (((time * r.speed + p.k * r.spacing + r.phase) % r.loop) + r.loop) % r.loop;
+    const travel = r.x1 - r.x0 - p.w, riseU = r.speed * RIVER.rise, sinkU = r.speed * RIVER.sink;
+    let x, sink = 0;
+    p.hidden = false;
+    if (u < travel) {
+      x = r.x1 - p.w - u;
+      if (u < riseU) sink = 5 * (1 - u / riseU); // still bobbing up
+    } else if (u < travel + sinkU) {
+      x = r.x0;                                   // bumped into the near bank: going under
+      sink = 6 * (u - travel) / sinkU;
+    } else {
+      x = r.x1 - p.w;                             // under water, on its way back round
+      p.hidden = true;
+    }
+    p.dx = p.hidden || Math.abs(x - p.x) > 8 ? 0 : x - p.x;
+    p.x = x;
+    p.sinkY = sink;
+  }
+
+  riverAt(x) {
+    return this.rivers.find((r) => x >= r.x0 && x < r.x1) || null;
   }
 
   // Where a saw blade's center is at a given time. It glides from (x0, y0) to (x1, y1)
@@ -427,6 +461,7 @@ class Level {
     if (this.biome === "snow" && this.col > 60) weights.thinIce = 4;
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
+    if (this.biome === "jungle" && this.col > 40) weights.river = 4;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -640,6 +675,39 @@ class Level {
     this.bushes.push(bush);
     if (this.rng() < TRAP.inBush) this.tryTrap(Math.floor((x0 + w / 2) / TILE), bush);
     return true;
+  }
+
+  // A river from x0 to x1 (pixels), its water just below banks at gy, with its logs
+  addRiver(x0, x1, gy, d) {
+    let speed = RIVER.speed[0] + this.rng() * (RIVER.speed[1] - RIVER.speed[0]) * (0.5 + d * 0.5);
+    // Logs and gaps that always leave a way across, with time to spare. On a wide river, the next log
+    // is up and steady a good second before the one you're on reaches the near bank. On a narrow one a
+    // single log does: for at least 2.5 s it's close enough to both banks to hop on and off (RIVER.hop tiles).
+    const W = (x1 - x0) / TILE;
+    const oneLog = (len) => { // seconds a single log is up, steady, and an easy hop from both banks
+      const from = Math.max(0, W - RIVER.hop - len), to = Math.min(RIVER.hop, W - len); // where its left end can be (tiles from the near bank)
+      if (to < from) return 0;
+      return ((to - from) * TILE) / speed + (from === 0 ? RIVER.sink / 2 : 0) - (to === W - len ? RIVER.rise * 0.6 : 0);
+    };
+    const works = (len, gap) => W - len >= len + gap + (speed * (RIVER.rise + 1.2)) / TILE || oneLog(len) >= 2.5;
+    let len = this.rand(RIVER.logTiles[0], RIVER.logTiles[1]), gap = this.rand(RIVER.gap[0], RIVER.gap[1]);
+    while (!works(len, gap)) {
+      const options = [];
+      for (let l = RIVER.logTiles[0]; l <= RIVER.logTiles[1]; l++) for (let g = RIVER.gap[0]; g <= RIVER.gap[1]; g++) if (works(l, g)) options.push([l, g]);
+      if (options.length) [len, gap] = this.pickFrom(options);
+      else speed *= 0.85; // nothing fits at this speed: a slower current
+    }
+    len *= TILE;
+    const spacing = len + gap * TILE;
+    const visible = x1 - x0 - len + speed * RIVER.sink; // how far a log drifts from bobbing up to gone
+    const n = Math.ceil(visible / spacing);
+    const r = { id: this.nextId++, x0, x1, gy, wy: gy + RIVER.surface, speed, spacing, loop: n * spacing, phase: this.rng() * n * spacing };
+    this.rivers.push(r);
+    for (let k = 0; k < n; k++) {
+      const log = { id: this.nextId++, kind: "log", river: r, k, x: x1 - len, y: gy, w: len, dx: 0, sinkY: 0, hidden: false };
+      this.moveLog(log, 0);
+      this.platforms.push(log);
+    }
   }
 
   // A calm stretch, then a sign, and from there on a different biome
@@ -948,6 +1016,18 @@ const SECTIONS = {
       this.pending.push({ kind: "sink", c: this.col, size });
       this.flat(i + 1 < count ? 2 * SINK.gap + 9 : SINK.gap + 6, false);
     }
+  },
+
+  // Jungle: a river too wide to jump. Hop across on the drifting logs, or the current carries you back.
+  river(d) {
+    this.iceBias = false;
+    this.flat(5);
+    const [a, b] = RIVER.widths[this.pickFrom(["small", "medium", "big"])];
+    const x0 = this.col * TILE, gy = this.groundRow * TILE;
+    this.empty(this.rand(a, b));
+    const x1 = this.col * TILE;
+    this.flat(5);
+    this.addRiver(x0, x1, gy, d);
   },
 
   // A patch of thin ice over a pond, with flat snow all round
