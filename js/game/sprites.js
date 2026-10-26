@@ -931,8 +931,41 @@ function makeBackBush(v) {
   return c;
 }
 
+// A fern rooted on the ground at x (in a layer 420 wide that repeats): a fan of five fronds,
+// the two at the back darker. s scales it (1 is about 18 pixels tall).
+function makeFern(g, x, s) {
+  const dot = (c, fx, fy) => px(g, c, ((Math.round(fx) % 420) + 420) % 420, Math.round(fy));
+  // one frond: a long tapered leaf curving along an arc, jagged edges, a light vein down the middle
+  const frond = (x0, len, ang, bend, back) => {
+    const body = back ? "#33703a" : "#3f8a40", edge = back ? "#2a5e30" : "#2f6e33", vein = back ? "#3f7f42" : "#6fb85a";
+    let fx = x0, fy = 96, a = ang;
+    const pts = [];
+    for (let i = 0; i < len * 2; i++) {
+      pts.push([fx, fy, a, i / (len * 2)]);
+      fx += Math.cos(a) * 0.5;
+      fy -= Math.sin(a) * 0.5;
+      a -= bend * 0.5 / len * Math.sign(Math.cos(ang));
+    }
+    for (const [x1, y1, a1, t] of pts) {
+      const w = 3.2 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.15)), 0.8) * Math.min(1, t / 0.12);
+      for (let d = -w; d <= w; d += 0.5) {
+        const rim = Math.abs(d) > w - 1;
+        if (rim && Math.floor(t * len * 1.5) % 2 === 0) continue; // the jagged edge
+        dot(rim ? edge : body, x1 + Math.sin(a1) * d, y1 + Math.cos(a1) * d);
+      }
+    }
+    for (const [x1, y1, , t] of pts) if (t > 0.08 && t < 0.85) dot(vein, x1, y1);
+  };
+  const L = (n) => Math.round(n * s);
+  frond(x - 2, L(13), Math.PI * 0.82, 1.1, true);
+  frond(x + 2, L(13), Math.PI * 0.18, 1.1, true);
+  frond(x - 1, L(16), Math.PI * 0.68, 0.9, false);
+  frond(x + 1, L(16), Math.PI * 0.32, 0.9, false);
+  frond(x, L(18), Math.PI * (hash(x, 9) < 0.5 ? 0.55 : 0.45), 0.5, false);
+}
+
 // The jungle's background, in three layers that each repeat sideways (drawn with parallax):
-// far canopy, tree trunks with hanging vines, and ferns along the horizon with the canopy edge above
+// far canopy, tree trunks with hanging vines, and undergrowth and ferns along the ground with the canopy edge above
 function makeJungleLayers() {
   const far = makeCanvas(400, VIEW_H);
   let g = far.getContext("2d");
@@ -958,14 +991,14 @@ function makeJungleLayers() {
     const h = 16 + 5 * Math.sin(x * Math.PI * 2 / 60 + 1) + 3 * Math.sin(x * Math.PI * 2 / 20);
     px(g, "#3f7f3f", x, 0, 1, Math.round(h));
   }
-  for (let x = 0; x < 420; x += 7) {
-    const fx = x + Math.floor(hash(x, 3) * 4);
-    for (let k = 0; k < 6; k++) {
-      px(g, "#3f7f3f", (fx - k + 420) % 420, 92 - k);
-      px(g, "#3f7f3f", (fx + k) % 420, 92 - k);
-      px(g, "#3f7f3f", fx % 420, 90 - k);
-    }
+  // a low band of leafy undergrowth along the ground, bumpy on top...
+  for (let x = 0; x < 420; x++) {
+    const h = 7 + 3 * Math.sin(x * Math.PI * 2 / 35) + 2 * Math.sin(x * Math.PI * 2 / 12 + 1) + (hash(x, 7) < 0.3 ? 1 : 0);
+    px(g, "#4a8c44", x, 96 - Math.round(h), 1, VIEW_H);
+    if (hash(x, 8) < 0.35) px(g, "#56994c", x, 93 - Math.floor(hash(x, 6) * 4));
   }
+  // ...with big ferns growing out of it here and there
+  for (let x = 20; x < 420; x += 60 + Math.floor(hash(x, 4) * 50)) makeFern(g, x, 0.85 + hash(x, 5) * 0.35);
   return { far, mid, near };
 }
 
