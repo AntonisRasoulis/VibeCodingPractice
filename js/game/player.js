@@ -70,6 +70,8 @@ class Player {
     this.biome = null;            // the biome we're in, to notice when it changes
     this.biomeBanner = 0;         // seconds left showing the new biome's name
     this.honey = 0;               // seconds left slowed down by a black bear's honey
+    this.poison = 0;              // seconds left of a poison dart messing with your screen (jungle turrets)
+    this.asleep = 0;              // seconds left asleep on the spot (a sleep dart)
     this.inQuick = false;         // stuck in quicksand
     this.inRiver = null;          // fell in a jungle river: the current is carrying us back to its near bank
     this.eatenBy = null;          // inside a jungle flytrap that's chewing us
@@ -97,6 +99,7 @@ class Player {
     if (this.biomeBanner > 0) this.biomeBanner -= dt;
     if (this.rescueBlock > 0) this.rescueBlock -= dt;
     if (this.honey > 0) this.honey -= dt;
+    if (this.poison > 0) this.poison -= dt;
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
@@ -177,6 +180,13 @@ class Player {
     if (this.frozen > 0) {
       this.frozen -= dt;
       if (this.frozen <= 0) Sound.play("thaw");
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+      this.jumpBuffer = 0;
+    }
+
+    // Hit by a sleep dart: fast asleep, no running or jumping
+    if (this.asleep > 0) {
+      this.asleep -= dt;
       input = { left: false, right: false, jump: false, jumpPressed: false };
       this.jumpBuffer = 0;
     }
@@ -912,6 +922,7 @@ class Player {
     this.hiddenIn = null;
     this.held = false;
     this.stun = 0;
+    this.asleep = 0;
     this.spin = 0;
     this.dashHold = 0;
     this.dashTime = 0;

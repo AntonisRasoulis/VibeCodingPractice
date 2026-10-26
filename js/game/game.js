@@ -51,6 +51,7 @@ const Game = (() => {
       bears: [],    // bears chasing a player (snow only)
       jaguars: [],  // jaguars and black panthers hunting the leader (jungle only)
       decoys: [],   // harmless eyes blinking in the jungle's bushes
+      arrows: [],   // arrows shot by the jungle's ancient turrets
       nextDecoy: null,
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
       drones: [],   // rescue drones: guarding a player, or flying to grab the leader
@@ -131,6 +132,8 @@ const Game = (() => {
     updateBears(dt);
     updateVultures(dt);
     updateFlytraps(dt);
+    updateTurrets(dt);
+    updateArrows(dt);
     updateJaguars(dt);
     updateDecoys(dt);
     checkOrbs();
@@ -1003,6 +1006,88 @@ const Game = (() => {
         f.t = 0;
       }
     }
+  }
+
+  // ---- Ancient turrets (jungle) ----
+
+  // A turret is shared: whoever comes first sets it off, and its arrows hit anyone in the way
+  function updateTurrets(dt) {
+    const { level, players } = world;
+    const free = (p) => !p.dead && !p.caught && !p.held && !p.eatenBy && !p.inRiver;
+    // what it shoots next: low or regular, and (past 400 m) which arrow
+    const load = (tu) => {
+      tu.low = Math.random() < 0.5;
+      tu.kind = Math.floor(tu.x / TILE) < level.baseAt ? "arrow" : pickWeighted(TURRET.kinds);
+    };
+    for (const tu of level.turrets) {
+      if (tu.state === "done" || !players.some((p) => Math.abs(p.x - tu.x) < VIEW_W * 1.5)) continue;
+      tu.t += dt;
+      const want = tu.state === "sink" ? 0 : tu.state === "hidden" || tu.state === "rumble" ? 0 : TURRET.heights[tu.low ? "low" : "regular"];
+      tu.moving = tu.h !== want; // (it shakes while it grinds up or down)
+      tu.h = approach(tu.h, want, (TURRET.heights.regular / (tu.state === "sink" ? TURRET.sink : TURRET.rise)) * dt);
+      if (tu.state === "hidden") {
+        const near = (p) => free(p) && Math.abs(p.y + HITBOX_H - tu.gy) < 40 &&
+          (tu.dir < 0 ? tu.x - p.x > 0 && tu.x - p.x < TURRET.sense : p.x - tu.x > tu.wait && p.x - tu.x < tu.wait + 60);
+        if (players.some(near)) {
+          tu.state = "rumble";
+          tu.t = 0;
+          tu.shotsLeft = level.wild ? WILD.turretShots : 1 + Math.floor(Math.random() * TURRET.shots[1]);
+          load(tu);
+          Sound.play("turretRumble");
+        }
+      } else if (tu.state === "rumble") {
+        if (tu.t >= TURRET.rumble) { tu.state = "aim"; tu.t = 0; Sound.play("turretRise"); }
+      } else if (tu.state === "aim") {
+        // (the glow only starts once it's up)
+        if (tu.h === want && tu.t >= TURRET.rise + (level.wild ? WILD.turretAim : TURRET.aim)) {
+          world.arrows.push({ x: tu.x + tu.dir * 8, y: tu.gy - tu.h + 13, dir: tu.dir, kind: tu.kind, traveled: 0 });
+          Sound.play("arrowShoot");
+          tu.shotsLeft--;
+          tu.state = tu.shotsLeft > 0 ? "reload" : "sink";
+          tu.t = 0;
+          if (tu.state === "sink") Sound.play("turretRise");
+        }
+      } else if (tu.state === "reload") {
+        if (tu.t >= (level.wild ? WILD.turretReload : TURRET.reload)) { load(tu); tu.state = "aim"; tu.t = TURRET.rise; }
+      } else if (tu.state === "sink" && tu.h === 0) {
+        tu.state = "done";
+      }
+    }
+  }
+
+  // Arrows fly straight along the ground until they hit someone, a wall, or run out of range
+  function updateArrows(dt) {
+    const { level, players } = world;
+    for (const a of world.arrows) {
+      const move = TURRET.speed * dt;
+      a.x += a.dir * move;
+      a.traveled += move;
+      if (a.traveled > TURRET.range || level.isSolid(Math.floor(a.x / TILE), Math.floor((a.y + 1) / TILE))) { a.done = true; continue; }
+      const bx = a.dir < 0 ? a.x : a.x - 12; // its tip is at a.x
+      const p = players.find((q) => !q.dead && !q.caught && !q.held && !q.eatenBy && !q.inRiver && overlaps(q.x, q.y, HITBOX_W, HITBOX_H, bx, a.y, 12, 3));
+      if (!p) continue;
+      a.done = true;
+      if (a.kind === "arrow") {
+        p.showHit("ARROW!", "#ff4d3d");
+        p.die();
+      } else if (a.kind === "poison") {
+        p.poison = TURRET.poison;
+        p.showHit("POISONED!", "#7dff4a");
+        Sound.play("poisoned");
+      } else if (a.kind === "sleep") {
+        p.asleep = TURRET.sleep;
+        p.vx = 0;
+        p.showHit("SLEEPY...", "#6ac8ff");
+        Sound.play("sleepDart");
+      } else {
+        throwPlayer(p); // knocked back, as far as the hand's backhand
+        p.dizzy = TURRET.bluntDizzy;
+        p.showHit("THWACK!", "#ffd23f");
+        p.sparkle("#ffd23f");
+        Sound.play("smack");
+      }
+    }
+    world.arrows = world.arrows.filter((a) => !a.done);
   }
 
   // ---- Jaguars (jungle) ----

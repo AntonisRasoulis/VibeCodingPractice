@@ -6,13 +6,14 @@ const Renderer = (() => {
   const BUFFER_H = VIEW_H * 2 + DIVIDER;
   const PIXEL_FONT = '"Press Start 2P", monospace';
   const cams = [0, 0];
-  let sprites, buffer, b;
+  let sprites, buffer, b, poisonCopy;
 
   function init() {
     sprites = buildSprites();
     buffer = makeCanvas(VIEW_W, BUFFER_H);
     b = buffer.getContext("2d");
     b.imageSmoothingEnabled = false; // keep rotated sprites (the hand) pixel-sharp
+    poisonCopy = makeCanvas(VIEW_W, VIEW_H);
   }
 
   function resetCameras(x) {
@@ -37,6 +38,7 @@ const Renderer = (() => {
       b.clip();
       drawView(world, p, world.players[1 - i], camX);
       b.restore();
+      if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time);
     }
     const height = world.players.length === 1 ? VIEW_H : BUFFER_H; // 1 player: just the one view
     if (world.players.length > 1) {
@@ -68,7 +70,9 @@ const Renderer = (() => {
     drawBackBushes(world.level, camX);
     for (const d of world.decoys) drawEyes(d.kind, d.ex, d.ey, camX, decoyOpacity(d), d.t > d.blink && d.t < d.blink + 0.12 ? "shut" : "open");
     for (const j of world.jaguars) drawJaguarBack(j, world.level, camX, world.time); // eyes in a bush, leaping out
+    drawTurrets(world.level, camX, world.time); // (before the ground, so it hides the part still underground)
     drawTiles(world.level, camX);
+    drawTurretDust(world.level, camX, world.time);
     drawSawTracks(world.level, camX);
     drawPalms(world.level, player, camX);
     drawSigns(world.level, camX);
@@ -114,6 +118,8 @@ const Renderer = (() => {
     drawRiverFronts(world.level, camX, world.time); // ...and anyone in a river is up to their neck
     drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
+    for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
+    for (const a of world.arrows) drawArrow(a, camX);
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
@@ -690,6 +696,111 @@ const Renderer = (() => {
       b.fillRect(x, y, 1, 1);
     }
     b.globalAlpha = 1;
+  }
+
+  // ---- The jungle's ancient turrets ----
+
+  // The idol, as far out of the ground as it has risen (the ground, drawn after, hides the rest).
+  // Just before it shoots, its eyes glow and the arrow's tip shows in its mouth.
+  function drawTurrets(level, camX, time) {
+    for (const tu of level.turrets) {
+      if (tu.h <= 0) continue;
+      const sx = Math.round(tu.x - camX);
+      if (sx < -30 || sx > VIEW_W + 30) continue;
+      const ready = tu.state === "aim" && !tu.moving && tu.t >= TURRET.rise;
+      const side = tu.dir < 0 ? 0 : 1;
+      const shake = tu.moving ? (Math.floor(time * 30) % 2 ? 1 : -1) : 0;
+      const left = sx - IDOL_W / 2 + shake, top = Math.round(tu.gy - tu.h);
+      b.drawImage(sprites.idols[ready ? tu.kind : "none"][side], left, top);
+      if (!ready) continue;
+      const my = top + IDOL_MOUTH, tip = sprites.arrows[tu.kind][side];
+      b.save();
+      b.beginPath();
+      if (tu.dir < 0) b.rect(left - 2, my, 7, 3);
+      else b.rect(left + IDOL_W - 5, my, 7, 3);
+      b.clip();
+      b.drawImage(tip, tu.dir < 0 ? left - 1 : left + IDOL_W + 1 - tip.width, my);
+      b.restore();
+      const a = ARROW_KINDS[tu.kind];
+      b.globalAlpha = 0.3 + 0.2 * Math.sin(time * 20);
+      b.fillStyle = a.T || a.B;
+      b.fillRect(tu.dir < 0 ? left - 3 : left + IDOL_W - 1, my - 1, 4, 5);
+      b.globalAlpha = 1;
+    }
+  }
+
+  // Dirt and pebbles hopping about while it rumbles, and while it grinds up or down
+  function drawTurretDust(level, camX, time) {
+    for (const tu of level.turrets) {
+      if (tu.state !== "rumble" && !tu.moving) continue;
+      const sx = Math.round(tu.x - camX);
+      if (sx < -30 || sx > VIEW_W + 30) continue;
+      for (let k = 0; k < 9; k++) {
+        const x = sx + Math.round((hash(k, tu.id) - 0.5) * 24);
+        const y = tu.gy - 1 - Math.round(Math.abs(Math.sin(time * 18 + k * 1.7)) * (2 + hash(k, tu.id + 1) * 3));
+        b.fillStyle = k % 3 ? "#7a5a3a" : "#c8b090";
+        b.fillRect(x, y, k % 4 ? 1 : 2, k % 4 ? 1 : 2);
+      }
+    }
+  }
+
+  function drawArrow(a, camX) {
+    const img = sprites.arrows[a.kind][a.dir < 0 ? 0 : 1];
+    const x = Math.round(a.x - camX);
+    if (x < -20 || x > VIEW_W + 20) return;
+    b.drawImage(img, a.dir < 0 ? x : x - img.width + 1, Math.round(a.y));
+  }
+
+  // Asleep: little Zs drifting up from your head
+  function drawSleep(p, camX, time, ghost) {
+    const Z = ["wwww", "..w.", ".w..", "wwww"];
+    for (let k = 0; k < 3; k++) {
+      const u = (time * 0.7 + k / 3) % 1;
+      const x = Math.round(p.x + 5 + u * 8 - camX), y = Math.round(p.y - 4 - u * 14);
+      b.globalAlpha = (ghost ? 0.35 : 1) * Math.min(1, (1 - u) * 3);
+      Z.forEach((row, j) => [...row].forEach((ch, i) => {
+        if (ch !== "w") return;
+        b.fillStyle = "#1a2a40";
+        b.fillRect(x + i + 1, y + j + 1, 1, 1);
+        b.fillStyle = "#ffffff";
+        b.fillRect(x + i, y + j, 1, 1);
+      }));
+    }
+    b.globalAlpha = 1;
+  }
+
+  // Poisoned: your half of the screen goes green and wobbly, then swims, doubles up and changes
+  // color, worse and worse... then clears in the last second
+  function drawPoison(y0, left, time) {
+    const s = Math.min(1, (TURRET.poison - left) / (TURRET.poison - 1)) * Math.min(1, left);
+    if (s <= 0) return;
+    const pg = poisonCopy.getContext("2d");
+    pg.clearRect(0, 0, VIEW_W, VIEW_H);
+    pg.drawImage(buffer, 0, y0, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+    b.save();
+    b.beginPath();
+    b.rect(0, y0, VIEW_W, VIEW_H);
+    b.clip();
+    const amp = 0.5 + s * 3.5; // each row slides a little sideways: the world swims
+    for (let y = 0; y < VIEW_H; y++) b.drawImage(poisonCopy, 0, y, VIEW_W, 1, Math.round(Math.sin(y * 0.22 + time * 5) * amp), y0 + y, VIEW_W, 1);
+    if (s > 0.35) { // double vision
+      b.globalAlpha = (s - 0.35) * 0.7;
+      b.drawImage(poisonCopy, Math.round(Math.sin(time * 1.7) * 6 * s), y0 + Math.round(Math.cos(time * 1.3) * 2 * s));
+    }
+    b.globalAlpha = 0.15 + s * 0.4; // green at first, then all the wrong colors
+    b.globalCompositeOperation = "color";
+    b.fillStyle = `hsl(${Math.round(110 + s * 200 + Math.sin(time * 0.9) * 40 * s)}, 85%, 50%)`;
+    b.fillRect(0, y0, VIEW_W, VIEW_H);
+    b.globalCompositeOperation = "source-over";
+    if (s > 0.6) { // and dark round the edges
+      const gr = b.createRadialGradient(VIEW_W / 2, y0 + VIEW_H / 2, 40, VIEW_W / 2, y0 + VIEW_H / 2, VIEW_W * 0.6);
+      gr.addColorStop(0, "rgba(20, 0, 30, 0)");
+      gr.addColorStop(1, `rgba(20, 0, 30, ${((s - 0.6) * 1.6).toFixed(2)})`);
+      b.globalAlpha = 1;
+      b.fillStyle = gr;
+      b.fillRect(0, y0, VIEW_W, VIEW_H);
+    }
+    b.restore();
   }
 
   // Jungle rivers: the water, rippling left with the current, and the logs on it

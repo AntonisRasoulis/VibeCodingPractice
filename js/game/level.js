@@ -100,6 +100,7 @@ class Level {
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
+    this.turrets = [];    // jungle: ancient turrets buried in the ground { id, x (middle), gy, dir (-1 shoots left, 1 right), wait, state, t, h (how far up) }
     this.palms = [];      // jungle: palm trees { id, x (trunk's foot), gy, h, kind, cx, cy (its crown), nuts: [[dx, dy]] (from the crown), drop: [dx, dy] (the one that falls) or null }
     this.lastPalm = 0;
     this.rivers = [];     // jungle: { id, x0, x1 (pixels), gy (the banks' top), wy (the water's surface) }; its logs are platforms
@@ -279,6 +280,7 @@ class Level {
     if (!ignoreTraps && this.flytraps.some((f) => Math.abs(f.x - (x + HITBOX_W / 2)) < this.flytrapReach(f) + HITBOX_W / 2 + 2)) return true;
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
+    if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
 
@@ -330,6 +332,18 @@ class Level {
       out.push({ x, y: g + 1, v: Math.floor(hash(k, 313) * 4) });
     }
     return out;
+  }
+
+  // ---- Ancient turrets ----
+
+  // The stretch of ground a turret's arrows fly along while you're on it: in front of one that
+  // shoots back at you, or after one that rises up behind you
+  inTurretZone(t, x) {
+    return t.dir < 0 ? x > t.x - 22 * TILE && x < t.x + 2 * TILE : x > t.x - 2 * TILE && x < t.x + 30 * TILE;
+  }
+
+  addTurret(c, dir) {
+    this.turrets.push({ id: this.nextId++, x: c * TILE + TILE / 2, gy: this.groundRow * TILE, dir, wait: this.rand(TURRET.behind[0], TURRET.behind[1]), state: "hidden", t: 0, h: 0 });
   }
 
   // ---- Flytraps ----
@@ -526,7 +540,7 @@ class Level {
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
-    if (this.biome === "jungle" && this.col > 60) weights.flytrap = 7;
+    if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -1139,6 +1153,16 @@ const SECTIONS = {
     this.flat(11, false);
     this.pending.push({ kind: "flytrap", c: this.col });
     this.flat(11, false);
+  },
+
+  // Jungle: an ancient turret buried in open ground, with room to dodge its arrows where they fly:
+  // in front of one that rises up ahead of you, after one that rises up behind you
+  turret() {
+    this.iceBias = false;
+    const dir = this.rng() < 0.5 ? -1 : 1;
+    this.flat(dir < 0 ? 22 : 3, false);
+    this.addTurret(this.col, dir);
+    this.flat(dir < 0 ? 3 : 30, false);
   },
 
   // Jungle: a river too wide to jump. Hop across on the drifting logs, or the current carries you back.

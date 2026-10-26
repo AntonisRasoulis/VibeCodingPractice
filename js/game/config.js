@@ -136,6 +136,9 @@ const WILD = {
   flytrapWindup: 0.28,  // flytraps snap quicker (normal 0.35)...$
   flytrapChewNothing: 0.9, // ...and get over a miss quicker (normal 1.2)
   jaguarGap: 0.6,       // jungle: the next jaguar comes this soon after the last one gives up
+  turretShots: 3,       // jungle: turrets fire 3 arrows before they sink back (normal 1-2)...
+  turretAim: 0.3,       // ...with less warning (normal 0.45)...
+  turretReload: 0.45,   // ...and less time between them (normal 0.7)
 };
 
 // The jungle's spikes come in two kinds: thin bamboo stakes, very tall (a jump lifts your feet
@@ -190,6 +193,30 @@ const FLYTRAP = {
   open: 0.35,         // seconds it takes to open up again
   spit: [120, 170],   // the small one spits you back this fast (sideways, up): about 5 tiles
   spitStun: 0.8,      // ...and you're dazed this long
+};
+
+// The jungle's ancient turret: a stone idol head buried under the course, with no sign of it at all.
+// Come close and the ground rumbles, it rises and shoots arrows along the ground: low ones at your
+// feet, or regular ones at body height (it rises a little higher for those). A jump clears either.
+// Some rise up ahead of you and shoot back at you; some wait until you've run over them and rise up
+// behind you. Just before each shot, the arrow's tip (and the idol's eyes) glow its color. Before
+// 400 m it only shoots plain arrows. It's shared: its arrows hit anyone in the way.
+const TURRET = {
+  sense: 175,          // one ahead of you rumbles when someone coming towards it is this close (pixels)
+  behind: [16, 40],    // one behind you rumbles once someone has run this far past it
+  rumble: 0.45,        // seconds the ground rumbles before it rises
+  rise: 0.35,          // seconds it takes to come all the way up
+  aim: 0.45,           // seconds the tip glows in its mouth before each shot (Wild: WILD.turretAim)
+  reload: 0.7,         // seconds between shots (Wild: WILD.turretReload)
+  shots: [1, 2],       // shots before it sinks back into the ground for good (Wild: WILD.turretShots)
+  sink: 0.5,           // seconds it takes to sink back
+  speed: 210,          // how fast its arrows fly (normal running is 96)
+  range: 300,          // how far an arrow flies before it drops
+  heights: { low: 16, regular: 20 }, // how far it rises for each kind of shot (its mouth is 13-15 pixels below its top)
+  kinds: { arrow: 1, poison: 1, sleep: 1, blunt: 1 }, // after 400 m: how likely each arrow is
+  poison: 6,           // seconds a poison dart messes with your screen (worse and worse, then it clears)
+  sleep: 3,            // seconds a sleep dart sends you to sleep on the spot
+  bluntDizzy: 0.8,     // a blunt arrow knocks you back as far as the hand's backhand, and you're dizzy this long
 };
 
 // The jungle's special danger: once or twice per jungle biome a jaguar (or, from 500 m, a black

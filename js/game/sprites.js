@@ -1002,6 +1002,77 @@ function makeJungleLayers() {
   return { far, mid, near };
 }
 
+// ---- The ancient turret (jungle) ----
+// A carved stone idol head, facing left (its mouth, where the arrows come out, is on the left).
+// Letters: o outline, S light stone, s stone, d / D dark stone, m / M moss, k inside its mouth,
+// W teeth, e / E its eyes (dark, or glowing the color of the arrow it's about to shoot)
+const IDOL_ROWS = [
+  "...ooooooooooo..",
+  "..oMMmmMMmmSSSo.",
+  ".oSSMmSSSSSSSdso",
+  ".oSSSSSSSSSSSSdo",
+  "oddddddddSSdSSdo",
+  "oDDeeEDDdSSSdSdo",
+  ".oDeeeDdSSdSSSdo",
+  "..odddddSSdSSsdo",
+  "..oSSSSSSSSdSsdo",
+  ".oSSsSSSSSdSSsdo",
+  "osSSssSSSSSdSsdo",
+  "oddddsSSSSdSSsdo",
+  "oSSSSSSSSSSdSsdo",
+  "oWkWkWkoSSSdSsdo",
+  "okkkkkkoSSdSSsdo",
+  "oWkWkWkoSSdSSsdo",
+  ".oSSSSSSSdSSsddo",
+  ".osssssssssssddo",
+  ".omdssmsssmssddo",
+  ".oDDDDDDDDDDDDDo",
+];
+const IDOL_H = IDOL_ROWS.length, IDOL_W = IDOL_ROWS[0].length, IDOL_MOUTH = 13; // its mouth: rows 13-15
+
+// Its arrows (flying left): a colored tip (T, t darker), a wooden shaft and fletching. The blunt one
+// has a round knob (B, b) instead of a point.
+const ARROW_ROWS = {
+  pointed: [".t..........f.f", "tTsssssssssssff", ".t..........f.f"],
+  blunt: [".bb.........f.f", "bBBssssssssssff", ".bb.........f.f"],
+};
+const ARROW_KINDS = {
+  arrow: { rows: "pointed", T: "#ff3b3b", t: "#8a1010", f: "#e8e0c8" },  // obsidian, glowing red: deadly
+  poison: { rows: "pointed", T: "#7dff4a", t: "#2f8a1a", f: "#b8f090" },
+  sleep: { rows: "pointed", T: "#6ac8ff", t: "#1f5aa6", f: "#cfe8ff" },
+  blunt: { rows: "blunt", B: "#ffd23f", b: "#b07a10", f: "#e8e0c8" },
+};
+
+function flipped(img) {
+  const c = makeCanvas(img.width, img.height);
+  const g = c.getContext("2d");
+  g.translate(img.width, 0);
+  g.scale(-1, 1);
+  g.drawImage(img, 0, 0);
+  return c;
+}
+
+// The idol, asleep (eyes dark) or glowing the color of each arrow: { none: [left, right], arrow: ... }
+function makeIdols() {
+  const out = {};
+  for (const kind of ["none", ...Object.keys(ARROW_KINDS)]) {
+    const a = ARROW_KINDS[kind];
+    const glow = a ? [a.T || a.B, a.t || a.b] : ["#3a3830", "#2a2820"];
+    const img = spriteFromRows(IDOL_ROWS, { o: "#2b2a22", S: "#a9a585", s: "#8b876a", d: "#6b6852", D: "#4d4a3a", m: "#3f7a34", M: "#63a84a", k: "#15140f", W: "#d8d4b4", E: glow[0], e: glow[1] });
+    out[kind] = [img, flipped(img)];
+  }
+  return out;
+}
+
+function makeArrows() {
+  const out = {};
+  for (const [kind, a] of Object.entries(ARROW_KINDS)) {
+    const img = spriteFromRows(ARROW_ROWS[a.rows], { T: a.T, t: a.t, B: a.B, b: a.b, s: "#8a5a2b", f: a.f });
+    out[kind] = [img, flipped(img)];
+  }
+  return out;
+}
+
 // ---- Vultures (desert) ----
 // Facing right. Letters: o outline, b body, d dark feathers, w wing tips, r head, y beak, n neck ruff
 const VULTURE_FRAMES = {
@@ -1180,6 +1251,8 @@ function buildSprites() {
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
+    idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow
+    arrows: makeArrows(), // its arrows: [flying left, flying right]
     cats: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, Object.fromEntries(["run1", "run2", "crouchLowHalf", "crouchLow", "crouchLowB", "crouchHighHalf", "crouchHigh", "crouchHighB", "push", "leap", "land", "turn"].map((pose) => [pose, makeCat(kind, pose)]))])),
     catEyes: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, { open: makeCatEyes(kind, false), narrow: makeCatEyes(kind, true) }])),
     backBushes: [0, 1, 2, 3].map(makeBackBush),
