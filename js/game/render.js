@@ -76,7 +76,7 @@ const Renderer = (() => {
     drawSnowballs(player, camX);
     drawTumbleweeds(player, camX);
     for (const bear of world.bears) drawBear(bear, camX, world.time);
-    for (const j of world.jaguars) drawJaguar(j, camX);
+    for (const j of world.jaguars) drawJaguar(j, camX, world.time);
     for (const v of world.vultures) drawVultureShadow(v, world.level, camX);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
@@ -572,7 +572,7 @@ const Renderer = (() => {
     const w = 6 + Math.round(u * 18);
     b.fillRect(tx - Math.floor(w / 2), Math.round(j.toY) - 1, w, 2);
     if (u >= 0.6) return; // (in front of the course from here: drawJaguar)
-    const img = sprites.cats[j.kind].leap, s = j.scale;
+    const img = sprites.cats[j.kind][j.t < 0.12 ? "push" : "leap"], s = j.scale; // (pushing off out of the bush)
     b.save();
     b.globalAlpha = 0.6 + u * 0.6;
     b.translate(Math.round(j.x - camX), Math.round(j.y));
@@ -582,15 +582,26 @@ const Renderer = (() => {
   }
 
   // A jaguar on the course: running, crouched to attack, leaping, slinking off
-  function drawJaguar(j, camX) {
+  function drawJaguar(j, camX, time) {
     if (j.state === "eyes" || (j.state === "leap" && j.t / JAGUAR[j.kind].leap < 0.6)) return;
     const sx = Math.round(j.x - camX);
     if (sx < -40 || sx > VIEW_W + 40) return;
-    const frames = sprites.cats[j.kind];
-    const img = j.state === "crouch" ? (j.high ? frames.crouchHigh : frames.crouchLow)
-      : j.state === "attack" || j.state === "leap" ? frames.leap
-      : j.state === "wait" ? frames.run1
-      : Math.floor(j.anim * 9) % 2 ? frames.run2 : frames.run1;
+    const frames = sprites.cats[j.kind], k = JAGUAR[j.kind];
+    // turning round: a moment with its head swung to face you
+    if (j.shownDir !== undefined && j.shownDir !== j.dir && (j.state === "run" || j.state === "wait" || j.state === "leave")) j.turnUntil = time + 0.15;
+    j.shownDir = j.dir;
+    let img;
+    if (j.state === "crouch") {
+      // sinking down (or rearing up) into it, then waiting with its tail twitching
+      const kind = j.high ? "crouchHigh" : "crouchLow";
+      img = frames[j.t < 0.1 ? kind + "Half" : Math.floor(j.t / 0.12) % 2 ? kind + "B" : kind];
+    } else if (j.state === "attack") {
+      const u = j.t / j.dur; // pushing off, flying, landing
+      img = u < 0.15 ? frames.push : u > 0.8 ? frames.land : frames.leap;
+    } else if (j.state === "leap") {
+      img = j.lunging && (j.t - k.leap) / k.lunge > 0.7 ? frames.land : frames.leap;
+    } else if (j.turnUntil > time) img = frames.turn;
+    else img = j.state === "wait" ? frames.run1 : Math.floor(j.anim * 9) % 2 ? frames.run2 : frames.run1;
     const shake = j.state === "crouch" ? (Math.floor(j.t * 30) % 2) : 0;
     b.save();
     b.translate(sx + shake, Math.round(j.y));

@@ -1147,7 +1147,7 @@ function buildSprites() {
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
-    cats: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, Object.fromEntries(["run1", "run2", "crouchLow", "crouchHigh", "leap"].map((pose) => [pose, makeCat(kind, pose)]))])),
+    cats: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, Object.fromEntries(["run1", "run2", "crouchLowHalf", "crouchLow", "crouchLowB", "crouchHighHalf", "crouchHigh", "crouchHighB", "push", "leap", "land", "turn"].map((pose) => [pose, makeCat(kind, pose)]))])),
     catEyes: Object.fromEntries(Object.keys(CAT_PALETTES).map((kind) => [kind, { open: makeCatEyes(kind, false), narrow: makeCatEyes(kind, true) }])),
     backBushes: [0, 1, 2, 3].map(makeBackBush),
     palms: PALMS.map((_, kind) => Object.fromEntries([48, 54, 60].map((h) => [h, makePalm(h, kind)]))), // palms[kind][height]
