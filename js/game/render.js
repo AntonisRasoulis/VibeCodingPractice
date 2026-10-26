@@ -707,7 +707,7 @@ const Renderer = (() => {
       if (tu.h <= 0) continue;
       const sx = Math.round(tu.x - camX);
       if (sx < -30 || sx > VIEW_W + 30) continue;
-      const ready = tu.state === "aim" && !tu.moving && tu.t >= TURRET.rise;
+      const ready = tu.state === "aim" && !tu.moving && tu.t >= TURRET.rise[tu.low ? "low" : "regular"];
       const side = tu.dir < 0 ? 0 : 1;
       const shake = tu.moving ? (Math.floor(time * 30) % 2 ? 1 : -1) : 0;
       const left = sx - IDOL_W / 2 + shake, top = Math.round(tu.gy - tu.h);
@@ -744,11 +744,18 @@ const Renderer = (() => {
     }
   }
 
+  // Tilted the way it's flying (nose dipping as it drops); stuck in the ground, it fades away
   function drawArrow(a, camX) {
     const img = sprites.arrows[a.kind][a.dir < 0 ? 0 : 1];
-    const x = Math.round(a.x - camX);
+    const x = a.x - camX;
     if (x < -20 || x > VIEW_W + 20) return;
-    b.drawImage(img, a.dir < 0 ? x : x - img.width + 1, Math.round(a.y));
+    if (a.stuck) b.globalAlpha = Math.min(1, (TURRET.stuck - a.t) / 0.4);
+    b.save();
+    b.translate(Math.round(x), Math.round(a.y) + 1); // turn round its tip
+    b.rotate((a.stuck ? 0.45 : Math.atan2(a.vy, Math.abs(a.vx))) * a.dir); // (stuck: nose dug into the ground)
+    b.drawImage(img, a.dir < 0 ? 0 : -img.width + 1, -1);
+    b.restore();
+    b.globalAlpha = 1;
   }
 
   // Asleep: little Zs drifting up from your head

@@ -137,7 +137,7 @@ const WILD = {
   flytrapChewNothing: 0.9, // ...and get over a miss quicker (normal 1.2)
   jaguarGap: 0.6,       // jungle: the next jaguar comes this soon after the last one gives up
   turretShots: 3,       // jungle: turrets fire 3 arrows before they sink back (normal 1-2)...
-  turretAim: 0.3,       // ...with less warning (normal 0.45)...
+  turretAim: { regular: 0.3, low: 0.14 }, // ...with less warning (normal 0.45 and 0.2)...
   turretReload: 0.45,   // ...and less time between them (normal 0.7)
 };
 
@@ -202,16 +202,19 @@ const FLYTRAP = {
 // behind you. Just before each shot, the arrow's tip (and the idol's eyes) glow its color. Before
 // 400 m it only shoots plain arrows. It's shared: its arrows hit anyone in the way.
 const TURRET = {
-  sense: 175,          // one ahead of you rumbles when someone coming towards it is this close (pixels)
+  sense: 260,          // one ahead of you rumbles when someone coming towards it is this close (pixels)
   behind: [16, 40],    // one behind you rumbles once someone has run this far past it
   rumble: 0.45,        // seconds the ground rumbles before it rises
-  rise: 0.35,          // seconds it takes to come all the way up
-  aim: 0.45,           // seconds the tip glows in its mouth before each shot (Wild: WILD.turretAim)
+  // A low shot comes out quicker, with less warning, and flies faster than a regular one:
+  rise: { regular: 0.35, low: 0.2 },   // seconds it takes to come up
+  aim: { regular: 0.45, low: 0.2 },    // seconds the tip glows in its mouth before each shot (Wild: WILD.turretAim)
+  speed: { regular: 420, low: 520 },   // how fast its arrows fly (normal running is 96)
+  drop: 28,            // gravity on its arrows: a regular one lands about 270 pixels away, a low one about 200
+  stuck: 1.5,          // seconds an arrow stays stuck in the ground before it fades away
   reload: 0.7,         // seconds between shots (Wild: WILD.turretReload)
+  closest: 60,         // it only fires again at someone who'll still be this far (pixels) from its mouth when it shoots
   shots: [1, 2],       // shots before it sinks back into the ground for good (Wild: WILD.turretShots)
   sink: 0.5,           // seconds it takes to sink back
-  speed: 210,          // how fast its arrows fly (normal running is 96)
-  range: 300,          // how far an arrow flies before it drops
   heights: { low: 16, regular: 20 }, // how far it rises for each kind of shot (its mouth is 13-15 pixels below its top)
   kinds: { arrow: 1, poison: 1, sleep: 1, blunt: 1 }, // after 400 m: how likely each arrow is
   poison: 6,           // seconds a poison dart messes with your screen (worse and worse, then it clears)

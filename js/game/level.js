@@ -339,7 +339,7 @@ class Level {
   // The stretch of ground a turret's arrows fly along while you're on it: in front of one that
   // shoots back at you, or after one that rises up behind you
   inTurretZone(t, x) {
-    return t.dir < 0 ? x > t.x - 22 * TILE && x < t.x + 2 * TILE : x > t.x - 2 * TILE && x < t.x + 30 * TILE;
+    return t.dir < 0 ? x > t.x - 26 * TILE && x < t.x + 2 * TILE : x > t.x - 2 * TILE && x < t.x + 30 * TILE;
   }
 
   addTurret(c, dir) {
@@ -1160,7 +1160,7 @@ const SECTIONS = {
   turret() {
     this.iceBias = false;
     const dir = this.rng() < 0.5 ? -1 : 1;
-    this.flat(dir < 0 ? 22 : 3, false);
+    this.flat(dir < 0 ? 26 : 3, false);
     this.addTurret(this.col, dir);
     this.flat(dir < 0 ? 3 : 30, false);
   },

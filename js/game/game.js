@@ -1022,9 +1022,10 @@ const Game = (() => {
     for (const tu of level.turrets) {
       if (tu.state === "done" || !players.some((p) => Math.abs(p.x - tu.x) < VIEW_W * 1.5)) continue;
       tu.t += dt;
-      const want = tu.state === "sink" ? 0 : tu.state === "hidden" || tu.state === "rumble" ? 0 : TURRET.heights[tu.low ? "low" : "regular"];
+      const shot = tu.low ? "low" : "regular";
+      const want = tu.state === "sink" || tu.state === "hidden" || tu.state === "rumble" ? 0 : TURRET.heights[shot];
       tu.moving = tu.h !== want; // (it shakes while it grinds up or down)
-      tu.h = approach(tu.h, want, (TURRET.heights.regular / (tu.state === "sink" ? TURRET.sink : TURRET.rise)) * dt);
+      tu.h = approach(tu.h, want, (TURRET.heights.regular / (tu.state === "sink" ? TURRET.sink : TURRET.rise[shot])) * dt);
       if (tu.state === "hidden") {
         const near = (p) => free(p) && Math.abs(p.y + HITBOX_H - tu.gy) < 40 &&
           (tu.dir < 0 ? tu.x - p.x > 0 && tu.x - p.x < TURRET.sense : p.x - tu.x > tu.wait && p.x - tu.x < tu.wait + 60);
@@ -1039,8 +1040,8 @@ const Game = (() => {
         if (tu.t >= TURRET.rumble) { tu.state = "aim"; tu.t = 0; Sound.play("turretRise"); }
       } else if (tu.state === "aim") {
         // (the glow only starts once it's up)
-        if (tu.h === want && tu.t >= TURRET.rise + (level.wild ? WILD.turretAim : TURRET.aim)) {
-          world.arrows.push({ x: tu.x + tu.dir * 8, y: tu.gy - tu.h + 13, dir: tu.dir, kind: tu.kind, traveled: 0 });
+        if (tu.h === want && tu.t >= TURRET.rise[shot] + (level.wild ? WILD.turretAim : TURRET.aim)[shot]) {
+          world.arrows.push({ x: tu.x + tu.dir * 8, y: tu.gy - tu.h + 13, dir: tu.dir, kind: tu.kind, vx: tu.dir * TURRET.speed[shot], vy: 0, t: 0 });
           Sound.play("arrowShoot");
           tu.shotsLeft--;
           tu.state = tu.shotsLeft > 0 ? "reload" : "sink";
@@ -1048,21 +1049,37 @@ const Game = (() => {
           if (tu.state === "sink") Sound.play("turretRise");
         }
       } else if (tu.state === "reload") {
-        if (tu.t >= (level.wild ? WILD.turretReload : TURRET.reload)) { load(tu); tu.state = "aim"; tu.t = TURRET.rise; }
+        if (tu.t >= (level.wild ? WILD.turretReload : TURRET.reload)) {
+          load(tu);
+          // another shot, but only at someone still a fair way out in front of it (never point-blank)
+          const next = tu.low ? "low" : "regular";
+          const room = TURRET.closest + PHYSICS.runSpeed * (level.wild ? WILD.turretAim : TURRET.aim)[next];
+          const mouth = tu.x + tu.dir * 8;
+          if (players.some((p) => free(p) && (tu.dir < 0 ? mouth - (p.x + HITBOX_W) : p.x - mouth) > room)) { tu.state = "aim"; tu.t = TURRET.rise[next]; }
+          else { tu.state = "sink"; tu.t = 0; Sound.play("turretRise"); }
+        }
       } else if (tu.state === "sink" && tu.h === 0) {
         tu.state = "done";
       }
     }
   }
 
-  // Arrows fly straight along the ground until they hit someone, a wall, or run out of range
+  // Arrows fly fast along the ground, dropping a little as they go, until they hit someone or a
+  // wall, or stick in the ground (where they stay a moment, harmless, then fade)
   function updateArrows(dt) {
     const { level, players } = world;
     for (const a of world.arrows) {
-      const move = TURRET.speed * dt;
-      a.x += a.dir * move;
-      a.traveled += move;
-      if (a.traveled > TURRET.range || level.isSolid(Math.floor(a.x / TILE), Math.floor((a.y + 1) / TILE))) { a.done = true; continue; }
+      a.t += dt;
+      if (a.stuck) { if (a.t >= TURRET.stuck) a.done = true; continue; }
+      a.vy += TURRET.drop * dt;
+      a.x += a.vx * dt;
+      a.y += a.vy * dt;
+      if (a.y > VIEW_H || level.isSolid(Math.floor(a.x / TILE), Math.floor((a.y + 1) / TILE))) {
+        const g = level.groundTop(a.x);
+        if (g !== null && a.y + 1 >= g - 1 && a.y < g + 2) { a.stuck = true; a.y = g; a.t = 0; } // its tip digs into the ground
+        else a.done = true; // (a wall, or down a pit)
+        continue;
+      }
       const bx = a.dir < 0 ? a.x : a.x - 12; // its tip is at a.x
       const p = players.find((q) => !q.dead && !q.caught && !q.held && !q.eatenBy && !q.inRiver && overlaps(q.x, q.y, HITBOX_W, HITBOX_H, bx, a.y, 12, 3));
       if (!p) continue;
