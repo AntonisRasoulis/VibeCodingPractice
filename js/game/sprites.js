@@ -807,28 +807,54 @@ function makeCat(kind, pose) {
   const get = (x, y) => grid.get(x + "," + y);
   const ell = (cx, cy, rx, ry, col) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const dx = (x - cx) / rx, dy = (y - cy) / ry; if (dx * dx + dy * dy <= 1.05) set(x, y, col); } };
   const line = (x0, y0, x1, y1, t, col) => { const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2) + 1; for (let k = 0; k <= n; k++) { const u = k / n; for (let j = 0; j < t; j++) for (let i = 0; i < t; i++) set(x0 + (x1 - x0) * u + i - (t - 1) / 2, y0 + (y1 - y0) * u + j - (t - 1) / 2, col); } };
-  let bx = 20, by = 12, hx = 35, hy = 10, legs, tail, rear = 0, flat = 0, jaw = 1.5;
-  if (pose === "run1") { legs = [[13, 14, 8, base], [16, 14, 18, base - 1], [26, 14, 30, base - 1], [28, 14, 33, base]]; tail = [[10, 10], [5, 8], [2, 5], [1, 3]]; }
-  if (pose === "run2") { by = 13; hy = 11; legs = [[13, 15, 15, base], [16, 15, 12, base], [26, 15, 26, base], [28, 15, 24, base]]; tail = [[10, 11], [5, 11], [2, 10], [0, 8]]; }
-  if (pose === "crouchLow") { by = 15.5; hy = 15; hx = 36; flat = 1; jaw = 2.5; legs = [[13, 16, 9, base], [16, 16, 13, base], [26, 17, 30, base], [29, 17, 34, base]]; tail = [[10, 16], [5, 17], [2, 18], [0, 17]]; }
-  if (pose === "crouchHigh") { by = 13; hy = 14; rear = 1; legs = [[13, 12, 12, base], [16, 12, 15, base], [27, 15, 29, base], [29, 15, 32, base]]; tail = [[10, 8], [7, 4], [7, 1], [9, 0]]; }
-  if (pose === "leap") { by = 10; hx = 37; hy = 8; jaw = 3; legs = [[11, 11, 4, 14], [13, 12, 6, 16], [29, 11, 40, 15], [30, 12, 41, 12]]; tail = [[8, 10], [4, 12], [1, 15], [0, 18]]; }
-  let [tx, ty] = [bx - 9, by - 1];
+  // Each pose: where its body (bx, by) and head (hx, hy) are, its legs ([hip x, y, paw x, y]: back
+  // two, then front two) and tail, how far its rear is raised (rear), flat to the ground (flat), how
+  // wide its mouth is open (jaw), and its chest / haunches raised or lowered (tilting the body)
+  const POSES = {
+    run1: { legs: [[13, 14, 8, base], [16, 14, 18, base - 1], [26, 14, 30, base - 1], [28, 14, 33, base]], tail: [[10, 10], [5, 8], [2, 5], [1, 3]] },
+    run2: { by: 13, hy: 11, legs: [[13, 15, 15, base], [16, 15, 12, base], [26, 15, 26, base], [28, 15, 24, base]], tail: [[10, 11], [5, 11], [2, 10], [0, 8]] },
+    // sinking into a crouch (halfway), then crouched; B: the same with its tail twitching
+    crouchLowHalf: { by: 14, hy: 13, hx: 35.5, flat: 0.5, jaw: 2, legs: [[13, 15, 9, base], [16, 15, 14, base], [26, 16, 29, base], [29, 16, 33, base]], tail: [[10, 13], [5, 14], [2, 14], [0, 12]] },
+    crouchLow: { by: 15.5, hy: 15, hx: 36, flat: 1, jaw: 2.5, legs: [[13, 16, 9, base], [16, 16, 13, base], [26, 17, 30, base], [29, 17, 34, base]], tail: [[10, 16], [5, 17], [2, 18], [0, 17]] },
+    crouchLowB: { by: 15.5, hy: 15, hx: 36, flat: 1, jaw: 2.5, legs: [[13, 16, 9, base], [16, 16, 13, base], [26, 17, 30, base], [29, 17, 34, base]], tail: [[10, 16], [5, 17], [2, 16], [1, 14]] },
+    crouchHighHalf: { by: 12.5, hy: 12.5, rear: 0.5, legs: [[13, 13, 11, base], [16, 13, 15, base], [27, 15, 29, base], [29, 15, 32, base]], tail: [[10, 9], [6, 6], [5, 3], [6, 1]] },
+    crouchHigh: { by: 13, hy: 14, rear: 1, legs: [[13, 12, 12, base], [16, 12, 15, base], [27, 15, 29, base], [29, 15, 32, base]], tail: [[10, 8], [7, 4], [7, 1], [9, 0]] },
+    crouchHighB: { by: 13, hy: 14, rear: 1, legs: [[13, 12, 12, base], [16, 12, 15, base], [27, 15, 29, base], [29, 15, 32, base]], tail: [[10, 8], [7, 4], [6, 1], [4, 0]] },
+    // a leap: pushing off (back legs driving, front reaching up), flying (stretched out), landing
+    // (front paws reaching for the ground, back legs tucked in)
+    push: { by: 12, hx: 37, hy: 6, jaw: 2, chest: -3, haunch: 2, legs: [[12, 14, 5, base], [14, 15, 8, base], [27, 11, 32, 15], [29, 11, 35, 13]], tail: [[9, 13], [5, 15], [2, 17], [0, 18]] },
+    leap: { by: 10, hx: 37, hy: 8, jaw: 3, legs: [[11, 11, 4, 14], [13, 12, 6, 16], [29, 11, 40, 15], [30, 12, 41, 12]], tail: [[8, 10], [4, 12], [1, 15], [0, 18]] },
+    land: { by: 12, hx: 36, hy: 14, jaw: 2, chest: 2, haunch: -3, legs: [[12, 10, 9, 15], [14, 11, 13, 16], [27, 15, 32, base], [29, 15, 35, base]], tail: [[9, 8], [5, 5], [2, 4], [0, 6]] },
+    // turning round: head swung to face you, body bunched up
+    turn: { bx: 22, hx: 25, hy: 9, front: 1, legs: [[15, 14, 14, base], [18, 14, 18, base], [25, 14, 25, base], [28, 14, 29, base]], tail: [[13, 10], [9, 7], [8, 4], [10, 2]] },
+  };
+  const P = { bx: 20, by: 12, hx: 35, hy: 10, rear: 0, flat: 0, jaw: 1.5, chest: 0, haunch: 0, front: 0, ...POSES[pose] };
+  const { bx, by, hx, hy, legs, tail, rear, flat, jaw, chest, haunch } = P;
+  let [tx, ty] = [bx - 9, by - 1 + haunch];
   for (const [x, y] of tail) { line(tx, ty, x, y, 2, C.body); [tx, ty] = [x, y]; }
   set(tx, ty, C.spot);
   set(tx + 1, ty, C.spot);
   for (const [x0, y0, x1, y1] of legs) { line(x0, y0, x1, y1, 3, C.body); for (let j = 0; j < 2; j++) for (let i = -1; i <= 1; i++) set(x1 + i, y1 - 1 + j, C.body); }
-  ell(bx, by, 11, flat ? 3.6 : 4.6, C.body);
-  ell(bx - 7, by - (rear ? 3 : 0.5), 5, rear ? 5 : 4.5, C.body);
-  ell(bx + 7, by - 0.5, 5.5, flat ? 4 : 5.2, C.body);
-  ell(bx + 1, by + (flat ? 2.5 : 3.5), 8, 1.2, C.belly);
-  ell(hx, hy, 5.2, 4.4, C.body);
-  set(hx - 4, hy - 4, C.body);
-  set(hx - 5, hy - 4, C.body);
-  set(hx - 3, hy - 4.6, C.body);
-  ell(hx + 4.5, hy + 0.5, 2.6, 2, C.belly);
-  for (let j = 0; j < Math.ceil(jaw); j++) for (let i = 0; i < 6; i++) set(hx + 2 + i, hy + 2 + j, C.mouth);
-  ell(hx + 4, hy + 2.5 + jaw, 3, 1.1, C.body);
+  const long = P.front ? 8 : 11;
+  ell(bx, by + (chest + haunch) / 2, long, 4.6 - flat, C.body);
+  ell(bx - 7, by - 0.5 - 2.5 * rear + haunch, 5, 4.5 + 0.5 * rear, C.body);
+  ell(bx + (P.front ? 4 : 7), by - 0.5 + chest, 5.5, 5.2 - 1.2 * flat, C.body);
+  ell(bx + 1, by + 3.5 - flat + (chest + haunch) / 2, long - 3, 1.2, C.belly);
+  if (P.front) {
+    // the head from the front: ears both sides, muzzle in the middle
+    ell(hx, hy, 5, 4.6, C.body);
+    for (const sx of [-1, 1]) { set(hx + sx * 3, hy - 4.6, C.body); set(hx + sx * 4, hy - 4.6, C.body); set(hx + sx * 4, hy - 5.4, C.body); }
+    ell(hx, hy + 2, 2.6, 1.8, C.belly);
+    for (let i = -1; i <= 1; i++) set(hx + i, hy + 3.5, C.mouth);
+  } else {
+    ell(hx, hy, 5.2, 4.4, C.body);
+    set(hx - 4, hy - 4, C.body);
+    set(hx - 5, hy - 4, C.body);
+    set(hx - 3, hy - 4.6, C.body);
+    ell(hx + 4.5, hy + 0.5, 2.6, 2, C.belly);
+    for (let j = 0; j < Math.ceil(jaw); j++) for (let i = 0; i < 6; i++) set(hx + 2 + i, hy + 2 + j, C.mouth);
+    ell(hx + 4, hy + 2.5 + jaw, 3, 1.1, C.body);
+  }
   for (let k = 0; k < 26; k++) {
     const x = Math.round(bx - 15 + hash(k, 3) * 30), y = Math.round(by - 4 + hash(k, 4) * 7);
     if (get(x, y) === C.body && get(x + 1, y) === C.body && get(x, y + 1) === C.body) { set(x, y, C.spot); set(x + 1, y, C.spot); set(x, y + 1, C.spot); set(x + 1, y + 1, C.spot2); }
@@ -841,8 +867,16 @@ function makeCat(kind, pose) {
     if (v) px(g, v, x, y);
     else if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => get(x + dx, y + dy))) px(g, C.out, x, y);
   }
-  // an angry slanted eye with a slit pupil, the nose, fangs, and claws out when it attacks
   const X = Math.round(hx), Y = Math.round(hy);
+  if (P.front) {
+    // two angry eyes looking right at you, a nose, a snarl
+    for (const sx of [-1, 1]) { px(g, C.out, X + sx * 2 - (sx < 0 ? 1 : 0), Y - 2, 2, 1); px(g, C.eye, X + sx * 2 - (sx < 0 ? 1 : 0), Y - 1, 2, 1); px(g, "#000000", X + sx * 2, Y - 1); }
+    px(g, C.out, X, Y + 1);
+    px(g, "#ffffff", X - 1, Y + 3);
+    px(g, "#ffffff", X + 1, Y + 3);
+    return c;
+  }
+  // an angry slanted eye with a slit pupil, the nose, fangs, and claws out when it attacks
   for (const [x, y] of [[-1, -3], [0, -3], [1, -2], [2, -2], [3, -1]]) px(g, C.out, X + x, Y + y);
   px(g, C.eye, X, Y - 2);
   px(g, C.eye, X + 1, Y - 1, 2, 1);
@@ -852,7 +886,7 @@ function makeCat(kind, pose) {
   px(g, "#ffffff", X + 6, Y + 2, 1, 2);
   px(g, "#ffffff", X + 4, Y + 1 + Math.ceil(jaw));
   px(g, "#ffffff", X + 6, Y + 1 + Math.ceil(jaw));
-  if (pose === "leap" || pose === "crouchLow") for (const [, , x1, y1] of legs.slice(2)) { px(g, "#ffffff", x1 + 2, y1 - 1); px(g, "#ffffff", x1 + 2, y1 + 1); px(g, "#ffffff", x1 + 3, y1); }
+  if (["leap", "push", "land", "crouchLow", "crouchLowB"].includes(pose)) for (const [, , x1, y1] of legs.slice(2)) { px(g, "#ffffff", x1 + 2, y1 - 1); px(g, "#ffffff", x1 + 2, y1 + 1); px(g, "#ffffff", x1 + 3, y1); }
   return c;
 }
 
