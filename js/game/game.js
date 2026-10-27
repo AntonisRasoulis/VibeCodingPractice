@@ -1060,6 +1060,7 @@ const Game = (() => {
         }
       } else if (tu.state === "sink" && tu.h === 0) {
         tu.state = "done";
+        tu.moving = false; // (back in the ground: no more shaking or dust)
       }
     }
   }
