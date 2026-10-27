@@ -1058,7 +1058,9 @@ const Game = (() => {
     for (const v of world.vultures) if (v.target === p && ["circle", "diving", "skim", "carry"].includes(v.state)) out.push({ who: v, list: "vultures", x: v.x, y: v.y });
     for (const bear of world.bears) if (bear.target === p && bear.state !== "leave") out.push({ who: bear, list: "bears", x: bear.x - BEAR_W / 2, y: bear.y - 10 });
     for (const j of world.jaguars) if (j.target === p && ["leap", "run", "wait", "crouch", "attack"].includes(j.state)) out.push({ who: j, list: "jaguars", x: j.x, y: j.y - 6 });
-    return out.filter((a) => Math.abs(a.x - (p.x + HITBOX_W / 2)) < FIREHAWK.guardSense);
+    // ...and a missile locked on to you (it's not an animal, but it's coming for you all the same)
+    for (const m of world.missiles) if (m.target === p && (m.state === "lock" || m.state === "fly")) out.push({ who: m, list: "missiles", x: m.x, y: m.y });
+    return out.filter((a) => Math.abs(a.x - (p.x + HITBOX_W / 2)) < (a.list === "missiles" ? FIREHAWK.missileSense : FIREHAWK.guardSense));
   }
 
   function updateHawks(dt) {

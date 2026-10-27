@@ -78,7 +78,7 @@ const SANDSTORM = {
 // Firehawk (light blue, S / Down): it flies out over the other player and drops a burning stick
 // where they'll be. The stick kills if it hits, and the ground it lands on burns for 10 seconds
 // (touch the flames and you die; jump over them). Alone, it circles you instead, and the first
-// animal that comes for you (a vulture, bear or jaguar), it dives on and burns.
+// animal that comes for you (a vulture, bear or jaguar), or missile, it dives on and burns.
 const FIREHAWK = {
   chance: 0.15,
   speed: 300,        // flying out to the other player (normal running is 96)
@@ -90,6 +90,7 @@ const FIREHAWK = {
   spread: 0.4,       // seconds the fire takes to spread out
   guardRadius: 26,   // alone: it circles you this far out...
   guardSense: 150,   // ...and dives on an animal coming for you once it's this close
+  missileSense: 230, // ...or on a missile locked on to you, from further out (it locks on from up to 195 px away)
   diveSpeed: 420,
 };
 
