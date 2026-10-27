@@ -120,6 +120,8 @@ const Renderer = (() => {
     drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
+    for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSnowIce(p, camX, world.time, p === other);
+    for (const sb of world.thrownSnowballs) b.drawImage(sprites.thrownSnowball, Math.round(sb.x - camX) - 2, Math.round(sb.y) - 2);
     for (const a of world.arrows) drawArrow(a, camX);
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
@@ -139,6 +141,8 @@ const Renderer = (() => {
     drawFire(world.fire, player, camX, world.time);
     const storm = Game.sandstormStrength();
     if (storm > 0) drawSandstorm(storm, world.time);
+    const blizzard = Game.snowstormStrength();
+    if (blizzard > 0) drawBlizzard(blizzard, world.time);
   }
 
   // ---- Snow biome ----
@@ -704,6 +708,83 @@ const Renderer = (() => {
     b.globalAlpha = 1;
   }
 
+  // ---- The snow's orbs: snowstorm and snowball ----
+
+  // Frost creeping up someone standing still in a snowstorm, the ice block it freezes them in
+  // (cracked by each jump), the snowball's thick block (with a bar for the 10 s), and skates
+  function drawSnowIce(p, camX, time, ghost) {
+    const x = Math.round(p.x - camX) - 1, y = Math.round(p.y) - 1; // (the runner's 8 x 12 sprite)
+    b.globalAlpha = ghost ? 0.35 : 1;
+    if (p.chill > 0 && !p.stormIce) {
+      const u = Math.min(1, p.chill / SNOWSTORM.freezeAfter), h = Math.round(12 * u);
+      b.globalAlpha *= 0.6;
+      b.fillStyle = "#c8ecff";
+      b.fillRect(x, y + 12 - h, 8, h);
+      b.globalAlpha = ghost ? 0.35 : 1;
+      b.fillStyle = "#ffffff";
+      for (let i = 0; i < 8; i++) if (i % 3 === 0 || u > 0.6) b.fillRect(x + i, y + 12 - h + ((i * 7) % 3), 1, 1);
+      const r = 10 - u * 5; // the cold closing in
+      for (let k = 0; k < 6; k++) { const a = k * 1.05 + time * 3; b.fillRect(Math.round(x + 4 + Math.cos(a) * r), Math.round(y + 6 + Math.sin(a) * r * 0.8), 1, 1); }
+    }
+    const block = (bx, top, w, h, thick) => {
+      b.globalAlpha = (ghost ? 0.35 : 1) * (thick ? 0.6 : 0.35);
+      b.fillStyle = "#c8ecff";
+      b.fillRect(bx, top, w, h);
+      b.globalAlpha = ghost ? 0.35 : 1;
+      b.fillStyle = "#ffffff";
+      b.fillRect(bx, top, w, 1);
+      b.fillRect(bx, top, 1, h);
+      b.fillRect(bx + 2, top + 2, 1, 3);
+      b.fillStyle = "#5fb6e8";
+      b.fillRect(bx + w - 1, top + 1, 1, h - 1);
+      b.fillRect(bx + 1, top + h - 1, w - 1, 1);
+    };
+    if (p.stormIce) {
+      block(x - 1, y - 2, 10, 15, false);
+      b.fillStyle = "#ffffff";
+      for (let c = 0; c < p.stormHits; c++) for (let i = 0; i < 5; i++) b.fillRect(x + 2 + c * 2 + (i % 2), y - 1 + i * 2, 1, 2); // a crack per jump
+    }
+    if (p.iceLock > 0) {
+      block(x - 2, y - 3, 12, 16, true);
+      b.fillStyle = "#ffffff";
+      b.fillRect(x - 3, y - 5, 14, 2); // snow piled on top
+      b.fillRect(x - 1, y - 6, 3, 1);
+      b.fillRect(x + 6, y - 6, 2, 1);
+      b.fillStyle = "#1b2a4a";
+      b.fillRect(x - 2, y + 15, 12, 2);
+      b.fillStyle = "#8fd8ff";
+      b.fillRect(x - 2, y + 15, Math.ceil(12 * p.iceLock / SNOWBALL.freeze), 2);
+    }
+    if (p.skate > 0 && p.onGround && p.onIce && Math.abs(p.vx) > 40) { // skating: a glint of ice off your heels
+      b.fillStyle = "#ffffff";
+      for (let k = 1; k <= 3; k++) b.fillRect(x + 4 - Math.sign(p.vx) * (k * 4 + (Math.floor(time * 20) % 2)), y + 12, 2, 1);
+    }
+    b.globalAlpha = 1;
+  }
+
+  // The blizzard: a white-out haze, drifting bands of snow, and snow driving sideways
+  function drawBlizzard(s, time) {
+    b.globalAlpha = 0.35 * s;
+    b.fillStyle = "#e8f4ff";
+    b.fillRect(0, 0, VIEW_W, VIEW_H);
+    for (let band = 0; band < 3; band++) {
+      b.globalAlpha = 0.2 * s;
+      b.fillStyle = "#ffffff";
+      const shift = time * (50 + band * 30);
+      for (let x = 0; x < VIEW_W; x += 2) b.fillRect(x, Math.round(15 + band * 32 + Math.sin((x + shift) * 0.025 + band * 2) * 9), 2, 9 + band * 3);
+    }
+    b.fillStyle = "#ffffff";
+    for (let i = 0; i < 170; i++) {
+      const speed = 140 + (i % 7) * 35;
+      const x = ((((i * 97) - time * speed) % (VIEW_W + 40)) + VIEW_W + 40) % (VIEW_W + 40) - 20;
+      const y = ((i * 53 + time * (20 + (i % 5) * 8)) % 120);
+      b.globalAlpha = (0.6 + (i % 3) * 0.15) * s;
+      if (i % 5) b.fillRect(Math.round(x), Math.round(y), i % 3 ? 2 : 3, 1);
+      else b.fillRect(Math.round(x), Math.round(y), 2, 2);
+    }
+    b.globalAlpha = 1;
+  }
+
   // ---- The desert's orbs: firehawk and sandstorm ----
 
   // Burning ground where a firehawk's stick landed: spreads out from the middle, flickers, dies down
@@ -756,7 +837,7 @@ const Renderer = (() => {
     for (let k = 0; k < 10; k++) {
       const a = k * 0.63, r = 3 + u * (8 + (k % 3) * 3);
       b.globalAlpha = 1 - u;
-      b.fillStyle = u < 0.4 ? ["#fff3b0", "#ffd23f", "#ff7a1a"][k % 3] : ["#5a4a40", "#7a6a5a", "#ff7a1a"][k % 3];
+      b.fillStyle = bu.snow ? ["#ffffff", "#e8f8ff", "#a8d4f0"][k % 3] : u < 0.4 ? ["#fff3b0", "#ffd23f", "#ff7a1a"][k % 3] : ["#5a4a40", "#7a6a5a", "#ff7a1a"][k % 3];
       b.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * 0.7 - u * 8), 2, 2);
     }
     b.globalAlpha = 1;
@@ -1083,12 +1164,12 @@ const Renderer = (() => {
       if (sx < -10 || sx > VIEW_W) continue;
       const bob = Math.round(Math.sin(time * 3 + o.x) * 1.5);
       if (Math.floor(time * 4) % 2) {
-        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone" || o.kind === "firehawk";
+        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone" || o.kind === "firehawk" || o.kind === "snowball";
         b.fillStyle = ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb, snowstorm: sprites.stormOrb, snowball: sprites.snowballOrb }[o.kind] || sprites.orb;
       if (o.kind === "wind") drawOrbWisps(sx, o.y + bob, time + o.x);
       b.drawImage(sprite, sx, o.y + bob);
     }
@@ -1313,6 +1394,7 @@ const Renderer = (() => {
         drone: ["#ffffff", "#4fc0ff", "#c9d4df", "#4fc0ff"],
         zap: ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"],
         firehawk: ["#fff3b0", "#ff7a1a", "#ffd23f", "#c8301a"],
+        snowball: ["#ffffff", "#a8e0ff", "#ffffff", "#6cc4f0"],
       }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }

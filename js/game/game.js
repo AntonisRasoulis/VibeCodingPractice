@@ -53,6 +53,8 @@ const Game = (() => {
       decoys: [],   // harmless eyes blinking in the jungle's bushes
       arrows: [],   // arrows shot by the jungle's ancient turrets
       sandstorm: null, // the desert's sandstorm orb, blowing: { t, owner }
+      snowstorm: null, // the snow's snowstorm orb, blowing: { t }
+      thrownSnowballs: [], // snowballs thrown with the snowball orb
       hawks: [],    // firehawks: flying out to drop a burning stick, or (alone) circling you
       sticks: [],   // burning sticks falling from a firehawk
       burns: [],    // a puff of fire where a firehawk burned an animal
@@ -139,6 +141,8 @@ const Game = (() => {
     updateTurrets(dt);
     updateArrows(dt);
     updateSandstorm(dt);
+    updateSnowstorm(dt);
+    updateThrownSnowballs(dt);
     updateHawks(dt);
     updateSticks(dt);
     updateFires(dt);
@@ -226,13 +230,21 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
-          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk") {
-            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a" }[orb.kind]);
-            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone", firehawk: "gotHawk" }[orb.kind]);
-            // Alone, the drone (and the firehawk) start guarding you right away with no button press
+          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk" || orb.kind === "snowball") {
+            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff" }[orb.kind]);
+            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone", firehawk: "gotHawk", snowball: "gotSnowball" }[orb.kind]);
+            // Alone, the drone (and the firehawk) start guarding you right away with no button press,
+            // and the snowball (with nobody to throw it at) gives you skates
             if (world.solo && orb.kind === "drone") launchDrone(p);
             else if (world.solo && orb.kind === "firehawk") launchHawk(p);
+            else if (world.solo && orb.kind === "snowball") { p.skate = SNOWBALL.skate; p.showHit("SKATES!", "#a8e0ff"); }
             else p.power = orb.kind; // holding one power at a time: the newest replaces the old
+            return;
+          }
+          if (orb.kind === "snowstorm") {
+            world.snowstorm = { t: world.snowstorm ? Math.min(world.snowstorm.t, SNOWSTORM.fade) : 0 };
+            for (const q of world.players) if (!q.caught) q.showHit("SNOWSTORM! KEEP MOVING!", "#e8f8ff");
+            Sound.play("snowstorm");
             return;
           }
           if (orb.kind === "sandstorm") {
@@ -284,6 +296,7 @@ const Game = (() => {
     else if (p.power === "wind") p.windDash();
     else if (p.power === "drone") launchDrone(p);
     else if (p.power === "firehawk") launchHawk(p);
+    else if (p.power === "snowball") throwSnowball(p);
     p.power = null;
   }
 
@@ -1044,6 +1057,57 @@ const Game = (() => {
     for (const p of world.players) p.windPush = s * SANDSTORM.push * (st && p === st.owner ? SANDSTORM.ownPush : 1);
   }
 
+  // ---- The snow's orbs: snowstorm and snowball ----
+
+  function snowstormStrength() {
+    const st = world.snowstorm;
+    if (!st) return 0;
+    return Math.max(0, Math.min(1, st.t / SNOWSTORM.fade, (SNOWSTORM.time - st.t) / SNOWSTORM.fade));
+  }
+
+  // While it blows (past its first half second), standing still freezes you (see Player.update)
+  function updateSnowstorm(dt) {
+    const st = world.snowstorm;
+    if (st) {
+      st.t += dt;
+      if (st.t >= SNOWSTORM.time) world.snowstorm = null;
+    }
+    const on = snowstormStrength() >= 0.5;
+    for (const p of world.players) p.snowstorm = on;
+  }
+
+  // Thrown the way you face, from about shoulder height, in a short low arc
+  function throwSnowball(p) {
+    const dir = p.facing;
+    world.thrownSnowballs.push({ owner: p, x: p.x + HITBOX_W / 2 + dir * 4, y: p.y + 3, vx: dir * SNOWBALL.vx, vy: -SNOWBALL.vy });
+    Sound.play("throwSnowball");
+  }
+
+  function updateThrownSnowballs(dt) {
+    const { level, players } = world;
+    for (const sb of world.thrownSnowballs) {
+      sb.vy += SNOWBALL.gravity * dt;
+      sb.x += sb.vx * dt;
+      sb.y += sb.vy * dt;
+      const half = SNOWBALL.size / 2;
+      const hit = players.find((q) => q !== sb.owner && !q.dead && !q.caught && !q.held && !q.eatenBy &&
+        overlaps(q.x, q.y, HITBOX_W, HITBOX_H, sb.x - half, sb.y - half, SNOWBALL.size, SNOWBALL.size));
+      if (hit) {
+        hit.iceLock = SNOWBALL.freeze;
+        hit.stormIce = false; // (a snowstorm's ice gives way to the snowball's)
+        hit.vx = 0;
+        hit.showHit("FROZEN SOLID!", "#a8e0ff");
+        hit.sparkle("#e8f8ff");
+        Sound.play("freeze");
+        sb.done = true;
+      } else if (level.isSolid(Math.floor(sb.x / TILE), Math.floor((sb.y + half) / TILE)) || sb.y > VIEW_H + 10) {
+        sb.done = true; // splat
+        world.burns.push({ x: sb.x, y: sb.y - 1, t: 0, snow: true }); // (a puff of snow, drawn like a firehawk's burst)
+      }
+    }
+    world.thrownSnowballs = world.thrownSnowballs.filter((sb) => !sb.done);
+  }
+
   // Off it goes: out to the other player with a burning stick, or (alone) to circle you
   function launchHawk(p) {
     const other = world.players.find((q) => q !== p);
@@ -1652,6 +1716,7 @@ const Game = (() => {
 
   return {
     sandstormStrength,
+    snowstormStrength,
     init(canvasElement, cb) {
       canvas = canvasElement;
       canvas.width = VIEW_W * SCALE;

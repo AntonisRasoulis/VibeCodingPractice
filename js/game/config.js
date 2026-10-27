@@ -94,6 +94,32 @@ const FIREHAWK = {
   diveSpeed: 420,
 };
 
+// The snow's own two orbs (only found in the snow): about 15% of its orbs each.
+// Snowstorm (gold): works at once. For 10 seconds a blizzard whites out everyone's screen, and
+// anyone who isn't holding left or right (jumping doesn't count) freezes solid within a second,
+// in a block of ice like thin ice: jump 3 times to break out.
+const SNOWSTORM = {
+  chance: 0.15,
+  time: 10,          // seconds it blows
+  fade: 1,           // seconds it takes to blow up, and to die down at the end
+  freezeAfter: 1,    // seconds of not moving before you freeze solid
+  jumpsToBreak: 3,   // frozen: jumps it takes to break out
+};
+// Snowball (light blue, S / Down): thrown the way you're facing, in a short low arc. It's small and
+// hard to hit, but if it hits the other player they're frozen for 10 seconds, with no way out.
+// Alone, it gives you skates instead: 20 seconds of running faster on ice.
+const SNOWBALL = {
+  chance: 0.15,
+  vx: 160,           // how fast it's thrown (it lands about 7 tiles away)
+  vy: 70,            // ...and how high (a low lob: it can hit you anywhere along the way)
+  gravity: 600,
+  size: 3,           // the part of it that hits (pixels: it's tiny)
+  freeze: 10,        // seconds a hit freezes you (no escape)
+  skate: 20,         // alone: seconds of skating
+  skateSpeed: 1.5,   // ...running this much faster on ice
+  skateAccel: 4,     // ...and speeding up / turning this much quicker on it
+};
+
 const WIND = {
   chance: 0.25, // share of orbs that are wind dash orbs (the most common)
   speed: 420,   // dash speed (normal running is 96)

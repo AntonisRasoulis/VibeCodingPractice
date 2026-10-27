@@ -1002,6 +1002,33 @@ function makeJungleLayers() {
   return { far, mid, near };
 }
 
+// ---- The snow's orbs ----
+
+// The snowstorm orb: a gold coin with a white snowflake
+const STORM_ORB_ROWS = [
+  "..oooo..",
+  ".oywyyo.",
+  "oywwwywo",
+  "oyywwwyo",
+  "oywwwyyo",
+  "owywwwyo",
+  ".oyywyo.",
+  "..oooo..",
+];
+// The snowball orb: a light blue coin with a snowball
+const SNOWBALL_ORB_ROWS = [
+  "..oooo..",
+  ".oyyyyo.",
+  "oyywwyyo",
+  "oywwwsyo",
+  "oywwssyo",
+  "oyysyyyo",
+  ".oyyyyo.",
+  "..oooo..",
+];
+// The thrown snowball: tiny
+const THROWN_SNOWBALL_ROWS = [".ww.", "wwws", "wwss", ".ss."];
+
 // ---- The desert's orbs ----
 
 // The sandstorm orb: a gold coin with streaks of blowing sand
@@ -1327,6 +1354,9 @@ function buildSprites() {
     windOrb: spriteFromRows(WIND_ORB_ROWS, ABILITY_ORB_PALETTE),
     droneOrb: spriteFromRows(DRONE_ORB_ROWS, ABILITY_ORB_PALETTE),
     drone: Object.fromEntries(Object.entries(DRONE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, DRONE_PALETTE)])),
+    stormOrb: spriteFromRows(STORM_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
+    snowballOrb: spriteFromRows(SNOWBALL_ORB_ROWS, { o: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, w: "#ffffff", s: "#a8d4f0" }),
+    thrownSnowball: spriteFromRows(THROWN_SNOWBALL_ROWS, { w: "#ffffff", s: "#a8d4f0" }),
     sandOrb: spriteFromRows(SAND_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", s: "#a86a2a" }),
     hawkOrb: spriteFromRows(HAWK_ORB_ROWS, { o: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, f: "#ff7a1a", r: "#c8301a" }),
     hawks: makeHawks(),

@@ -73,6 +73,12 @@ class Player {
     this.poison = 0;              // seconds left of a poison dart messing with your screen (jungle turrets)
     this.asleep = 0;              // seconds left asleep on the spot (a sleep dart)
     this.windPush = 0;            // a sandstorm pushing us left (pixels per second)
+    this.snowstorm = false;       // a snowstorm is blowing: stand still and you freeze
+    this.chill = 0;               // ...seconds we've stood still in it so far
+    this.stormIce = false;        // ...frozen solid by it (jump to break out)
+    this.stormHits = 0;           // ...and how many jumps we've cracked the ice with
+    this.iceLock = 0;             // seconds left frozen by a snowball (no way out)
+    this.skate = 0;               // seconds left on skates (faster on ice)
     this.inQuick = false;         // stuck in quicksand
     this.inRiver = null;          // fell in a jungle river: the current is carrying us back to its near bank
     this.eatenBy = null;          // inside a jungle flytrap that's chewing us
@@ -170,6 +176,43 @@ class Player {
     if (this.inSink) return this.updateSink(dt, input, level);
     if (this.inPond) return this.updatePond(dt, input, level);
 
+    // Snowstorm: stand still (not holding left or right) for a second and you freeze solid.
+    // Frozen, each jump cracks the ice; the third breaks you out.
+    if (this.stormIce) {
+      if (input.jumpPressed) {
+        this.stormHits++;
+        if (this.stormHits >= SNOWSTORM.jumpsToBreak) {
+          this.stormIce = false;
+          this.chill = 0;
+          this.sparkle("#e8f8ff");
+          Sound.play("iceBreak");
+        } else Sound.play("iceCrack");
+      }
+      if (this.stormIce) {
+        input = { left: false, right: false, jump: false, jumpPressed: false };
+        this.jumpBuffer = 0;
+        this.vx = 0;
+      }
+    } else if (this.snowstorm && this.stun <= 0 && this.frozen <= 0 && this.asleep <= 0 && this.iceLock <= 0) {
+      if (input.left || input.right) this.chill = 0;
+      else if ((this.chill += dt) >= SNOWSTORM.freezeAfter) {
+        this.stormIce = true;
+        this.stormHits = 0;
+        this.vx = 0;
+        Sound.play("freeze");
+      }
+    } else this.chill = 0;
+
+    // Hit by a snowball: frozen solid, no way out until it thaws
+    if (this.iceLock > 0) {
+      this.iceLock -= dt;
+      if (this.iceLock <= 0) Sound.play("thaw");
+      input = { left: false, right: false, jump: false, jumpPressed: false };
+      this.jumpBuffer = 0;
+      this.vx = 0;
+    }
+    if (this.skate > 0) this.skate -= dt;
+
     // Thrown by a hand: no control until we recover (gravity and momentum still work)
     if (this.stun > 0) {
       this.stun -= dt;
@@ -214,9 +257,10 @@ class Player {
     // Running
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     if (dir !== 0) {
-      let accel = this.onGround ? (this.onIce ? SNOW.iceAccel : PHYSICS.groundAccel) : PHYSICS.airAccel;
+      const skating = this.skate > 0 && this.onGround && this.onIce;
+      let accel = this.onGround ? (this.onIce ? SNOW.iceAccel * (skating ? SNOWBALL.skateAccel : 1) : PHYSICS.groundAccel) : PHYSICS.airAccel;
       if (Math.sign(this.vx) === -dir && !(this.onGround && this.onIce)) accel *= 2; // turn around quickly (not on ice)
-      const top = PHYSICS.runSpeed * (this.honey > 0 ? BEAR.honeySpeed : 1); // sticky honey slows you down
+      const top = PHYSICS.runSpeed * (this.honey > 0 ? BEAR.honeySpeed : 1) * (skating ? SNOWBALL.skateSpeed : 1); // sticky honey slows you down; skates speed you up on ice
       this.vx = clamp(this.vx + dir * accel * dt, -top, top);
       this.facing = dir;
     } else if (this.onGround) {
@@ -925,6 +969,9 @@ class Player {
     this.held = false;
     this.stun = 0;
     this.asleep = 0;
+    this.stormIce = false;
+    this.chill = 0;
+    this.iceLock = 0;
     this.spin = 0;
     this.dashHold = 0;
     this.dashTime = 0;
