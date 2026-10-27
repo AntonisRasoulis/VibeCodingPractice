@@ -1015,10 +1015,18 @@ const Game = (() => {
   function updateTurrets(dt) {
     const { level, players } = world;
     const free = (p) => !p.dead && !p.caught && !p.held && !p.eatenBy && !p.inRiver;
-    // what it shoots next: low or regular, and (past 400 m) which arrow
+    // Which arrows it'll shoot, picked when it wakes up: a sleep dart always goes first (so the next
+    // arrow finds you asleep) and a blunt one always last (it knocks you out of reach of the rest)
+    const ORDER = { sleep: 0, arrow: 1, poison: 1, blunt: 2 };
+    const plan = (tu) => {
+      const kinds = [];
+      for (let i = 0; i < tu.shotsLeft; i++) kinds.push(Math.floor(tu.x / TILE) < level.baseAt ? "arrow" : pickWeighted(TURRET.kinds));
+      tu.plan = kinds.sort((a, b) => ORDER[a] - ORDER[b]);
+    };
+    // what it shoots next: low or regular, and the next arrow in its plan
     const load = (tu) => {
       tu.low = Math.random() < 0.5;
-      tu.kind = Math.floor(tu.x / TILE) < level.baseAt ? "arrow" : pickWeighted(TURRET.kinds);
+      tu.kind = tu.plan.shift() || "arrow";
     };
     for (const tu of level.turrets) {
       if (tu.state === "done" || !players.some((p) => Math.abs(p.x - tu.x) < VIEW_W * 1.5)) continue;
@@ -1034,6 +1042,7 @@ const Game = (() => {
           tu.state = "rumble";
           tu.t = 0;
           tu.shotsLeft = level.wild ? WILD.turretShots : 1 + Math.floor(Math.random() * TURRET.shots[1]);
+          plan(tu);
           load(tu);
           Sound.play("turretRumble");
         }
