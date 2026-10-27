@@ -126,7 +126,7 @@ const SNOW = {
 
 // Wild mode: the hard mode. These change from normal while it's on.
 const WILD = {
-  missileEvery: [3, 8], // prairie: seconds between missiles at the leader (normal: about 2 per biome)
+  missileEvery: [1, 2], // prairie: the next missile comes 1-2 seconds after the last one is gone (normal: about 2 per biome)
   vultureGap: 0.6,      // desert: the next group comes this soon after the last one is gone
   bearGap: 0.5,         // snow: the next bear charges in this soon after one gives up
   sinkTime: 1.6,        // quicksand: seconds to sink all the way (normal 3): mash jump!
