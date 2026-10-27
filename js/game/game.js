@@ -52,6 +52,10 @@ const Game = (() => {
       jaguars: [],  // jaguars and black panthers hunting the leader (jungle only)
       decoys: [],   // harmless eyes blinking in the jungle's bushes
       arrows: [],   // arrows shot by the jungle's ancient turrets
+      sandstorm: null, // the desert's sandstorm orb, blowing: { t, owner }
+      hawks: [],    // firehawks: flying out to drop a burning stick, or (alone) circling you
+      sticks: [],   // burning sticks falling from a firehawk
+      burns: [],    // a puff of fire where a firehawk burned an animal
       nextDecoy: null,
       vultures: [], // vultures circling, diving and skimming the ground (desert only)
       drones: [],   // rescue drones: guarding a player, or flying to grab the leader
@@ -134,6 +138,10 @@ const Game = (() => {
     updateFlytraps(dt);
     updateTurrets(dt);
     updateArrows(dt);
+    updateSandstorm(dt);
+    updateHawks(dt);
+    updateSticks(dt);
+    updateFires(dt);
     updateJaguars(dt);
     updateDecoys(dt);
     checkOrbs();
@@ -218,12 +226,19 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
-          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone") {
-            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff" }[orb.kind]);
-            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone" }[orb.kind]);
-            // Alone, the drone starts guarding right away with no button press
+          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk") {
+            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a" }[orb.kind]);
+            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone", firehawk: "gotHawk" }[orb.kind]);
+            // Alone, the drone (and the firehawk) start guarding you right away with no button press
             if (world.solo && orb.kind === "drone") launchDrone(p);
+            else if (world.solo && orb.kind === "firehawk") launchHawk(p);
             else p.power = orb.kind; // holding one power at a time: the newest replaces the old
+            return;
+          }
+          if (orb.kind === "sandstorm") {
+            world.sandstorm = { t: world.sandstorm ? Math.min(world.sandstorm.t, SANDSTORM.fade) : 0, owner: p };
+            for (const q of world.players) if (!q.caught) q.showHit("SANDSTORM!", "#f0d8a0");
+            Sound.play("sandstorm");
             return;
           }
           if (orb.kind === "dash") {
@@ -268,6 +283,7 @@ const Game = (() => {
     else if (p.power === "hand") throwHand(p, owner);
     else if (p.power === "wind") p.windDash();
     else if (p.power === "drone") launchDrone(p);
+    else if (p.power === "firehawk") launchHawk(p);
     p.power = null;
   }
 
@@ -1009,6 +1025,144 @@ const Game = (() => {
     }
   }
 
+  // ---- The desert's orbs: sandstorm and firehawk ----
+
+  // How hard the sandstorm is blowing (0 to 1): it builds up, blows, then dies down
+  function sandstormStrength() {
+    const st = world.sandstorm;
+    if (!st) return 0;
+    return Math.max(0, Math.min(1, st.t / SANDSTORM.fade, (SANDSTORM.time - st.t) / SANDSTORM.fade));
+  }
+
+  function updateSandstorm(dt) {
+    const st = world.sandstorm;
+    if (st) {
+      st.t += dt;
+      if (st.t >= SANDSTORM.time) world.sandstorm = null;
+    }
+    const s = sandstormStrength();
+    for (const p of world.players) p.windPush = s * SANDSTORM.push * (st && p === st.owner ? SANDSTORM.ownPush : 1);
+  }
+
+  // Off it goes: out to the other player with a burning stick, or (alone) to circle you
+  function launchHawk(p) {
+    const other = world.players.find((q) => q !== p);
+    const guard = world.solo || !other;
+    world.hawks.push({ mode: guard ? "guard" : "attack", owner: p, target: other, x: p.x + HITBOX_W / 2, y: p.y - 6, t: 0, angle: -Math.PI / 2, facing: 1, flap: 0 });
+    Sound.play("hawkScreech");
+  }
+
+  // The animals coming for p that a guarding firehawk will go for (once they're close)
+  function preyFor(p) {
+    const out = [];
+    for (const v of world.vultures) if (v.target === p && ["circle", "diving", "skim", "carry"].includes(v.state)) out.push({ who: v, list: "vultures", x: v.x, y: v.y });
+    for (const bear of world.bears) if (bear.target === p && bear.state !== "leave") out.push({ who: bear, list: "bears", x: bear.x - BEAR_W / 2, y: bear.y - 10 });
+    for (const j of world.jaguars) if (j.target === p && ["leap", "run", "wait", "crouch", "attack"].includes(j.state)) out.push({ who: j, list: "jaguars", x: j.x, y: j.y - 6 });
+    return out.filter((a) => Math.abs(a.x - (p.x + HITBOX_W / 2)) < FIREHAWK.guardSense);
+  }
+
+  function updateHawks(dt) {
+    const { level } = world;
+    for (const h of world.hawks) {
+      h.t += dt;
+      h.flap += dt * (h.mode === "dive" ? 4 : 8);
+      const px = h.x, py = h.y;
+      const steer = (tx, ty, speed) => {
+        const dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
+        if (d <= speed * dt) { h.x = tx; h.y = ty; return true; }
+        h.x += (dx / d) * speed * dt;
+        h.y += (dy / d) * speed * dt;
+        return false;
+      };
+      if (h.mode === "attack") {
+        // fly to where the stick, dropped now, would land on them
+        const q = h.target;
+        const g = level.groundTop(q.x + HITBOX_W / 2) ?? q.y + HITBOX_H;
+        const dropY = g - FIREHAWK.height;
+        const fall = Math.sqrt((2 * Math.max(10, q.y + HITBOX_H / 2 - dropY)) / FIREHAWK.gravity);
+        const aimX = q.x + HITBOX_W / 2 + (q.dead ? 0 : q.vx * fall);
+        steer(aimX, dropY, FIREHAWK.speed);
+        if (Math.abs(h.x - aimX) < 4 && Math.abs(h.y - dropY) < 6) {
+          world.sticks.push({ x: h.x, y: h.y + 6, vy: 0, t: 0 });
+          Sound.play("stickDrop");
+          h.mode = "leave";
+          h.t = 0;
+        }
+        if (h.t > 6) h.mode = "leave"; // (never caught up)
+      } else if (h.mode === "guard") {
+        const p = h.owner;
+        h.angle += dt * 3;
+        steer(p.x + HITBOX_W / 2 + Math.cos(h.angle) * FIREHAWK.guardRadius, p.y - 16 + Math.sin(h.angle) * 6, 200);
+        if (!p.dead && !p.caught) {
+          const prey = preyFor(p)[0];
+          if (prey) { h.mode = "dive"; h.prey = prey; Sound.play("hawkScreech"); }
+        }
+      } else if (h.mode === "dive") {
+        const prey = h.prey, who = prey.who;
+        if (who.done || !world[prey.list].includes(who)) { h.mode = "guard"; continue; }
+        const now = prey.list === "bears" ? [who.x - BEAR_W / 2, who.y - 10] : prey.list === "jaguars" ? [who.x, who.y - 6] : [who.x, who.y];
+        if (steer(now[0], now[1], FIREHAWK.diveSpeed) || Math.hypot(now[0] - h.x, now[1] - h.y) < 8) {
+          // burned up!
+          if (prey.list === "vultures" && who.state === "carry") { const p = who.target; p.held = false; p.vx = p.vy = 0; p.onGround = false; p.stun = 0.3; }
+          who.done = true;
+          world.burns.push({ x: now[0], y: now[1], t: 0 });
+          h.owner.showHit("FIREHAWK!", "#ff7a1a");
+          Sound.play("hawkBurn");
+          h.mode = "leave";
+          h.t = 0;
+        }
+      } else {
+        // off it goes, up and away
+        h.x += h.facing * 160 * dt;
+        h.y -= 110 * dt;
+        if (h.y < -40 || h.t > 4) h.done = true;
+      }
+      if (h.mode !== "leave" && Math.abs(h.x - px) > 0.2) h.facing = h.x > px ? 1 : -1;
+    }
+    world.hawks = world.hawks.filter((h) => !h.done);
+    for (const b of world.burns) b.t += dt;
+    world.burns = world.burns.filter((b) => b.t < 0.8);
+  }
+
+  // A burning stick tumbling down: it kills whoever it hits, and sets the ground alight where it lands
+  function updateSticks(dt) {
+    const { level, players } = world;
+    for (const st of world.sticks) {
+      st.t += dt;
+      st.vy += FIREHAWK.gravity * dt;
+      st.y += st.vy * dt;
+      for (const p of players) {
+        if (p.dead || p.caught || p.held || p.eatenBy || !overlaps(p.x, p.y, HITBOX_W, HITBOX_H, st.x - 2, st.y - 2, 4, 4)) continue;
+        p.showHit("BURNED!", "#ff7a1a");
+        p.die();
+      }
+      const g = level.groundTop(st.x);
+      if (g !== null && st.y >= g - 1) {
+        level.fires.push({ x: st.x, gy: g, t: 0 });
+        Sound.play("fireIgnite");
+        st.done = true;
+      } else if (st.y > VIEW_H + 10) st.done = true; // (down a pit)
+    }
+    world.sticks = world.sticks.filter((st) => !st.done);
+  }
+
+  // Burning ground: touch the flames and you die (they're low: jump over them)
+  function updateFires(dt) {
+    const { level, players } = world;
+    for (const f of level.fires) {
+      f.t += dt;
+      const half = FIREHAWK.fireHalf * Math.min(1, f.t / FIREHAWK.spread);
+      for (const p of players) {
+        if (p.dead || p.caught || p.held || p.eatenBy) continue;
+        if (p.x + HITBOX_W > f.x - half + 2 && p.x < f.x + half - 2 && p.y + HITBOX_H > f.gy - FIREHAWK.fireTall && p.y < f.gy + 2) {
+          p.showHit("BURNED!", "#ff7a1a");
+          p.die();
+        }
+      }
+    }
+    level.fires = level.fires.filter((f) => f.t < FIREHAWK.fireTime);
+  }
+
   // ---- Ancient turrets (jungle) ----
 
   // A turret is shared: whoever comes first sets it off, and its arrows hit anyone in the way
@@ -1495,6 +1649,7 @@ const Game = (() => {
   }
 
   return {
+    sandstormStrength,
     init(canvasElement, cb) {
       canvas = canvasElement;
       canvas.width = VIEW_W * SCALE;

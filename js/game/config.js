@@ -65,6 +65,34 @@ const DRONE = {
   dropAhead: 24,     // how far in front of the player behind it drops the leader
 };
 
+// The desert's own two orbs (only found in the desert): about 15% of its orbs each.
+// Sandstorm (gold): works at once. For 10 seconds sand blows across everyone's screen (a little
+// harder to see) and slowly pushes everyone left; whoever grabbed it is pushed 10% less.
+const SANDSTORM = {
+  chance: 0.15,
+  time: 10,          // seconds it blows
+  push: 34,          // how hard it pushes left (pixels per second; running is 96)
+  ownPush: 0.9,      // the one who grabbed it is pushed this much as hard
+  fade: 1,           // seconds it takes to blow up, and to die down at the end
+};
+// Firehawk (light blue, S / Down): it flies out over the other player and drops a burning stick
+// where they'll be. The stick kills if it hits, and the ground it lands on burns for 10 seconds
+// (touch the flames and you die; jump over them). Alone, it circles you instead, and the first
+// animal that comes for you (a vulture, bear or jaguar), it dives on and burns.
+const FIREHAWK = {
+  chance: 0.15,
+  speed: 300,        // flying out to the other player (normal running is 96)
+  height: 48,        // how high above the ground it drops the stick from
+  gravity: 520,      // how fast the stick falls
+  fireTime: 10,      // seconds the ground burns where the stick lands
+  fireHalf: 16,      // the flames reach this far each side of it (4 tiles across: a running jump clears it)
+  fireTall: 8,       // ...and burn you below this height
+  spread: 0.4,       // seconds the fire takes to spread out
+  guardRadius: 26,   // alone: it circles you this far out...
+  guardSense: 150,   // ...and dives on an animal coming for you once it's this close
+  diveSpeed: 420,
+};
+
 const WIND = {
   chance: 0.25, // share of orbs that are wind dash orbs (the most common)
   speed: 420,   // dash speed (normal running is 96)

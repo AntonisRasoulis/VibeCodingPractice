@@ -100,6 +100,7 @@ class Level {
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
+    this.fires = [];      // desert: ground set alight by a firehawk's stick { x (middle), gy, t }
     this.turrets = [];    // jungle: ancient turrets buried in the ground { id, x (middle), gy, dir (-1 shoots left, 1 right), wait, state, t, h (how far up) }
     this.palms = [];      // jungle: palm trees { id, x (trunk's foot), gy, h, kind, cx, cy (its crown), nuts: [[dx, dy]] (from the crown), drop: [dx, dy] (the one that falls) or null }
     this.lastPalm = 0;
@@ -281,6 +282,7 @@ class Level {
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
+    if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
 
@@ -332,6 +334,13 @@ class Level {
       out.push({ x, y: g + 1, v: Math.floor(hash(k, 313) * 4) });
     }
     return out;
+  }
+
+  // ---- Fire (from a firehawk's stick) ----
+
+  // Is x within `margin` of ground that's burning?
+  onFire(x, margin = 0) {
+    return this.fires.some((f) => f.t < FIREHAWK.fireTime && Math.abs(f.x - x) < FIREHAWK.fireHalf + margin);
   }
 
   // ---- Ancient turrets ----
@@ -1209,13 +1218,19 @@ const SECTIONS = {
     const roll = this.rng();
     // On your own, swap / freeze / lightning / hand orbs would do nothing (or nothing good): only dashes
     const soloTotal = WIND.chance + DASH.chance + DRONE.chance; // (on your own, the drone saves you from pits)
-    const kind = this.solo ? (roll < WIND.chance / soloTotal ? "wind" : roll < (WIND.chance + DASH.chance) / soloTotal ? "dash" : "drone")
+    let kind = this.solo ? (roll < WIND.chance / soloTotal ? "wind" : roll < (WIND.chance + DASH.chance) / soloTotal ? "dash" : "drone")
       : roll < WIND.chance ? "wind"
       : roll < WIND.chance + DASH.chance ? "dash"
       : roll < WIND.chance + DASH.chance + ZAP.chance ? "zap"
       : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance ? "hand"
       : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance + DRONE.chance ? "drone"
       : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
+    // the desert's own orbs: a sandstorm, or a firehawk
+    if (this.biome === "desert") {
+      const r = this.rng();
+      if (r < SANDSTORM.chance) kind = "sandstorm";
+      else if (r < SANDSTORM.chance + FIREHAWK.chance) kind = "firehawk";
+    }
     this.orbs.push({ x: this.col * TILE, y: this.groundRow * TILE - 32, w: 8, h: 8, used: false, kind });
     this.lastOrbCol = this.col;
     this.flat(6);

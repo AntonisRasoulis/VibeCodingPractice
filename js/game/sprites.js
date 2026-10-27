@@ -1002,6 +1002,108 @@ function makeJungleLayers() {
   return { far, mid, near };
 }
 
+// ---- The desert's orbs ----
+
+// The sandstorm orb: a gold coin with streaks of blowing sand
+const SAND_ORB_ROWS = [
+  "..oooo..",
+  ".oyyyyo.",
+  "oysssyyo",
+  "oyyyysso",
+  "osssyyyo",
+  "oyyyssso",
+  ".oyyyyo.",
+  "..oooo..",
+];
+// The firehawk orb: a light blue coin with a little orange bird, wings spread
+const HAWK_ORB_ROWS = [
+  "..oooo..",
+  ".oyyyyo.",
+  "ofyyyyfo",
+  "offyyffo",
+  "oyfrrfyo",
+  "oyyrryyo",
+  ".oyfyyo.",
+  "..oooo..",
+];
+
+// The firehawk: drawn like the vultures (both wings spread), in fire colours, facing right.
+// o outline, f flame orange, d deep red, b red, l light orange, y yellow, w white-hot, h head, k beak, e eye
+const HAWK_FRAMES = {
+  glide: [
+    "w..................w",
+    "yfoo............oofy",
+    ".yffdoo......oodffy.",
+    "..yfdbboo..oobbdfy..",
+    "...yfdbbbobhhbbdfy..",
+    "....llbbbbbheekko...",
+    ".....llbbbbbbhk.....",
+    "......ofybyfo.......",
+    ".......y.w.y........",
+  ],
+  up: [
+    ".w..............w...",
+    "yfo............ofy..",
+    ".yfdo.........odfy..",
+    "..yfdoo.....oodfy...",
+    "...ofdbbo..obbdfo...",
+    "....lfbbbobhhbbo....",
+    ".....llbbbbheekko...",
+    "......ofbbbbbhk.....",
+    ".......ofyfyfo......",
+    "........y.w.y.......",
+  ],
+  down: [
+    "....................",
+    "......oobbobhho.....",
+    "....oodbbbbbheekko..",
+    "...ofdbbbbbbbbhk....",
+    "..ofdffbbbbbbffdfo..",
+    ".ofdfo.ofyfyfo.ofdfo",
+    "ofyfo...y.w.y...ofyf",
+    "yfy..............yfy",
+    "w..................w",
+  ],
+};
+const HAWK_PALETTE = (flick) => ({ o: "#2a0a04", f: "#ff7a1a", d: "#8c1c10", b: "#c8301a", l: "#ffb347", y: flick ? "#fff3b0" : "#ffd23f", w: flick ? "#ffd23f" : "#fff3b0", h: "#e04020", k: "#f0c050", e: "#1a0602" });
+
+// { up: [[flicker 0 right, left], [flicker 1 right, left]], glide: ..., down: ... }
+function makeHawks() {
+  const out = {};
+  for (const [wing, rows] of Object.entries(HAWK_FRAMES)) out[wing] = [0, 1].map((f) => { const img = spriteFromRows(rows, HAWK_PALETTE(f)); return [img, flipped(img)]; });
+  return out;
+}
+
+// The burning stick, tumbling: 8 turns, 2 flickers
+function makeSticks() {
+  const out = [];
+  for (let turn = 0; turn < 8; turn++) out.push([0, 1].map((flick) => {
+    const c = makeCanvas(12, 12), g = c.getContext("2d");
+    const a = turn * Math.PI / 4, at = (i) => [Math.round(6 + Math.cos(a) * i), Math.round(6 + Math.sin(a) * i)];
+    for (let i = -4; i <= 2; i++) px(g, "#6a3a1a", ...at(i));
+    const [ex, ey] = at(4), [mx, my] = at(3);
+    px(g, "#ff7a1a", mx, my); px(g, "#ff7a1a", ex, ey);
+    px(g, flick ? "#ffd23f" : "#ff7a1a", ex, ey - 1); px(g, "#ffd23f", ex + (flick ? 1 : -1), ey - 2); px(g, "#fff3b0", ex, ey - 2);
+    return c;
+  }));
+  return out;
+}
+
+// A patch of burning ground, w pixels wide, 4 flickering frames: hottest (white-yellow) at the bottom
+function makeFirePatch(w, frame) {
+  const h = 18, c = makeCanvas(w, h), g = c.getContext("2d");
+  for (let x = 0; x < w; x++) {
+    const edge = Math.min(1, Math.min(x, w - 1 - x) / 6);
+    const t = Math.round((5 + 4 * Math.abs(Math.sin(x * 0.55 + frame * 1.7)) + 2 * Math.abs(Math.sin(x * 1.3 - frame * 2.3))) * (0.45 + 0.55 * edge));
+    for (let y = 0; y < t; y++) {
+      const u = y / t;
+      px(g, u > 0.8 ? "#c8301a" : u > 0.55 ? "#ff7a1a" : u > 0.25 ? "#ffd23f" : "#fff3b0", x, h - 1 - y);
+    }
+    if ((x + frame * 3) % 7 === 0 && t > 6) px(g, "#ffd23f", x, h - 2 - t - ((frame + x) % 3)); // sparks
+  }
+  return c;
+}
+
 // ---- The ancient turret (jungle) ----
 // A carved stone idol head, facing left (its mouth, where the arrows come out, is on the left).
 // Letters: o outline, S light stone, s stone, d / D dark stone, m / M moss, k inside its mouth,
@@ -1225,6 +1327,11 @@ function buildSprites() {
     windOrb: spriteFromRows(WIND_ORB_ROWS, ABILITY_ORB_PALETTE),
     droneOrb: spriteFromRows(DRONE_ORB_ROWS, ABILITY_ORB_PALETTE),
     drone: Object.fromEntries(Object.entries(DRONE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, DRONE_PALETTE)])),
+    sandOrb: spriteFromRows(SAND_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", s: "#a86a2a" }),
+    hawkOrb: spriteFromRows(HAWK_ORB_ROWS, { o: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, f: "#ff7a1a", r: "#c8301a" }),
+    hawks: makeHawks(),
+    sticks: makeSticks(),
+    firePatch: [0, 1, 2, 3].map((f) => makeFirePatch(FIREHAWK.fireHalf * 2, f)),
     handOrb: spriteFromRows(HAND_ORB_ROWS, { g: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, v: "#7b3fd0", l: "#c9a3ff" }),
     handOpen: spriteFromRows(HAND_OPEN_ROWS, HAND_PALETTE),
     handBack: spriteFromRows(HAND_BACK_ROWS, HAND_PALETTE),

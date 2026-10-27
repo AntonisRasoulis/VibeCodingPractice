@@ -72,6 +72,7 @@ class Player {
     this.honey = 0;               // seconds left slowed down by a black bear's honey
     this.poison = 0;              // seconds left of a poison dart messing with your screen (jungle turrets)
     this.asleep = 0;              // seconds left asleep on the spot (a sleep dart)
+    this.windPush = 0;            // a sandstorm pushing us left (pixels per second)
     this.inQuick = false;         // stuck in quicksand
     this.inRiver = null;          // fell in a jungle river: the current is carrying us back to its near bank
     this.eatenBy = null;          // inside a jungle flytrap that's chewing us
@@ -245,6 +246,7 @@ class Player {
     // Gravity and movement
     this.vy = Math.min(this.vy + PHYSICS.gravity * dt, PHYSICS.maxFall);
     this.moveX(this.vx * dt, level);
+    if (this.windPush > 0) this.moveX(-this.windPush * dt, level); // a sandstorm blowing us back
     const prevBottom = this.y + HITBOX_H;
     const wasOnGround = this.onGround;
     const fallSpeed = this.vy;
@@ -938,7 +940,8 @@ class Player {
     const target = this.x - DEATH.respawnBehind;
     let spot = null;
     const firm = (s) => !this.level || (this.level.groundTop(s.x + 1) !== null && this.level.groundTop(s.x + HITBOX_W - 1) !== null); // (a sinkhole may have caved in there since)
-    for (const s of this.safeSpots) if (s.x <= target && firm(s) && (!spot || s.x > spot.x)) spot = s;
+    const burning = (s) => this.level && this.level.onFire(s.x + HITBOX_W / 2, HITBOX_W / 2 + 4); // (a firehawk's fire may be there now)
+    for (const s of this.safeSpots) if (s.x <= target && firm(s) && !burning(s) && (!spot || s.x > spot.x)) spot = s;
     const near = this.level && this.level.safeSpotBefore(target);
     if (near && (!spot || near.x > spot.x)) spot = near;
     // Nothing behind (say, just carried far back by a drone): look further back,

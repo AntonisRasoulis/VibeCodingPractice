@@ -90,6 +90,7 @@ const Renderer = (() => {
     drawPonds(world.level, world.players, camX, world.time);
     drawRivers(world.level, camX, world.time);
     drawFlytraps(world.level, camX, world.time);
+    drawGroundFires(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
     // (someone hiding in a bush can't be seen, on either screen)
@@ -129,10 +130,15 @@ const Renderer = (() => {
     for (const bolt of world.bolts) drawBolt(bolt, world.level, camX, world.time);
     drawBoltWarnings(world, player, camX);
     for (const v of world.vultures) drawVulture(v, camX, world.time);
+    for (const st of world.sticks) drawStick(st, camX, world.time);
+    for (const h of world.hawks) drawHawk(h, camX, world.time);
+    for (const bu of world.burns) drawBurn(bu, camX);
     for (const d of world.drones) drawDrone(d, camX, world.time);
     drawParticles(player, camX);
     if (snow > 0) drawSnowfall(camX, world.time, snow);
     drawFire(world.fire, player, camX, world.time);
+    const storm = Game.sandstormStrength();
+    if (storm > 0) drawSandstorm(storm, world.time);
   }
 
   // ---- Snow biome ----
@@ -698,6 +704,86 @@ const Renderer = (() => {
     b.globalAlpha = 1;
   }
 
+  // ---- The desert's orbs: firehawk and sandstorm ----
+
+  // Burning ground where a firehawk's stick landed: spreads out from the middle, flickers, dies down
+  function drawGroundFires(level, camX, time) {
+    for (const f of level.fires) {
+      const img = sprites.firePatch[Math.floor(time * 10 + f.x) % 4];
+      const sx = Math.round(f.x - camX);
+      if (sx < -40 || sx > VIEW_W + 40) continue;
+      const half = Math.round(FIREHAWK.fireHalf * Math.min(1, f.t / FIREHAWK.spread));
+      const left = FIREHAWK.fireTime - f.t;
+      b.globalAlpha = Math.min(1, left / 0.6);
+      // (the last half second, the flames sink low)
+      const sink = left < 0.6 ? Math.round((1 - left / 0.6) * img.height * 0.6) : 0;
+      b.drawImage(img, FIREHAWK.fireHalf - half, 0, half * 2, img.height - sink, sx - half, f.gy - img.height + 1 + sink, half * 2, img.height - sink);
+      b.globalAlpha = 1;
+    }
+  }
+
+  // The firehawk, flapping (it glides while circling), with sparks trailing off it
+  function drawHawk(h, camX, time) {
+    const seq = ["up", "glide", "down", "glide"];
+    const wing = h.mode === "dive" ? "glide" : seq[Math.floor(h.flap) % 4];
+    const img = sprites.hawks[wing][Math.floor(time * 12) % 2][h.facing > 0 ? 0 : 1];
+    const x = Math.round(h.x - camX), y = Math.round(h.y);
+    if (x < -30 || x > VIEW_W + 30) return;
+    for (let k = 1; k <= 4; k++) {
+      b.globalAlpha = 0.6 - k * 0.12;
+      b.fillStyle = k % 2 ? "#ff7a1a" : "#ffd23f";
+      b.fillRect(x - h.facing * (6 + k * 5), y + 2 + Math.round(Math.sin(time * 14 + k) * 1.5), 2, 1);
+    }
+    b.globalAlpha = 1;
+    b.drawImage(img, x - Math.round(img.width / 2), y - 5);
+    // carrying the stick, before it lets go
+    if (h.mode === "attack") {
+      b.fillStyle = "#6a3a1a";
+      b.fillRect(x - 4, y + 5, 7, 1);
+      b.fillStyle = Math.floor(time * 12) % 2 ? "#ffd23f" : "#ff7a1a";
+      b.fillRect(x + (h.facing > 0 ? 3 : -5), y + 4, 1, 2);
+    }
+  }
+
+  function drawStick(st, camX, time) {
+    const img = sprites.sticks[Math.floor(st.t * 16) % 8][Math.floor(time * 12) % 2];
+    b.drawImage(img, Math.round(st.x - camX) - 6, Math.round(st.y) - 6);
+  }
+
+  // A burst of flame (and smoke) where a firehawk burned an animal
+  function drawBurn(bu, camX) {
+    const x = Math.round(bu.x - camX), y = Math.round(bu.y), u = bu.t / 0.8;
+    for (let k = 0; k < 10; k++) {
+      const a = k * 0.63, r = 3 + u * (8 + (k % 3) * 3);
+      b.globalAlpha = 1 - u;
+      b.fillStyle = u < 0.4 ? ["#fff3b0", "#ffd23f", "#ff7a1a"][k % 3] : ["#5a4a40", "#7a6a5a", "#ff7a1a"][k % 3];
+      b.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r * 0.7 - u * 8), 2, 2);
+    }
+    b.globalAlpha = 1;
+  }
+
+  // The sandstorm: a sandy haze over everything, big drifting bands of sand, streaks blowing left,
+  // and sand skittering along the ground
+  function drawSandstorm(s, time) {
+    b.globalAlpha = 0.3 * s;
+    b.fillStyle = "#d8a860";
+    b.fillRect(0, 0, VIEW_W, VIEW_H);
+    for (let band = 0; band < 3; band++) {
+      b.globalAlpha = 0.2 * s;
+      b.fillStyle = "#c89048";
+      const shift = time * (40 + band * 25);
+      for (let x = 0; x < VIEW_W; x += 2) b.fillRect(x, Math.round(20 + band * 30 + Math.sin((x + shift) * 0.03 + band * 2) * 8), 2, 10 + band * 3);
+    }
+    for (let i = 0; i < 140; i++) {
+      const speed = 160 + (i % 7) * 30, len = 4 + (i % 5) * 3;
+      const x = ((((i * 97) - time * speed) % (VIEW_W + 40)) + VIEW_W + 40) % (VIEW_W + 40) - 20;
+      b.globalAlpha = (0.5 + (i % 3) * 0.2) * s;
+      b.fillStyle = i % 4 ? "#f0d8a0" : "#fff8e8";
+      b.fillRect(Math.round(x), (i * 53) % 118, len, 1);
+    }
+    b.globalAlpha = 1;
+  }
+
   // ---- The jungle's ancient turrets ----
 
   // The idol, as far out of the ground as it has risen (the ground, drawn after, hides the rest).
@@ -997,12 +1083,12 @@ const Renderer = (() => {
       if (sx < -10 || sx > VIEW_W) continue;
       const bob = Math.round(Math.sin(time * 3 + o.x) * 1.5);
       if (Math.floor(time * 4) % 2) {
-        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone";
+        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone" || o.kind === "firehawk";
         b.fillStyle = ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb }[o.kind] || sprites.orb;
       if (o.kind === "wind") drawOrbWisps(sx, o.y + bob, time + o.x);
       b.drawImage(sprite, sx, o.y + bob);
     }
@@ -1226,6 +1312,7 @@ const Renderer = (() => {
         wind: ["#ffffff", "#e8f4ff", "#ffffff", "#cfe3f5"],
         drone: ["#ffffff", "#4fc0ff", "#c9d4df", "#4fc0ff"],
         zap: ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"],
+        firehawk: ["#fff3b0", "#ff7a1a", "#ffd23f", "#c8301a"],
       }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }

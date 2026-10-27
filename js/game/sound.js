@@ -230,6 +230,12 @@ const Sound = (() => {
     coconutWobble: () => noise({ filter: "bandpass", f: 1600, to: 2400, q: 2, dur: 0.3, vol: 0.18, attack: 0.05 }),
     coconutCrack: () => { tone({ f: 420, to: 220, dur: 0.1, type: "triangle", vol: 0.12 }); noise({ filter: "highpass", f: 1500, dur: 0.06, vol: 0.25 }); },
     bonk: () => { tone({ f: 700, to: 260, dur: 0.14, type: "square", vol: 0.13 }); tone({ f: 1400, to: 900, dur: 0.5, type: "sine", vol: 0.06, at: 0.08, vibrato: 30 }); },
+    sandstorm: () => { noise({ filter: "bandpass", f: 500, to: 1400, q: 0.8, dur: 1.8, vol: 0.35, attack: 0.5 }); noise({ filter: "highpass", f: 3000, dur: 1.4, vol: 0.12, attack: 0.4, at: 0.3 }); },
+    gotHawk: () => { tone({ f: 1400, to: 900, dur: 0.25, type: "sawtooth", vol: 0.07 }); noise({ filter: "bandpass", f: 2000, to: 800, dur: 0.3, vol: 0.15 }); },
+    hawkScreech: () => { tone({ f: 1800, to: 1100, dur: 0.35, type: "sawtooth", vol: 0.08, vibrato: 40 }); tone({ f: 1500, to: 900, dur: 0.3, type: "square", vol: 0.04, at: 0.05 }); },
+    stickDrop: () => noise({ filter: "bandpass", f: 1500, to: 400, q: 1, dur: 0.35, vol: 0.2 }),
+    fireIgnite: () => { noise({ filter: "lowpass", f: 300, to: 1800, dur: 0.5, vol: 0.6, attack: 0.02 }); tone({ f: 120, to: 60, dur: 0.4, type: "sine", vol: 0.2 }); },
+    hawkBurn: () => { noise({ filter: "lowpass", f: 400, to: 2500, dur: 0.4, vol: 0.5 }); tone({ f: 900, to: 300, dur: 0.3, type: "sawtooth", vol: 0.08 }); },
     turretRumble: () => { noise({ filter: "lowpass", f: 140, dur: 0.5, vol: 0.7, attack: 0.08 }); tone({ f: 48, to: 40, dur: 0.5, type: "sawtooth", vol: 0.1, vibrato: 6 }); },
     turretRise: () => noise({ filter: "bandpass", f: 300, to: 180, q: 3, dur: 0.35, vol: 0.4, attack: 0.03 }), // stone grinding
     arrowShoot: () => { tone({ f: 190, to: 140, dur: 0.12, type: "triangle", vol: 0.2 }); noise({ filter: "bandpass", f: 2500, to: 900, q: 2, dur: 0.18, vol: 0.2 }); }, // twang... whoosh
