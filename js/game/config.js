@@ -131,13 +131,13 @@ const MONKEY = {
 
 // The snow's own two orbs (only found in the snow): about 15% of its orbs each.
 // Snowstorm (gold): works at once. For 10 seconds a blizzard whites out everyone's screen, and
-// anyone who isn't holding left or right (jumping doesn't count) freezes solid within a second,
+// anyone who isn't holding left or right (jumping doesn't count) freezes solid within half a second,
 // in a block of ice like thin ice: jump 3 times to break out.
 const SNOWSTORM = {
   chance: 0.15,
   time: 10,          // seconds it blows
   fade: 1,           // seconds it takes to blow up, and to die down at the end
-  freezeAfter: 1,    // seconds of not moving before you freeze solid
+  freezeAfter: 0.5,  // seconds of not moving before you freeze solid
   jumpsToBreak: 3,   // frozen: jumps it takes to break out
 };
 // Snowball (light blue, S / Down): thrown the way you're facing, in a short low arc. It's small and
