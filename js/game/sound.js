@@ -230,6 +230,11 @@ const Sound = (() => {
     coconutWobble: () => noise({ filter: "bandpass", f: 1600, to: 2400, q: 2, dur: 0.3, vol: 0.18, attack: 0.05 }),
     coconutCrack: () => { tone({ f: 420, to: 220, dur: 0.1, type: "triangle", vol: 0.12 }); noise({ filter: "highpass", f: 1500, dur: 0.06, vol: 0.25 }); },
     bonk: () => { tone({ f: 700, to: 260, dur: 0.14, type: "square", vol: 0.13 }); tone({ f: 1400, to: 900, dur: 0.5, type: "sine", vol: 0.06, at: 0.08, vibrato: 30 }); },
+    monsoon: () => { noise({ filter: "lowpass", f: 3000, to: 1200, dur: 2.2, vol: 0.35, attack: 0.4 }); noise({ filter: "lowpass", f: 120, dur: 1.4, vol: 0.6, attack: 0.05, at: 0.2 }); }, // a downpour, and thunder
+    gotMonkey: () => notes([660, 880, 660], { gap: 0.07, dur: 0.08, type: "square", vol: 0.07 }),
+    monkeySwing: () => { noise({ filter: "bandpass", f: 900, to: 2600, q: 1.2, dur: 0.4, vol: 0.3 }); tone({ f: 500, to: 900, dur: 0.15, type: "square", vol: 0.06, at: 0.1 }); tone({ f: 900, to: 500, dur: 0.15, type: "square", vol: 0.06, at: 0.25 }); },
+    monkeyGrab: () => { noise({ filter: "lowpass", f: 900, dur: 0.12, vol: 0.4 }); notes([880, 1100], { gap: 0.06, dur: 0.08, type: "square", vol: 0.07 }); },
+    monkeyHoot: () => notes([700, 950, 700, 950], { gap: 0.08, dur: 0.09, type: "square", vol: 0.07 }),
     snowstorm: () => { noise({ filter: "bandpass", f: 900, to: 2200, q: 1.2, dur: 2, vol: 0.3, attack: 0.6 }); tone({ f: 220, to: 330, dur: 1.6, type: "sine", vol: 0.06, attack: 0.5, vibrato: 12 }); },
     gotSnowball: () => { noise({ filter: "highpass", f: 2500, dur: 0.12, vol: 0.25 }); tone({ f: 1320, dur: 0.12, type: "triangle", vol: 0.08, at: 0.05 }); },
     throwSnowball: () => noise({ filter: "bandpass", f: 1800, to: 700, q: 1, dur: 0.18, vol: 0.25 }),

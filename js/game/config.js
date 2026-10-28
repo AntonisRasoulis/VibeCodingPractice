@@ -94,6 +94,41 @@ const FIREHAWK = {
   diveSpeed: 420,
 };
 
+// The jungle's own two orbs (only found in the jungle): about 15% of its orbs each.
+// Monsoon (gold): works at once. Pouring rain, and a fast river rises up out of the ground over
+// everything, above the tallest obstacle, for 10 seconds. Nothing can hurt you while it's flooded:
+// just stay on the logs drifting along it. Fall in and the current sweeps you back, fast, until you
+// catch a log again. When it drains, the log you're on carries you down onto safe ground.
+const MONSOON = {
+  chance: 0.15,
+  time: 10,          // seconds it lasts (rising and draining included)
+  rise: 1.2,         // seconds the water takes to rise...
+  drain: 1.2,        // ...and to drain away at the end
+  surface: 30,       // how high it rises (the water's surface, pixels from the top: above every obstacle)
+  logSpeed: 42,      // the logs drift left this fast (twice a jungle river's speed)
+  logWidths: [32, 40],
+  gap: [24, 32],     // water between one log and the next (3-4 tiles: an easy hop)
+  sweep: 240,        // fall in and the current carries you left this fast (running is 96)...
+  sweepFor: 0.8,     // ...for at least this long, then you grab the first log you come to
+};
+// Monkey (light blue, S / Down): it swings in fast from the top of the screen on a vine, sweeping
+// through the other player. If it catches them it carries them up and flings them a little back;
+// either way it then jumps off its vine after them (at running speed) and once it gets them it sits
+// on their head and covers their eyes with two big hands for 4 seconds. Jump the swing to dodge it.
+// Alone, it swings you forward to the next safe spot instead.
+const MONKEY = {
+  chance: 0.15,
+  radius: 100,       // its vine: the swing's radius (the vine hangs from above the top of the screen)
+  swing: 0.7,        // seconds for the whole swing (fastest at the bottom, where it sweeps through you)
+  carry: 0.18,       // caught: swept up off your feet for this long...
+  fling: [70, 160],  // ...then flung back (and up): about 6 tiles in all
+  chaseSpeed: 96,    // jumping off its vine, it chases at running speed
+  giveUp: 8,         // ...for this long at most
+  blind: 4,          // seconds it covers your eyes
+  ferry: 0.9,        // alone: seconds to swing you to the next safe spot
+  ferryAhead: 8,     // ...at least this many tiles ahead
+};
+
 // The snow's own two orbs (only found in the snow): about 15% of its orbs each.
 // Snowstorm (gold): works at once. For 10 seconds a blizzard whites out everyone's screen, and
 // anyone who isn't holding left or right (jumping doesn't count) freezes solid within a second,

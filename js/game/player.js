@@ -79,6 +79,10 @@ class Player {
     this.stormHits = 0;           // ...and how many jumps we've cracked the ice with
     this.iceLock = 0;             // seconds left frozen by a snowball (no way out)
     this.skate = 0;               // seconds left on skates (faster on ice)
+    this.flood = null;            // a monsoon's flood: { surface } (nothing can hurt us while it's up)
+    this.inFlood = false;         // ...fell in: swept back by the current until we catch a log
+    this.floodT = 0;
+    this.blind = 0;               // seconds left with a monkey's hands over our eyes
     this.inQuick = false;         // stuck in quicksand
     this.inRiver = null;          // fell in a jungle river: the current is carrying us back to its near bank
     this.eatenBy = null;          // inside a jungle flytrap that's chewing us
@@ -107,6 +111,7 @@ class Player {
     if (this.rescueBlock > 0) this.rescueBlock -= dt;
     if (this.honey > 0) this.honey -= dt;
     if (this.poison > 0) this.poison -= dt;
+    if (this.blind > 0) this.blind -= dt;
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
@@ -173,6 +178,7 @@ class Player {
     // Stuck in quicksand: sinking, unless you keep pressing jump
     if (this.inQuick) return this.updateQuicksand(dt, input, level);
     if (this.inRiver) return this.updateRiver(dt, level);
+    if (this.inFlood) return this.updateFlood(dt, level);
     if (this.inSink) return this.updateSink(dt, input, level);
     if (this.inPond) return this.updatePond(dt, input, level);
 
@@ -299,6 +305,18 @@ class Player {
     this.moveY(this.vy * dt, level);
     if (this.vy >= 0) this.landOnPlatforms(level, prevBottom);
     this.onIce = this.onGround && !this.standingOn && level.isIce(Math.floor((this.x + HITBOX_W / 2) / TILE));
+    // A monsoon's flood: off the logs and into the water, and the current takes you
+    if (this.flood && !(this.onGround && this.standingOn && this.standingOn.kind === "flood") && this.y + HITBOX_H > this.flood.surface + 3) {
+      this.inFlood = true;
+      this.floodT = 0;
+      this.vx = this.vy = 0;
+      this.onGround = false;
+      this.standingOn = null;
+      this.sparkle("#bfe9ff");
+      Sound.play("splash");
+      return;
+    }
+    if (this.flood) return; // (nothing can hurt you while it's flooded)
     // Stepped into quicksand
     if (this.onGround && !this.standingOn && level.isQuick(Math.floor((this.x + HITBOX_W / 2) / TILE))) {
       this.inQuick = true;
@@ -454,6 +472,30 @@ class Player {
   // ---- Jungle: swept along a river ----
 
   // No control: the current carries you back to the near bank, where you climb out
+  // Swept along by a monsoon's flood, up to our neck: carried back, fast, until we've been in a moment
+  // and a log comes under us. (When the water drains away, we drop wherever we are.)
+  updateFlood(dt, level) {
+    if (!this.flood) { this.inFlood = false; this.onGround = false; return; }
+    this.floodT += dt;
+    this.stun = 0;
+    this.facing = -1;
+    this.vx = -MONSOON.sweep;
+    this.vy = 0;
+    this.x = Math.max(0, this.x - MONSOON.sweep * dt);
+    this.y = this.flood.surface - 5;
+    if (this.floodT < MONSOON.sweepFor) return;
+    const mid = this.x + HITBOX_W / 2;
+    const log = level.platforms.find((p) => p.kind === "flood" && mid > p.x + 2 && mid < p.x + p.w - 2);
+    if (log) {
+      this.inFlood = false;
+      this.y = log.y - HITBOX_H;
+      this.vx = 0;
+      this.onGround = true;
+      this.standingOn = log;
+      Sound.play("land");
+    }
+  }
+
   updateRiver(dt, level) {
     const r = this.inRiver;
     if (this.x + HITBOX_W / 2 >= r.x1) { this.inRiver = null; return; } // (thrown out of it somehow)
@@ -959,7 +1001,7 @@ class Player {
   }
 
   die() {
-    if (this.dead) return;
+    if (this.dead || this.flood) return; // (nothing can hurt you while it's flooded)
     this.onPond = null;
     this.trapped = 0;
     this.inSink = null;
@@ -972,6 +1014,8 @@ class Player {
     this.stormIce = false;
     this.chill = 0;
     this.iceLock = 0;
+    this.blind = 0;
+    this.inFlood = false;
     this.spin = 0;
     this.dashHold = 0;
     this.dashTime = 0;

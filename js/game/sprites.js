@@ -1002,6 +1002,44 @@ function makeJungleLayers() {
   return { far, mid, near };
 }
 
+// ---- The jungle's orbs ----
+
+// The monsoon orb: a gold coin with blue raindrops falling on a wave
+const MONSOON_ORB_ROWS = ["..oooo..", ".oybyyo.", "oyybyyyo", "oybyybyo", "oyyybyyo", "owwwwwwo", ".obbbbo.", "..oooo.."];
+// The monkey orb: a light blue coin with a monkey's face (big brown muzzle, pink ears sticking out)
+const MONKEY_ORB_ROWS = ["..oooo..", ".obbbbo.", "obfbbfbo", "pbkbbkbp", "obffffbo", "obfnnfbo", ".obmmbo.", "..oooo.."];
+// The monkey, facing right: hanging from its vine, carrying someone, leaping, sitting on a head.
+// b fur, d dark fur (hands, feet, tail), f face and belly, k eyes, m mouth
+const MONKEY_FRAMES = {
+  hang: [".....dd.....", "....b..b....", "....b..b....", "...bbbbbb...", "..bbffffbb..", "..bfkffkfb..", "...ffmmff...", "....bffb....", "...bbffbb...", "...bbffbb..d", "....bbbb..d.", "....b..b.dd.", "...dd..dd..."],
+  carry: [".....dd.....", "....b.......", "....b.......", "...bbbbbb...", "..bbffffbb..", "..bfkffkfb..", "...ffmmff...", "....bffbb...", "...bbffb.b..", "...bbffb..b.", "....bbbb..dd", "....b..b..d.", "...dd..dd.dd"],
+  leap: ["............", "d..........d", ".b..bbbb..b.", "..bbbbbbbb..", "...bffffb...", "...fkffkf...", "...ffmmff...", "....bffb....", "...bbffbb...", "..bb.bb.bb..", ".dd......dd.", "....dddd....", "............"],
+  sit: ["...bbbbbb...", "..bbffffbb..", "..bfkffkfb..", "...ffmmff...", "..b.bffb.b..", ".bb.bffb.bb.", ".d..bbbb..d.", "...bb..bb.dd", "...dd..dd..d"],
+};
+const MONKEY_PALETTE = { b: "#7a4a2a", d: "#4a2a14", f: "#e8c090", k: "#1a0e06", m: "#c87a5a" };
+// One of its big hands over your eyes (right hand, fingers up), drawn small and blown up into big chunky pixels.
+// o outline, b fur on the back of the hand, t palm, p finger pads, c creases
+const MONKEY_HAND_ROWS = [
+  "...oo.oo.oo.oo.....",
+  "..obpobpobpobpo....",
+  "..obtobtobtobto....",
+  "..obtobtobtobto....",
+  "..obtobtobtobto.oo.",
+  "..obtbbtbbtbbtoobpo",
+  "..obttttttttttobtto",
+  "..obtttttttttttttbo",
+  "..obtccccttttttttbo",
+  "..obttttcccttttbbo.",
+  "..obtttttttttttbo..",
+  "..obttccccttttbbo..",
+  "...obtttttttttbo...",
+  "...obbttttttbbbo...",
+  "....obbbbbbbbbo....",
+  "....obbbbbbbbbo....",
+  "....obbbbbbbbbo....",
+];
+const MONKEY_HAND_PALETTE = { o: "#2a160a", b: "#7a4a2a", t: "#d8a878", p: "#e8c098", c: "#b8885a" };
+
 // ---- The snow's orbs ----
 
 // The snowstorm orb: a gold coin with a white snowflake
@@ -1354,6 +1392,10 @@ function buildSprites() {
     windOrb: spriteFromRows(WIND_ORB_ROWS, ABILITY_ORB_PALETTE),
     droneOrb: spriteFromRows(DRONE_ORB_ROWS, ABILITY_ORB_PALETTE),
     drone: Object.fromEntries(Object.entries(DRONE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, DRONE_PALETTE)])),
+    monsoonOrb: spriteFromRows(MONSOON_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", b: "#3f8fd0", w: "#2a7f8f" }),
+    monkeyOrb: spriteFromRows(MONKEY_ORB_ROWS, { o: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, b: "#7a4a2a", f: "#e8c090", k: "#1a0e06", m: "#8a3a2a", p: "#d89878", n: "#5a3018" }),
+    monkeys: Object.fromEntries(Object.entries(MONKEY_FRAMES).map(([f, rows]) => { const img = spriteFromRows(rows, MONKEY_PALETTE); return [f, [img, flipped(img)]]; })),
+    monkeyHand: spriteFromRows(MONKEY_HAND_ROWS, MONKEY_HAND_PALETTE),
     stormOrb: spriteFromRows(STORM_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", w: "#ffffff" }),
     snowballOrb: spriteFromRows(SNOWBALL_ORB_ROWS, { o: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, w: "#ffffff", s: "#a8d4f0" }),
     thrownSnowball: spriteFromRows(THROWN_SNOWBALL_ROWS, { w: "#ffffff", s: "#a8d4f0" }),

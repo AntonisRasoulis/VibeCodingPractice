@@ -93,6 +93,8 @@ const Renderer = (() => {
     drawGroundFires(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
+    drawFlood(world, camX, world.time);
+
     // (someone hiding in a bush can't be seen, on either screen)
     if (other && !other.dead && !other.caught && !other.hiddenIn && !other.eatenBy) {
       b.globalAlpha = 0.35; // the other runner shows as a ghost
@@ -113,6 +115,7 @@ const Renderer = (() => {
       if (!p.hiddenIn) drawWiggleHint(p, camX, world.time);
     }
     drawBushes(world.level, camX, false); // whole bushes: in front, so they hide whoever is inside
+    drawFloodFront(world, camX, world.time); // (anyone in the flood is up to their neck in it)
     for (const p of [player, other]) if (p && p.inSink && !p.dead) drawSinkPile(p.inSink, camX); // sand round their legs
     drawIceBlocks(world.level, camX); // anyone frozen in a pond, in their block of ice
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
@@ -122,6 +125,7 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSnowIce(p, camX, world.time, p === other);
     for (const sb of world.thrownSnowballs) b.drawImage(sprites.thrownSnowball, Math.round(sb.x - camX) - 2, Math.round(sb.y) - 2);
+    for (const mk of world.monkeys) drawMonkey(mk, camX, world.time);
     for (const a of world.arrows) drawArrow(a, camX);
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
@@ -143,6 +147,9 @@ const Renderer = (() => {
     if (storm > 0) drawSandstorm(storm, world.time);
     const blizzard = Game.snowstormStrength();
     if (blizzard > 0) drawBlizzard(blizzard, world.time);
+    const monsoon = Game.monsoonStrength();
+    if (monsoon > 0) drawRain(monsoon, world.time);
+    if (player.blind > 0 && !player.dead) drawMonkeyHands(player.blind);
   }
 
   // ---- Snow biome ----
@@ -708,6 +715,95 @@ const Renderer = (() => {
     b.globalAlpha = 1;
   }
 
+  // ---- The jungle's orbs: monsoon and monkey ----
+
+  // The flood: deep water over everything (you can still make out what's under it), and the logs on it
+  function drawFlood(world, camX, time) {
+    const surf = Game.floodSurface();
+    if (surf === null) return;
+    const s = Math.round(surf);
+    b.globalAlpha = 0.72;
+    b.fillStyle = "#2a7f8f";
+    b.fillRect(0, s, VIEW_W, VIEW_H - s);
+    b.fillStyle = "#1f6676";
+    b.fillRect(0, s + 6, VIEW_W, VIEW_H - s - 6);
+    b.globalAlpha = 1;
+    // the current, streaking left
+    b.fillStyle = "#9fe0e8";
+    for (let i = 0; i < 30; i++) {
+      const x = ((((i * 53) - time * 100 - camX * 0.0) % VIEW_W) + VIEW_W) % VIEW_W;
+      const y = s + 5 + ((i * 17) % Math.max(1, VIEW_H - s - 6));
+      b.globalAlpha = 0.5;
+      b.fillRect(Math.round(x), y, 5 + (i % 3) * 3, 1);
+    }
+    b.globalAlpha = 1;
+    for (const log of world.monsoon.logs) {
+      const sx = Math.round(log.x - camX);
+      if (sx > VIEW_W || sx + log.w < 0) continue;
+      b.drawImage(sprites.logs[log.w] || sprites.logs[40], sx, Math.round(log.y));
+    }
+  }
+
+  // ...and its surface in front: waves, covering the bottom of the logs and anyone swept along in it
+  function drawFloodFront(world, camX, time) {
+    const surf = Game.floodSurface();
+    if (surf === null) return;
+    const s = Math.round(surf);
+    b.globalAlpha = 0.85;
+    b.fillStyle = "#2a7f8f";
+    b.fillRect(0, s + 2, VIEW_W, 3);
+    b.globalAlpha = 1;
+    b.fillStyle = "#3fa0a8";
+    for (let x = 0; x < VIEW_W; x++) b.fillRect(x, s + Math.round(Math.sin((x + camX) * 0.15 + time * 6)), 1, 2);
+  }
+
+  // Pouring rain over everything (a little darker), splashing where it lands on the water
+  function drawRain(s, time) {
+    b.globalAlpha = 0.18 * s;
+    b.fillStyle = "#304a60";
+    b.fillRect(0, 0, VIEW_W, VIEW_H);
+    b.fillStyle = "#d8ecff";
+    for (let i = 0; i < 160; i++) {
+      const x = ((i * 83 + time * 60) % (VIEW_W + 20)) - 10, y = ((i * 47 + time * 420) % (VIEW_H + 20)) - 10;
+      b.globalAlpha = (0.35 + (i % 3) * 0.15) * s;
+      b.fillRect(Math.round(x), Math.round(y), 1, 4 + (i % 3));
+    }
+    b.globalAlpha = 1;
+  }
+
+  // The monkey: swinging on its vine (from above the top of the screen), scampering, or on someone's head
+  function drawMonkey(mk, camX, time) {
+    const x = Math.round(mk.x - camX), y = Math.round(mk.y);
+    if (x < -40 || x > VIEW_W + 40) return;
+    if (mk.mode === "swing" || mk.mode === "carry" || (mk.mode === "fetch" && !mk.from)) {
+      const ax = mk.mode === "fetch" ? x : Math.round(mk.ax - camX), ay = mk.mode === "fetch" ? -40 : Math.round(mk.ay);
+      b.fillStyle = "#4f8a2f";
+      const n = Math.max(1, Math.ceil(Math.hypot(x - ax, y - ay) / 2));
+      for (let k = 0; k <= n; k++) b.fillRect(Math.round(ax + (x - ax) * k / n), Math.round(ay + (y - 6 - ay) * k / n), 2, 1);
+    }
+    let frame = mk.frame;
+    if (mk.mode === "ride") frame = "sit";
+    const img = sprites.monkeys[frame][mk.facing < 0 ? 1 : 0];
+    b.drawImage(img, x - 6, mk.mode === "ride" ? y - img.height + 4 : y - 6);
+    if (mk.mode === "ride") { // its tail, swishing
+      b.fillStyle = "#4a2a14";
+      b.fillRect(x + 5, y - 1 + (Math.floor(time * 6) % 2), 1, 2);
+    }
+  }
+
+  // Two big monkey hands over your eyes: they slap on, stay, then come away
+  function drawMonkeyHands(left) {
+    const img = sprites.monkeyHand, k = 9;
+    const on = Math.min(1, (MONKEY.blind - left) / 0.18), off = Math.min(1, left / 0.25);
+    const slide = Math.round((1 - Math.min(on, off)) * VIEW_H);
+    b.save();
+    b.translate(30 + img.width * k, -6 + slide);
+    b.scale(-1, 1);
+    b.drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width * k, img.height * k);
+    b.restore();
+    b.drawImage(img, 0, 0, img.width, img.height, 206, -2 + slide, img.width * k, img.height * k);
+  }
+
   // ---- The snow's orbs: snowstorm and snowball ----
 
   // Frost creeping up someone standing still in a snowstorm, the ice block it freezes them in
@@ -1091,7 +1187,7 @@ const Renderer = (() => {
 
   function drawPlatforms(level, player, camX, time) {
     for (const p of level.platforms) {
-      if (p.kind === "log") continue; // (drawn with their river)
+      if (p.kind === "log" || p.kind === "flood") continue; // (drawn with their river, or the flood)
       const sx = Math.round(p.x - camX);
       if (sx > VIEW_W || sx + p.w < 0) continue;
 
@@ -1164,12 +1260,12 @@ const Renderer = (() => {
       if (sx < -10 || sx > VIEW_W) continue;
       const bob = Math.round(Math.sin(time * 3 + o.x) * 1.5);
       if (Math.floor(time * 4) % 2) {
-        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone" || o.kind === "firehawk" || o.kind === "snowball";
+        const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone" || o.kind === "firehawk" || o.kind === "snowball" || o.kind === "monkey";
         b.fillStyle = ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb, snowstorm: sprites.stormOrb, snowball: sprites.snowballOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb, snowstorm: sprites.stormOrb, snowball: sprites.snowballOrb, monsoon: sprites.monsoonOrb, monkey: sprites.monkeyOrb }[o.kind] || sprites.orb;
       if (o.kind === "wind") drawOrbWisps(sx, o.y + bob, time + o.x);
       b.drawImage(sprite, sx, o.y + bob);
     }
@@ -1395,6 +1491,7 @@ const Renderer = (() => {
         zap: ["#ffffff", "#28aaff", "#5a2bd0", "#28aaff"],
         firehawk: ["#fff3b0", "#ff7a1a", "#ffd23f", "#c8301a"],
         snowball: ["#ffffff", "#a8e0ff", "#ffffff", "#6cc4f0"],
+        monkey: ["#e8c090", "#7a4a2a", "#c8946a", "#4a2a14"],
       }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }

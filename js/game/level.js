@@ -1225,7 +1225,12 @@ const SECTIONS = {
       : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance ? "hand"
       : roll < WIND.chance + DASH.chance + ZAP.chance + HAND.chance + DRONE.chance ? "drone"
       : this.rng() < FREEZE_CHANCE ? "freeze" : "swap";
-    // the snow's and the desert's own orbs: a snowstorm or snowball; a sandstorm or firehawk
+    // each biome's own orbs: monsoon or monkey (jungle), snowstorm or snowball (snow), sandstorm or firehawk (desert)
+    if (this.biome === "jungle") {
+      const r = this.rng();
+      if (r < MONSOON.chance) kind = "monsoon";
+      else if (r < MONSOON.chance + MONKEY.chance) kind = "monkey";
+    }
     if (this.biome === "snow") {
       const r = this.rng();
       if (r < SNOWSTORM.chance) kind = "snowstorm";

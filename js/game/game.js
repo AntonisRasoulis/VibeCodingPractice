@@ -55,6 +55,8 @@ const Game = (() => {
       sandstorm: null, // the desert's sandstorm orb, blowing: { t, owner }
       snowstorm: null, // the snow's snowstorm orb, blowing: { t }
       thrownSnowballs: [], // snowballs thrown with the snowball orb
+      monsoon: null,   // the jungle's monsoon orb, flooding the course: { t, logs }
+      monkeys: [],     // monkeys swinging in on their vines (the monkey orb)
       hawks: [],    // firehawks: flying out to drop a burning stick, or (alone) circling you
       sticks: [],   // burning sticks falling from a firehawk
       burns: [],    // a puff of fire where a firehawk burned an animal
@@ -131,23 +133,30 @@ const Game = (() => {
     const inputs = players.map((p, i) => readInput(i));
     players.forEach((p, i) => p.update(dt, inputs[i], level));
     players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
+    updateMonsoon(dt);
+    const flooded = world.monsoon !== null; // (while it's flooded, every danger waits)
     updateDrones(dt);
     updateBolts(dt);
     updateHands(dt);
-    updateMissiles(dt);
-    updateBears(dt);
-    updateVultures(dt);
-    updateFlytraps(dt);
-    updateTurrets(dt);
-    updateArrows(dt);
+    if (!flooded) {
+      updateMissiles(dt);
+      updateBears(dt);
+      updateVultures(dt);
+      updateFlytraps(dt);
+      updateTurrets(dt);
+      updateArrows(dt);
+    }
+    updateMonkeys(dt);
     updateSandstorm(dt);
     updateSnowstorm(dt);
     updateThrownSnowballs(dt);
     updateHawks(dt);
-    updateSticks(dt);
-    updateFires(dt);
-    updateJaguars(dt);
-    updateDecoys(dt);
+    if (!flooded) {
+      updateSticks(dt);
+      updateFires(dt);
+      updateJaguars(dt);
+      updateDecoys(dt);
+    }
     checkOrbs();
     checkThinIce();
     checkTrapRescue();
@@ -230,15 +239,21 @@ const Game = (() => {
         if (p.dead || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
-          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk" || orb.kind === "snowball") {
-            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff" }[orb.kind]);
-            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone", firehawk: "gotHawk", snowball: "gotSnowball" }[orb.kind]);
+          if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk" || orb.kind === "snowball" || orb.kind === "monkey") {
+            p.sparkle({ zap: "#bff4ff", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#c8946a" }[orb.kind]);
+            Sound.play({ zap: "gotZap", hand: "gotHand", wind: "gotWind", drone: "gotDrone", firehawk: "gotHawk", snowball: "gotSnowball", monkey: "gotMonkey" }[orb.kind]);
             // Alone, the drone (and the firehawk) start guarding you right away with no button press,
             // and the snowball (with nobody to throw it at) gives you skates
             if (world.solo && orb.kind === "drone") launchDrone(p);
             else if (world.solo && orb.kind === "firehawk") launchHawk(p);
             else if (world.solo && orb.kind === "snowball") { p.skate = SNOWBALL.skate; p.showHit("SKATES!", "#a8e0ff"); }
             else p.power = orb.kind; // holding one power at a time: the newest replaces the old
+            return;
+          }
+          if (orb.kind === "monsoon") {
+            if (!world.monsoon) startMonsoon();
+            for (const q of world.players) if (!q.caught) q.showHit("MONSOON! STAY ON THE LOGS!", "#9fe0e8");
+            Sound.play("monsoon");
             return;
           }
           if (orb.kind === "snowstorm") {
@@ -297,6 +312,7 @@ const Game = (() => {
     else if (p.power === "drone") launchDrone(p);
     else if (p.power === "firehawk") launchHawk(p);
     else if (p.power === "snowball") throwSnowball(p);
+    else if (p.power === "monkey") launchMonkey(p);
     p.power = null;
   }
 
@@ -1057,6 +1073,268 @@ const Game = (() => {
     for (const p of world.players) p.windPush = s * SANDSTORM.push * (st && p === st.owner ? SANDSTORM.ownPush : 1);
   }
 
+  // ---- The jungle's orbs: monsoon and monkey ----
+
+  // How high the water is (its surface, pixels from the top): rising up out of the ground, staying
+  // up over everything, then draining away
+  function floodSurface() {
+    const m = world.monsoon;
+    if (!m) return null;
+    const low = VIEW_H + 4, high = MONSOON.surface;
+    const up = Math.min(1, m.t / MONSOON.rise), down = Math.max(0, (m.t - (MONSOON.time - MONSOON.drain)) / MONSOON.drain);
+    const ease = (u) => u * u * (3 - 2 * u);
+    return low + (high - low) * ease(up) + (low - high) * ease(down);
+  }
+
+  // The water's coming: the dangers are washed away (or wait it out), everyone stuck in something
+  // is let go, and a log rises up under everyone's feet
+  function startMonsoon() {
+    const { level, players } = world;
+    world.monsoon = { t: 0, logs: [], draining: false };
+    for (const v of world.vultures) v.done = true;
+    for (const bear of world.bears) bear.done = true;
+    for (const j of world.jaguars) j.done = true;
+    world.missiles = [];
+    world.arrows = [];
+    world.sticks = [];
+    level.fires = []; // (the rain puts them out)
+    for (const tu of level.turrets) if (tu.state !== "hidden") { tu.state = "done"; tu.h = 0; tu.moving = false; }
+    for (const p of players) {
+      p.inRiver = null;
+      p.inQuick = false;
+      p.inSink = null;
+      if (p.inPond) { p.inPond.frozen = p.inPond.frozen.filter((q) => q !== p); p.inPond = null; }
+      p.trapped = 0;
+      if (p.eatenBy) { p.eatenBy.victim = null; p.eatenBy.state = "opening"; p.eatenBy.t = 0; p.eatenBy = null; }
+    }
+    for (const p of players) if (!p.dead && !p.caught) addFloodLog(p.x + HITBOX_W / 2 - 20, 40);
+    fillFloodLogs();
+  }
+
+  function addFloodLog(x, w) {
+    const log = { kind: "flood", id: world.level.nextId++, x, y: (floodSurface() ?? VIEW_H) - 2, w, dx: 0 };
+    world.monsoon.logs.push(log);
+    world.level.platforms.push(log);
+    return log;
+  }
+
+  // Logs all along the water, from well behind the last player to well ahead of the first, with an
+  // easy hop between each
+  function fillFloodLogs() {
+    const m = world.monsoon, xs = world.players.map((p) => p.x);
+    const from = Math.min(...xs) - VIEW_W, to = Math.max(...xs) + VIEW_W * 1.5;
+    const gap = () => MONSOON.gap[0] + Math.random() * (MONSOON.gap[1] - MONSOON.gap[0]);
+    const width = () => MONSOON.logWidths[Math.floor(Math.random() * MONSOON.logWidths.length)];
+    const have = m.logs.slice().sort((a, c) => a.x - c.x);
+    // walk along from behind everyone to out ahead, adding logs wherever there's room for one
+    let x = Math.min(from, have.length ? have[0].x : from);
+    for (const log of [...have, null]) {
+      const end = log ? log.x - MONSOON.gap[0] : to;
+      while (true) {
+        const w = width();
+        if (x + w > end) break;
+        addFloodLog(x, w);
+        x += w + gap();
+      }
+      if (log) x = Math.max(x, log.x + log.w + gap());
+    }
+  }
+
+  function updateMonsoon(dt) {
+    const m = world.monsoon, { level, players } = world;
+    if (!m) { for (const p of players) p.flood = null; return; }
+    m.t += dt;
+    const surf = floodSurface();
+    const riders = (log) => players.filter((p) => p.standingOn === log && !p.dead);
+    if (!m.draining && m.t >= MONSOON.time - MONSOON.drain) {
+      // draining away: each log someone's riding drifts them down onto the nearest safe ground
+      m.draining = true;
+      for (const log of m.logs) {
+        const p = riders(log)[0];
+        if (!p) continue;
+        const a = level.safeSpotBefore(p.x + 1, 480), c = level.safeSpotAfter(p.x, 480);
+        const spot = !a ? c : !c ? a : (p.x - a.x <= c.x - p.x ? a : c);
+        if (spot) log.land = { x0: log.x, y0: log.y, dx: spot.x - p.x, y1: spot.y + HITBOX_H, t: 0 };
+      }
+    }
+    for (const log of m.logs) {
+      const ox = log.x, oy = log.y;
+      if (log.land) {
+        const L = log.land, u = Math.min(1, (L.t += dt) / MONSOON.drain), e = u * u * (3 - 2 * u);
+        log.x = L.x0 + L.dx * e;
+        log.y = L.y0 + (L.y1 - L.y0) * e;
+      } else {
+        if (m.t >= MONSOON.rise) log.x -= MONSOON.logSpeed * dt; // (they only start drifting once the water's all the way up)
+        // (lying on the ground until the water reaches them and lifts them, bobbing)
+        const rest = level.groundTop(log.x + log.w / 2) ?? VIEW_H + 4;
+        log.y = Math.min(rest, surf - 2 + Math.sin(world.time * 3 + log.id) * 0.6);
+      }
+      log.dx = log.x - ox;
+      // Rising up out of the ground, it scoops up whoever's standing there (the water mustn't beat it
+      // to them); sinking as the water drains, it takes whoever's on it down with it (so they go
+      // wherever it goes)
+      if (log.y !== oy) for (const p of players) {
+        if (p.dead || p.caught || p.held || p.inFlood || p.vy < 0 || p.x + HITBOX_W <= log.x || p.x >= log.x + log.w) continue;
+        const feet = p.y + HITBOX_H;
+        const on = log.y < oy ? feet >= log.y - 0.5 && feet <= oy + 2 : feet >= oy - 1 && feet <= oy + 3;
+        if (on) { p.y = log.y - HITBOX_H; p.vy = 0; p.onGround = true; p.standingOn = log; }
+      }
+    }
+    if (m.t >= MONSOON.time) {
+      // gone: everyone's back on the ground (or wherever they were)
+      level.platforms = level.platforms.filter((p) => p.kind !== "flood");
+      for (const p of players) { if (p.standingOn && p.standingOn.kind === "flood") { p.standingOn = null; p.onGround = false; } p.flood = null; p.inFlood = false; }
+      world.monsoon = null;
+      return;
+    }
+    // logs drift off behind everyone and new ones come in ahead
+    const minX = Math.min(...players.map((p) => p.x));
+    const gone = m.logs.filter((l) => l.x + l.w < minX - VIEW_W * 1.5 && !riders(l).length);
+    if (gone.length) {
+      m.logs = m.logs.filter((l) => !gone.includes(l));
+      level.platforms = level.platforms.filter((p) => !gone.includes(p));
+    }
+    if (!m.draining) fillFloodLogs();
+    for (const p of players) p.flood = { surface: surf };
+  }
+
+  // The monkey swings in from the top of the screen on its vine, sweeping through the other player
+  // (it aims for where they'll be at the bottom of its swing). Alone, it swings you forward instead.
+  function launchMonkey(p) {
+    const target = world.players.find((q) => q !== p && !q.caught);
+    Sound.play("monkeySwing");
+    if (!target || world.solo) {
+      const spot = world.level.safeSpotAfter(p.x + MONKEY.ferryAhead * TILE, 480) || landingAfter(p.x + MONKEY.ferryAhead * TILE);
+      if (!spot) return;
+      world.monkeys.push({ mode: "fetch", owner: p, target: p, spot, t: 0, x: p.x - 60, y: -14, frame: "hang" });
+      return;
+    }
+    const bottomT = MONKEY.swing / 2;
+    const bx = target.x + HITBOX_W / 2 + target.vx * bottomT, by = target.y + HITBOX_H / 2;
+    world.monkeys.push({ mode: "swing", owner: p, target, t: 0, ax: bx, ay: by - MONKEY.radius, x: bx + MONKEY.radius, y: by - MONKEY.radius, frame: "hang", facing: -1 });
+  }
+
+  function updateMonkeys(dt) {
+    const { level } = world;
+    for (const mk of world.monkeys) {
+      mk.t += dt;
+      const q = mk.target;
+      const gone = q.dead || q.caught;
+      if (mk.mode === "swing" || mk.mode === "carry") {
+        // round the swing: from the right, down through the bottom (fastest) and up the left
+        const u = Math.min(1, mk.t / MONKEY.swing), a = Math.PI * (1 - Math.cos(Math.PI * u)) / 2;
+        if (mk.mode === "swing") {
+          mk.x = mk.ax + Math.cos(a) * MONKEY.radius;
+          mk.y = mk.ay + Math.sin(a) * MONKEY.radius;
+        }
+        mk.facing = -1;
+        if (mk.mode === "swing" && !gone && !q.held && mk.y > mk.ay + MONKEY.radius - 8 && overlaps(q.x, q.y, HITBOX_W, HITBOX_H, mk.x - 4, mk.y - 4, 8, 8)) {
+          mk.mode = "carry";
+          mk.caughtAt = mk.t;
+          q.held = true;
+          q.vx = q.vy = 0;
+          q.inQuick = false;
+          q.trapped = 0;
+          q.showHit("GRABBED BY A MONKEY!", "#c8946a");
+          Sound.play("monkeyGrab");
+        }
+        if (mk.mode === "carry") {
+          // swept up off their feet (a short way: the swing is fast)
+          const c = Math.min(1, (mk.t - mk.caughtAt) / MONKEY.carry);
+          if (!mk.from) mk.from = { x: q.x, y: q.y };
+          mk.frame = "carry";
+          q.x = mk.from.x - 14 * c;
+          q.y = mk.from.y - 18 * c;
+          mk.x = q.x + HITBOX_W / 2;
+          mk.y = q.y - 6;
+          if (mk.t - mk.caughtAt >= MONKEY.carry || gone) {
+            // fling them back, and leap off after them
+            q.held = false;
+            q.vx = -MONKEY.fling[0];
+            q.vy = -MONKEY.fling[1];
+            q.onGround = false;
+            q.standingOn = null;
+            q.stun = 0.35;
+            q.noCut = 0.5;
+            mk.mode = "leap";
+            mk.vx = -MONKEY.fling[0] * 0.6;
+            mk.vy = -120;
+          }
+        } else if (u >= 0.62) {
+          // missed: it lets go of its vine and comes after them anyway
+          mk.mode = "leap";
+          mk.vx = -60;
+          mk.vy = -40;
+        }
+      } else if (mk.mode === "leap" || mk.mode === "chase") {
+        mk.frame = mk.mode === "leap" ? "leap" : "hang";
+        if (gone || mk.t > MONKEY.giveUp + MONKEY.swing) { mk.mode = "leave"; continue; }
+        if (mk.mode === "leap") {
+          mk.vy += PHYSICS.gravity * dt;
+          mk.x += mk.vx * dt;
+          mk.y += mk.vy * dt;
+          const g = level.groundTop(mk.x) ?? VIEW_H;
+          if (mk.y >= g - 6 && mk.vy > 0) { mk.y = g - 6; mk.mode = "chase"; }
+        } else {
+          // scamper after them at running speed, along the ground (or the logs)
+          const dir = Math.sign(q.x + HITBOX_W / 2 - mk.x) || 1;
+          mk.facing = dir;
+          mk.x += dir * MONKEY.chaseSpeed * dt;
+          const g = level.groundTop(mk.x);
+          mk.y = g !== null ? g - 6 : Math.min(mk.y + 200 * dt, VIEW_H);
+          mk.frame = Math.floor(mk.t * 10) % 2 ? "leap" : "hang";
+        }
+        // close enough: it jumps up onto their head
+        if (!q.held && Math.abs(mk.x - (q.x + HITBOX_W / 2)) < 9 && Math.abs(mk.y - (q.y + 2)) < 22) {
+          mk.mode = "ride";
+          mk.t = 0;
+          q.blind = MONKEY.blind;
+          q.showHit("CAN'T SEE!", "#c8946a");
+          Sound.play("monkeyHoot");
+        }
+      } else if (mk.mode === "ride") {
+        mk.frame = "sit";
+        mk.x = q.x + HITBOX_W / 2;
+        mk.y = q.y - 4;
+        if (gone || q.blind <= 0) { q.blind = 0; mk.mode = "leave"; mk.t = 0; }
+      } else if (mk.mode === "fetch") {
+        // alone: swing down to you, then carry you along an arc to the safe spot ahead
+        const down = 0.35;
+        if (mk.t < down) {
+          const u = mk.t / down;
+          mk.x = q.x + HITBOX_W / 2 - 60 * (1 - u);
+          mk.y = -14 + (q.y - 4 + 14) * u * u;
+          mk.frame = "hang";
+          mk.facing = 1;
+        } else {
+          if (!mk.from) { mk.from = { x: q.x, y: q.y }; q.held = true; q.vx = q.vy = 0; Sound.play("monkeyGrab"); }
+          const u = Math.min(1, (mk.t - down) / MONKEY.ferry), e = u * u * (3 - 2 * u);
+          q.x = mk.from.x + (mk.spot.x - mk.from.x) * e;
+          q.y = mk.from.y + (mk.spot.y - mk.from.y) * e - Math.sin(Math.PI * u) * 46;
+          mk.x = q.x + HITBOX_W / 2;
+          mk.y = q.y - 10;
+          mk.frame = "carry";
+          if (u >= 1) {
+            q.held = false;
+            q.x = mk.spot.x;
+            q.y = mk.spot.y;
+            q.vx = q.vy = 0;
+            q.onGround = true;
+            mk.mode = "leave";
+            mk.t = 0;
+          }
+        }
+      } else {
+        // off it goes, up out of sight
+        mk.frame = "leap";
+        mk.y -= 180 * dt;
+        mk.x += (mk.facing || 1) * 60 * dt;
+        if (mk.y < -30 || mk.t > 3) mk.done = true;
+      }
+    }
+    world.monkeys = world.monkeys.filter((mk) => !mk.done);
+  }
+
   // ---- The snow's orbs: snowstorm and snowball ----
 
   function snowstormStrength() {
@@ -1716,6 +1994,8 @@ const Game = (() => {
 
   return {
     sandstormStrength,
+    floodSurface,
+    monsoonStrength: () => (world.monsoon ? Math.max(0, Math.min(1, world.monsoon.t / 0.6, (MONSOON.time - world.monsoon.t) / 0.6)) : 0),
     snowstormStrength,
     init(canvasElement, cb) {
       canvas = canvasElement;
