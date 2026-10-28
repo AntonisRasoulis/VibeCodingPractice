@@ -57,6 +57,10 @@ const Game = (() => {
       thrownSnowballs: [], // snowballs thrown with the snowball orb
       monsoon: null,   // the jungle's monsoon orb, flooding the course: { t, logs }
       monkeys: [],     // monkeys swinging in on their vines (the monkey orb)
+      nextCatchup: null, // when (world time) the next purple orb comes for whoever's fallen behind
+      warps: [],       // portal gun: someone going into a portal and out of another one far ahead
+      grapples: [],    // grapple hooks flying out to the leader, or reeling them back
+      vines: [],       // vines swinging someone far forward (wherever they land)
       hawks: [],    // firehawks: flying out to drop a burning stick, or (alone) circling you
       sticks: [],   // burning sticks falling from a firehawk
       burns: [],    // a puff of fire where a firehawk burned an animal
@@ -147,6 +151,10 @@ const Game = (() => {
       updateArrows(dt);
     }
     updateMonkeys(dt);
+    updateWarps(dt);
+    updateGrapples(dt);
+    updateVines(dt);
+    updateCatchup();
     updateSandstorm(dt);
     updateSnowstorm(dt);
     updateThrownSnowballs(dt);
@@ -234,9 +242,10 @@ const Game = (() => {
     const [a, b] = world.players;
     for (const orb of world.level.orbs) {
       if (orb.used) continue;
+      if (orb.purple && world.monsoon) continue; // (not while it's flooded)
       for (const p of world.players) {
         const other = p === a ? b : a;
-        if (p.dead || (orb.kind === "swap" && other.dead)) continue;
+        if (p.dead || p.held || (orb.kind === "swap" && other.dead)) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
           if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk" || orb.kind === "snowball" || orb.kind === "monkey") {
@@ -248,6 +257,13 @@ const Game = (() => {
             else if (world.solo && orb.kind === "firehawk") launchHawk(p);
             else if (world.solo && orb.kind === "snowball") { p.skate = SNOWBALL.skate; p.showHit("SKATES!", "#a8e0ff"); }
             else p.power = orb.kind; // holding one power at a time: the newest replaces the old
+            return;
+          }
+          if (orb.purple) {
+            p.sparkle("#d9a3ff");
+            Sound.play("gotCatchup");
+            if (orb.kind === "vine") launchVine(p);
+            else p.power = orb.kind; // the portal gun and the grapple: used with S / Down
             return;
           }
           if (orb.kind === "monsoon") {
@@ -313,6 +329,10 @@ const Game = (() => {
     else if (p.power === "firehawk") launchHawk(p);
     else if (p.power === "snowball") throwSnowball(p);
     else if (p.power === "monkey") launchMonkey(p);
+    else if (p.power === "portalgun" || p.power === "grapple") {
+      if (world.monsoon || p.flood) return; // (keep it for after the flood)
+      if (!(p.power === "portalgun" ? firePortalGun(p) : throwGrapple(p))) return; // (nothing happened: keep it)
+    }
     p.power = null;
   }
 
@@ -1333,6 +1353,253 @@ const Game = (() => {
       }
     }
     world.monkeys = world.monkeys.filter((mk) => !mk.done);
+  }
+
+  // ---- Purple catch-up orbs: portal gun, grapple and vine ----
+
+  // Someone who's fallen off the leader's screen (alone: who has the fire on their screen) gets purple
+  // orbs now and then, out of sight of both of you, ahead of them. The further behind, the more often.
+  function updateCatchup() {
+    const { level, players, fire } = world;
+    const runners = players.filter((p) => !p.caught);
+    let behind = null, far = 0, lo = 0, hi = 0;
+    if (world.solo) {
+      const p = runners[0];
+      if (p && !p.dead && p.x - fire.x < CATCHUP.fireNear) {
+        behind = p;
+        far = 1 - Math.max(0, p.x - fire.x) / CATCHUP.fireNear;
+        lo = p.x + VIEW_W * 0.65 + CATCHUP.margin;
+        hi = lo + VIEW_W;
+      }
+    } else if (runners.length === 2) {
+      const [trail, lead] = [...runners].sort((p, q) => p.trackX - q.trackX);
+      const leadScreen = lead.x - VIEW_W * 0.35; // the left edge of the leader's screen
+      if (!trail.dead && !lead.dead && trail.x + HITBOX_W < leadScreen) {
+        behind = trail;
+        far = Math.min(1, (leadScreen - trail.x - HITBOX_W) / CATCHUP.far);
+        lo = trail.x + VIEW_W * 0.65 + CATCHUP.margin;
+        hi = leadScreen - CATCHUP.margin - 8;
+      }
+    }
+    if (!behind || world.monsoon) { world.nextCatchup = null; return; }
+    const wait = CATCHUP.every[0] + (CATCHUP.every[1] - CATCHUP.every[0]) * far;
+    if (world.nextCatchup === null) world.nextCatchup = world.time + wait;
+    if (world.time < world.nextCatchup) return;
+    world.nextCatchup = world.time + wait;
+    const waiting = level.orbs.filter((o) => o.purple && !o.used && o.x > behind.x).length;
+    if (waiting >= CATCHUP.maxWaiting || hi - lo < TILE * 2) return;
+    // somewhere safe to stand under it, out of both screens, away from other orbs
+    for (let from = lo; from < hi - TILE; from += 4 * TILE) {
+      const spot = level.safeSpotAfter(from, hi - from - TILE);
+      if (!spot) return;
+      if (level.orbs.some((o) => !o.used && Math.abs(o.x - spot.x) < 6 * TILE)) { from = spot.x; continue; }
+      const kinds = { ...CATCHUP.kinds };
+      if (world.solo) delete kinds.grapple;
+      level.orbs.push({ x: spot.x, y: spot.y + HITBOX_H - 32, w: 8, h: 8, used: false, kind: pickWeighted(kinds), purple: true });
+      return;
+    }
+  }
+
+  // Where the next `n` obstacles ahead of x end: pits, dangers (maces, saws, traps, turrets...) and
+  // long runs of spikes or quicksand. A single spike doesn't count. Dangers close together count as one.
+  function obstaclesEnd(x, n) {
+    const { level } = world;
+    let count = 0, cur = null;
+    const close = () => {
+      if (cur && (cur.big || cur.cols >= PORTAL_GUN.bigRun)) count++;
+      return count >= n;
+    };
+    const first = Math.floor(x / TILE) + 1;
+    for (let c = first; c < first + 800 && c < level.cols.length - 2; c++) {
+      const g = level.groundTop(c * TILE);
+      let big = false, small = false;
+      if (g === null) big = true;
+      else {
+        if (level.tile(c, g / TILE - 1) === T_SPIKE || level.isQuick(c)) small = true;
+        if (level.threatened(c * TILE + TILE / 2 - HITBOX_W / 2, g - HITBOX_H)) big = true;
+      }
+      if (!big && !small) {
+        if (cur && c - cur.end > PORTAL_GUN.merge) { if (close()) return (cur.end + 1) * TILE; cur = null; }
+        continue;
+      }
+      if (!cur) cur = { end: c, cols: 0, big: false };
+      cur.end = c;
+      cur.cols++;
+      cur.big ||= big;
+    }
+    return close() ? (cur.end + 1) * TILE : null;
+  }
+
+  // The portal gun: a portal opens right in front of you, you're pulled in, and you come out
+  // of another one on safe ground past the next 3 obstacles
+  function firePortalGun(p) {
+    const { level } = world;
+    level.ensure(p.x + VIEW_W * 8);
+    const end = obstaclesEnd(p.x + HITBOX_W, PORTAL_GUN.passes);
+    const spot = end !== null && (level.safeSpotAfter(end) || landingAfter(end));
+    if (!spot) return false;
+    world.warps.push({ owner: p, from: { x: p.x, y: p.y }, door: p.x + HITBOX_W / 2 + 10, to: spot, t: 0, out: false });
+    grab(p);
+    p.facing = 1;
+    Sound.play("portal");
+    return true;
+  }
+
+  // Taken out of whatever they were doing: something else is moving them now
+  function grab(p) {
+    p.held = true;
+    p.vx = p.vy = 0;
+    p.inQuick = false;
+    p.inRiver = null;
+    p.trapped = 0;
+    p.standingOn = null;
+    p.dashHold = 0;
+  }
+
+  function updateWarps(dt) {
+    for (const w of world.warps) {
+      w.t += dt;
+      if (w.done) continue; // (its portals fading away)
+      const p = w.owner;
+      if (p.caught || p.dead) { w.done = true; w.t = 0; p.warp = null; continue; }
+      if (!w.out) {
+        // sucked in, shrinking
+        const u = Math.min(1, w.t / PORTAL_GUN.inTime);
+        p.x = w.from.x + (w.door - HITBOX_W / 2 - w.from.x) * u;
+        p.y = w.from.y;
+        p.warp = { scale: 1 - u };
+        if (u >= 1) { w.out = true; w.t = 0; p.x = w.to.x; p.y = w.to.y; Sound.play("portal"); }
+      } else {
+        const u = Math.min(1, w.t / PORTAL_GUN.outTime);
+        p.warp = { scale: u };
+        if (u >= 1) {
+          w.done = true;
+          w.t = 0;
+          p.warp = null;
+          p.held = false;
+          p.onGround = false;
+          p.safeSpots.push({ x: w.to.x, y: w.to.y });
+        }
+      }
+    }
+    world.warps = world.warps.filter((w) => !w.done || w.t < 0.5);
+  }
+
+  // The grapple: a hook flies to whoever is ahead and reels them back, halfway to you
+  function throwGrapple(p) {
+    const target = world.players.find((q) => q !== p && !q.caught && !q.dead && q.trackX > p.trackX);
+    if (!target) { p.showHit("NOBODY AHEAD", "#d9a3ff"); return false; }
+    world.grapples.push({ owner: p, target, x: p.x + HITBOX_W / 2, y: p.y + 4, mode: "fly", t: 0 });
+    Sound.play("grappleThrow");
+    return true;
+  }
+
+  function updateGrapples(dt) {
+    const { level } = world;
+    for (const g of world.grapples) {
+      g.t += dt;
+      const p = g.owner, q = g.target;
+      if (g.mode === "fly") {
+        if (q.caught || q.dead || p.caught || g.t > 6) { g.mode = "back"; continue; }
+        const tx = q.x + HITBOX_W / 2, ty = q.y + 3;
+        const dist = Math.hypot(tx - g.x, ty - g.y), step = GRAPPLE.speed * dt;
+        if (dist > step) { g.x += ((tx - g.x) / dist) * step; g.y += ((ty - g.y) / dist) * step; continue; }
+        g.x = tx;
+        g.y = ty;
+        if (q.held) continue; // (something else has them: hang on until it lets go)
+        // hooked: reel them back to safe ground halfway between you
+        const mid = (p.x + q.x) / 2;
+        const spot = level.safeSpotBefore(mid) || level.safeSpotAfter(mid, q.x - mid);
+        if (!spot || spot.x >= q.x) { g.mode = "back"; continue; }
+        grab(q);
+        q.eatenBy = null;
+        q.hiddenIn = null;
+        g.mode = "reel";
+        g.from = { x: q.x, y: q.y };
+        g.spot = spot;
+        g.u = 0;
+        q.showHit("HOOKED!", "#d9a3ff");
+        Sound.play("grappleHook");
+      } else if (g.mode === "reel") {
+        if (q.caught || q.dead) { q.held = false; g.mode = "back"; continue; }
+        const len = Math.max(1, Math.hypot(g.spot.x - g.from.x, g.spot.y - g.from.y));
+        g.u = Math.min(1, g.u + (GRAPPLE.reel * dt) / len);
+        q.x = g.from.x + (g.spot.x - g.from.x) * g.u;
+        q.y = g.from.y + (g.spot.y - g.from.y) * g.u - Math.sin(Math.PI * g.u) * GRAPPLE.arc;
+        g.x = q.x + HITBOX_W / 2;
+        g.y = q.y + 3;
+        if (g.u >= 1) {
+          q.held = false;
+          q.x = g.spot.x;
+          q.y = g.spot.y;
+          q.onGround = false;
+          q.safeSpots.push({ x: g.spot.x, y: g.spot.y });
+          g.mode = "back";
+        }
+      } else {
+        // the rope zips back
+        const tx = p.x + HITBOX_W / 2, ty = p.y + 4;
+        const dist = Math.hypot(tx - g.x, ty - g.y), step = GRAPPLE.speed * 1.5 * dt;
+        if (dist <= step || p.caught) g.done = true;
+        else { g.x += ((tx - g.x) / dist) * step; g.y += ((ty - g.y) / dist) * step; }
+      }
+    }
+    world.grapples = world.grapples.filter((g) => !g.done);
+  }
+
+  // The vine: it drops down, swings you up and flings you far ahead. Where you land is up to luck.
+  function launchVine(p) {
+    world.level.ensure(p.x + VINE.distance[1] + VIEW_W * 2);
+    const r = Math.max(60, p.y + 20); // (it hangs from just above the top of the screen)
+    const dist = VINE.distance[0] + Math.random() * (VINE.distance[1] - VINE.distance[0]);
+    world.vines.push({ owner: p, t: 0, mode: "drop", ax: p.x + HITBOX_W / 2, ay: p.y - r, r, dist, from: { x: p.x, y: p.y } });
+    grab(p);
+    p.facing = 1;
+    p.spin = 0;
+    Sound.play("vineSwing");
+  }
+
+  function updateVines(dt) {
+    const { level } = world;
+    for (const v of world.vines) {
+      v.t += dt;
+      const p = v.owner;
+      if (p.caught || (p.dead && v.mode !== "gone")) { v.mode = "gone"; v.t = 0; }
+      if (v.mode === "drop") {
+        p.x = v.from.x;
+        p.y = v.from.y;
+        if (v.t >= VINE.drop) { v.mode = "swing"; v.t = 0; }
+      } else if (v.mode === "swing") {
+        const u = Math.min(1, v.t / VINE.swing), a = (Math.PI * 0.42) * u * u;
+        p.x = v.ax + Math.sin(a) * v.r - HITBOX_W / 2;
+        p.y = v.ay + Math.cos(a) * v.r;
+        if (u >= 1) {
+          v.mode = "fly";
+          v.t = 0;
+          v.start = { x: p.x, y: p.y };
+          const lx = v.from.x + v.dist, g = level.groundTop(lx + HITBOX_W / 2);
+          v.land = { x: lx, y: (g ?? VIEW_H - 20) - HITBOX_H - 20 };
+          Sound.play("vineFling");
+        }
+      } else if (v.mode === "fly") {
+        const u = Math.min(1, v.t / VINE.fly);
+        const mid = (v.start.y + v.land.y) / 2, h = mid - VINE.peak;
+        p.x = v.start.x + (v.land.x - v.start.x) * u;
+        p.y = v.start.y + (v.land.y - v.start.y) * u - h * 4 * u * (1 - u);
+        p.spin = u * Math.PI * 2; // one somersault on the way
+        if (u >= 1) {
+          // let go: fall onto whatever's there
+          p.held = false;
+          p.spin = 0;
+          p.vx = PHYSICS.runSpeed;
+          p.vy = 60;
+          p.onGround = false;
+          v.mode = "gone";
+          v.t = 0;
+        }
+      } else if (v.t > 0.5) v.done = true;
+    }
+    world.vines = world.vines.filter((v) => !v.done);
   }
 
   // ---- The snow's orbs: snowstorm and snowball ----

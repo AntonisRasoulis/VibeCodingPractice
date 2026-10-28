@@ -94,6 +94,7 @@ const Renderer = (() => {
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
     drawFlood(world, camX, world.time);
+    for (const w of world.warps) drawWarp(w, camX, world.time); // (behind the runner going in or coming out)
 
     // (someone hiding in a bush can't be seen, on either screen)
     if (other && !other.dead && !other.caught && !other.hiddenIn && !other.eatenBy) {
@@ -126,6 +127,9 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSnowIce(p, camX, world.time, p === other);
     for (const sb of world.thrownSnowballs) b.drawImage(sprites.thrownSnowball, Math.round(sb.x - camX) - 2, Math.round(sb.y) - 2);
     for (const mk of world.monkeys) drawMonkey(mk, camX, world.time);
+    for (const g of world.grapples) drawGrapple(g, camX, world.time);
+    for (const v of world.vines) drawVine(v, camX);
+    if (!player.dead && player.y + HITBOX_H < 0) drawAboveMarker(player, camX); // flung up off the top of the screen
     for (const a of world.arrows) drawArrow(a, camX);
     drawSaws(world.level, camX, world.time);
     drawMaces(world.level, camX, world.time);
@@ -791,6 +795,90 @@ const Renderer = (() => {
     }
   }
 
+  // ---- Purple catch-up orbs ----
+
+  // A portal: an upright ring of swirling purple and teal, dark in the middle
+  function drawPortalRing(cx, cy, alpha, time) {
+    if (alpha <= 0) return;
+    b.globalAlpha = Math.min(1, alpha);
+    b.fillStyle = "#2a0c50";
+    b.fillRect(Math.round(cx) - 4, Math.round(cy) - 9, 8, 18);
+    b.fillRect(Math.round(cx) - 3, Math.round(cy) - 10, 6, 20);
+    b.fillStyle = "#7b3fd0";
+    b.fillRect(Math.round(cx) - 2, Math.round(cy) - 6, 4, 12);
+    for (let k = 0; k < 28; k++) {
+      const a = (k / 28) * Math.PI * 2 + time * 6;
+      b.fillStyle = k % 4 === 0 ? "#ffffff" : k % 2 ? "#d070ff" : "#5ff0d0";
+      b.fillRect(Math.round(cx + Math.cos(a) * 5.5) - 1, Math.round(cy + Math.sin(a) * 11) - 1, 2, 2);
+    }
+    b.globalAlpha = 1;
+  }
+
+  function drawWarp(w, camX, time) {
+    const cy = w.from.y + HITBOX_H / 2;
+    // the portal you go in, then the one you come out of
+    const inAlpha = w.done ? 0 : !w.out ? w.t / 0.1 : 1 - w.t / 0.3;
+    drawPortalRing(w.door - camX, cy, inAlpha, time);
+    if (w.out) drawPortalRing(w.to.x + HITBOX_W / 2 - camX, w.to.y + HITBOX_H / 2, w.done ? 1 - w.t / 0.5 : 1, time);
+  }
+
+  // The grapple's rope: a sine wave while it flies out, pulled tight while it reels them in
+  function drawGrapple(g, camX, time) {
+    const p = g.owner;
+    const x0 = p.x + HITBOX_W / 2, y0 = p.y + 4;
+    const dx = g.x - x0, dy = g.y - y0, len = Math.hypot(dx, dy);
+    if (len < 1) return;
+    const nx = -dy / len, ny = dx / len;
+    const amp = g.mode === "fly" ? GRAPPLE.wave : 0;
+    b.fillStyle = "#e8d8ff";
+    for (let d = 0; d <= len; d += 1.5) {
+      const sx = x0 + (dx * d) / len - camX;
+      if (sx < -2 || sx > VIEW_W + 2) continue;
+      const off = amp * Math.sin(Math.PI * d / len) * Math.sin(d / 9 - time * 25);
+      b.fillRect(Math.round(sx + nx * off), Math.round(y0 + (dy * d) / len + ny * off), 1, 1);
+    }
+    // the hook
+    const hx = Math.round(g.x - camX), hy = Math.round(g.y);
+    b.fillStyle = "#4a1680";
+    b.fillRect(hx - 2, hy - 2, 4, 4);
+    b.fillStyle = "#ffffff";
+    b.fillRect(hx - 1, hy - 1, 2, 2);
+  }
+
+  // The vine: hanging from the treetops above the screen, it swings you up and lets go
+  function drawVine(v, camX) {
+    let tx, ty;
+    if (v.mode === "drop") {
+      const u = Math.min(1, v.t / VINE.drop);
+      tx = v.ax;
+      ty = v.ay + v.r * u * (2 - u);
+    } else if (v.mode === "swing") {
+      tx = v.owner.x + HITBOX_W / 2;
+      ty = v.owner.y + 1;
+    } else if (v.mode === "fly" && v.t < 0.8) {
+      const a = Math.PI * 0.42 * Math.cos((v.t / 0.8) * Math.PI * 1.5) * (1 - v.t / 0.8); // swinging back, slowing down
+      tx = v.ax + Math.sin(a) * v.r;
+      ty = v.ay + Math.cos(a) * v.r;
+    } else return;
+    const n = Math.max(1, Math.ceil(Math.hypot(tx - v.ax, ty - v.ay)));
+    for (let k = 0; k <= n; k++) {
+      const x = Math.round(v.ax + ((tx - v.ax) * k) / n - camX), y = Math.round(v.ay + ((ty - v.ay) * k) / n);
+      if (x < -3 || x > VIEW_W + 3 || y > VIEW_H) continue;
+      b.fillStyle = "#2f7a24";
+      b.fillRect(x, y, 2, 1);
+      if (k % 11 === 5) { b.fillStyle = "#7ad04a"; b.fillRect(x + (k % 22 === 5 ? 2 : -2), y, 2, 2); } // leaves
+    }
+  }
+
+  // Someone flung up off the top of their screen: a little arrow shows where they are
+  function drawAboveMarker(p, camX) {
+    const x = Math.round(p.x + HITBOX_W / 2 - camX);
+    b.fillStyle = "#ffffff";
+    b.fillRect(x, 0, 1, 1);
+    b.fillRect(x - 1, 1, 3, 1);
+    b.fillRect(x - 2, 2, 5, 1);
+  }
+
   // Two big monkey hands over your eyes: they slap on, stay, then come away
   function drawMonkeyHands(left) {
     const img = sprites.monkeyHand, k = 9;
@@ -1261,11 +1349,11 @@ const Renderer = (() => {
       const bob = Math.round(Math.sin(time * 3 + o.x) * 1.5);
       if (Math.floor(time * 4) % 2) {
         const ability = o.kind === "zap" || o.kind === "hand" || o.kind === "wind" || o.kind === "drone" || o.kind === "firehawk" || o.kind === "snowball" || o.kind === "monkey";
-        b.fillStyle = ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
+        b.fillStyle = o.purple ? "rgba(215, 160, 255, 0.55)" : ability ? "rgba(170, 225, 255, 0.5)" : "rgba(255, 240, 150, 0.5)";
         b.fillRect(sx - 1, o.y + bob + 1, 10, 6);
         b.fillRect(sx + 1, o.y + bob - 1, 6, 10);
       }
-      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb, snowstorm: sprites.stormOrb, snowball: sprites.snowballOrb, monsoon: sprites.monsoonOrb, monkey: sprites.monkeyOrb }[o.kind] || sprites.orb;
+      const sprite = { freeze: sprites.freezeOrb, dash: sprites.dashOrb, zap: sprites.zapOrb, hand: sprites.handOrb, wind: sprites.windOrb, drone: sprites.droneOrb, sandstorm: sprites.sandOrb, firehawk: sprites.hawkOrb, snowstorm: sprites.stormOrb, snowball: sprites.snowballOrb, monsoon: sprites.monsoonOrb, monkey: sprites.monkeyOrb, portalgun: sprites.portalGunOrb, grapple: sprites.grappleOrb, vine: sprites.vineOrb }[o.kind] || sprites.orb;
       if (o.kind === "wind") drawOrbWisps(sx, o.y + bob, time + o.x);
       b.drawImage(sprite, sx, o.y + bob);
     }
@@ -1492,6 +1580,8 @@ const Renderer = (() => {
         firehawk: ["#fff3b0", "#ff7a1a", "#ffd23f", "#c8301a"],
         snowball: ["#ffffff", "#a8e0ff", "#ffffff", "#6cc4f0"],
         monkey: ["#e8c090", "#7a4a2a", "#c8946a", "#4a2a14"],
+        portalgun: ["#5ff0d0", "#b04bff", "#ffffff", "#7b3fd0"],
+        grapple: ["#ffffff", "#d9a3ff", "#b04bff", "#d9a3ff"],
       }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }
@@ -2378,6 +2468,16 @@ const Renderer = (() => {
     const shake = p.dashHold > 0 ? Math.round(Math.sin(p.dashHold * 90)) : 0; // trembling before a dash
     const x = Math.round(p.x - camX) - 1 + shake;
     const y = Math.round(p.y) - 1;
+    if (p.warp) { // going into a portal, or coming out of one: shrinking or growing, and turning
+      if (p.warp.scale <= 0.05) return;
+      b.save();
+      b.translate(x + 4, y + 6);
+      b.rotate((1 - p.warp.scale) * 4);
+      b.scale(p.warp.scale, p.warp.scale);
+      b.drawImage(frame, -4, -6);
+      b.restore();
+      return;
+    }
     // Swung by a hand, or tumbling backwards after being thrown
     const spin = p.held ? p.spin : p.stun > 0 && !p.onGround ? -(HAND.stun - p.stun) * 14 : 0;
     if (spin) {
@@ -2468,8 +2568,8 @@ const Renderer = (() => {
       if (p.power) {
         const key = world.solo ? "S/DOWN" : i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
-        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE", firehawk: "FIREHAWK", snowball: "SNOWBALL", monkey: "MONKEY" }[p.power] || p.power.toUpperCase();
-        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#e8c090" }[p.power] || "#ffffff";
+        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE", firehawk: "FIREHAWK", snowball: "SNOWBALL", monkey: "MONKEY", portalgun: "PORTAL GUN", grapple: "GRAPPLE" }[p.power] || p.power.toUpperCase();
+        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#e8c090", portalgun: "#d9a3ff", grapple: "#d9a3ff" }[p.power] || "#ffffff";
         text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, color, 10);
       }
       if (p.flash > 0) {

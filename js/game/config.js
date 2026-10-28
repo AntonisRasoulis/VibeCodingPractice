@@ -163,6 +163,40 @@ const ORBS = {
   weight: { prairie: 10, snow: 16, desert: 12, jungle: 15 },
 };
 
+// Purple catch-up orbs: they appear for a runner who has fallen off the leader's screen (alone: when
+// the fire is on your screen), ahead of them but out of sight of both. Further behind, they come more often.
+const CATCHUP = {
+  every: [9, 3],      // seconds between orbs: just off the screen ... `far` or more behind
+  far: 1200,          // (pixels behind the leader's screen; alone: how close the fire is, see fireNear)
+  fireNear: 140,      // alone: the fire within this many pixels of you counts as falling behind
+  margin: 24,         // how far outside both screens it has to be
+  maxWaiting: 2,      // never more than this many waiting ahead of you
+  kinds: { portalgun: 1, grapple: 1, vine: 1 }, // (alone, no grapple: there's nobody to pull)
+};
+
+const PORTAL_GUN = {
+  passes: 3,          // you come out past this many obstacles (big ones: a single spike doesn't count)
+  bigRun: 3,          // a run of spikes or quicksand counts once it's this many tiles long
+  merge: 4,           // dangers closer than this many tiles count as one obstacle
+  inTime: 0.4,        // seconds being pulled into the portal
+  outTime: 0.35,      // ...and coming out of the other one
+};
+
+const GRAPPLE = {
+  speed: 1400,        // how fast the hook flies to the leader
+  reel: 700,          // how fast it reels them back
+  arc: 30,            // how high they're swung while reeled in
+  wave: 5,            // the rope's sine wave while it flies out
+};
+
+const VINE = {
+  distance: [1300, 1600], // how far forward it flings you (more than a portal; it can land you anywhere)
+  drop: 0.25,         // seconds for the vine to come down to you
+  swing: 0.35,        // ...to swing you up
+  fly: 1.4,           // ...and flying through the air
+  peak: -40,          // the top of the flight (above the top of the screen)
+};
+
 const WIND = {
   chance: 0.25, // share of orbs that are wind dash orbs (the most common)
   speed: 420,   // dash speed (normal running is 96)

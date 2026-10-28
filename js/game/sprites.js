@@ -1005,6 +1005,12 @@ function makeJungleLayers() {
 // ---- The jungle's orbs ----
 
 // The monsoon orb: a gold coin with blue raindrops falling on a wave
+// ---- Purple catch-up orbs (for whoever has fallen behind) ----
+const CATCHUP_ORB_PALETTE = { o: "#4a1680", y: "#b04bff", w: "#ffffff" };
+const PORTAL_GUN_ORB_ROWS = ["..oooo..", ".oyccyo.", "oycddcyo", "ocdwddco", "ocddwdco", "oycddcyo", ".oyccyo.", "..oooo.."]; // a swirling portal
+const GRAPPLE_ORB_ROWS = ["..oooo..", ".oyyyyo.", "oyyyyyyo", "oywwyywo", "owyywwyo", "oyyyyyyo", ".oyyyyo.", "..oooo.."];    // a rope, as a sine wave
+const VINE_ORB_ROWS = ["..oooo..", ".ogyyyo.", "oyggyyyo", "oyyggyyo", "oyyylgyo", "oyyllgyo", ".oyyygo.", "..oooo.."];       // a vine with a leaf
+
 const MONSOON_ORB_ROWS = ["..oooo..", ".oybyyo.", "oyybyyyo", "oybyybyo", "oyyybyyo", "owwwwwwo", ".obbbbo.", "..oooo.."];
 // The monkey orb: a light blue coin with a monkey's face (big brown muzzle, pink ears sticking out)
 const MONKEY_ORB_ROWS = ["..oooo..", ".obbbbo.", "obfbbfbo", "pbkbbkbp", "obffffbo", "obfnnfbo", ".obmmbo.", "..oooo.."];
@@ -1393,6 +1399,9 @@ function buildSprites() {
     droneOrb: spriteFromRows(DRONE_ORB_ROWS, ABILITY_ORB_PALETTE),
     drone: Object.fromEntries(Object.entries(DRONE_FRAMES).map(([f, rows]) => [f, spriteFromRows(rows, DRONE_PALETTE)])),
     monsoonOrb: spriteFromRows(MONSOON_ORB_ROWS, { o: "#b8860b", y: "#ffd23f", b: "#3f8fd0", w: "#2a7f8f" }),
+    portalGunOrb: spriteFromRows(PORTAL_GUN_ORB_ROWS, { ...CATCHUP_ORB_PALETTE, c: "#5ff0d0", d: "#2a0c50" }),
+    grappleOrb: spriteFromRows(GRAPPLE_ORB_ROWS, CATCHUP_ORB_PALETTE),
+    vineOrb: spriteFromRows(VINE_ORB_ROWS, { ...CATCHUP_ORB_PALETTE, g: "#2f7a24", l: "#7ad04a" }),
     monkeyOrb: spriteFromRows(MONKEY_ORB_ROWS, { o: ABILITY_ORB_PALETTE.o, y: ABILITY_ORB_PALETTE.y, b: "#7a4a2a", f: "#e8c090", k: "#1a0e06", m: "#8a3a2a", p: "#d89878", n: "#5a3018" }),
     monkeys: Object.fromEntries(Object.entries(MONKEY_FRAMES).map(([f, rows]) => { const img = spriteFromRows(rows, MONKEY_PALETTE); return [f, [img, flipped(img)]]; })),
     monkeyHand: spriteFromRows(MONKEY_HAND_ROWS, MONKEY_HAND_PALETTE),
