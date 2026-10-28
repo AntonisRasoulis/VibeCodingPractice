@@ -106,7 +106,7 @@ const SNOWSTORM = {
   jumpsToBreak: 3,   // frozen: jumps it takes to break out
 };
 // Snowball (light blue, S / Down): thrown the way you're facing, in a short low arc. It's small and
-// hard to hit, but if it hits the other player they're frozen for 10 seconds, with no way out.
+// hard to hit, but if it hits the other player they're frozen for 7 seconds, with no way out.
 // Alone, it gives you skates instead: 20 seconds of running faster on ice.
 const SNOWBALL = {
   chance: 0.15,
@@ -114,7 +114,7 @@ const SNOWBALL = {
   vy: 70,            // ...and how high (a low lob: it can hit you anywhere along the way)
   gravity: 600,
   size: 3,           // the part of it that hits (pixels: it's tiny)
-  freeze: 10,        // seconds a hit freezes you (no escape)
+  freeze: 7,         // seconds a hit freezes you (no escape)
   skate: 20,         // alone: seconds of skating
   skateSpeed: 1.5,   // ...running this much faster on ice
   skateAccel: 4,     // ...and speeding up / turning this much quicker on it
