@@ -2468,8 +2468,8 @@ const Renderer = (() => {
       if (p.power) {
         const key = world.solo ? "S/DOWN" : i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
-        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE" }[p.power];
-        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff" }[p.power];
+        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE", firehawk: "FIREHAWK", snowball: "SNOWBALL", monkey: "MONKEY" }[p.power] || p.power.toUpperCase();
+        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#e8c090" }[p.power] || "#ffffff";
         text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, color, 10);
       }
       if (p.flash > 0) {
