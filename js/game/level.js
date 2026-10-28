@@ -543,7 +543,7 @@ class Level {
     const weights = { flat: 1, step: 2, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 4 };
     if (this.col > 60) Object.assign(weights, { shooter: 5, saw: 5 });
     if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 1, bush: 2 });
-    if (this.col > 120 && this.col - this.lastOrbCol > 55) weights.orb = 7; // about 5.8 orbs every 1000 m
+    if (this.col > 120 && this.col - this.lastOrbCol > ORBS.gap) weights.orb = ORBS.weight[this.biome]; // about 3 orbs per biome
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "snow" && this.col > 60) weights.thinIce = 4;
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });

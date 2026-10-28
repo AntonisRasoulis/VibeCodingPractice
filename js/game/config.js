@@ -51,9 +51,9 @@ const ZAP = {
 };
 
 // Orb shares: wind 25%, dash 18.5%, lightning 15.2%, hand 15.2%, drone 15.2%, and the
-// rest (10.9%) split between swap and freeze by FREEZE_CHANCE (5.45% each). With about
-// 5.8 orbs every 1000 m: wind ~1.45, dash ~1.07, lightning / hand / drone ~0.88 each,
-// swap and freeze ~0.33 each.
+// rest (10.9%) split between swap and freeze by FREEZE_CHANCE (5.45% each). In the desert, snow and
+// jungle, 30% of the orbs are that biome's own two instead. With about 3 orbs per biome (ORBS),
+// that's about 8 orbs every 1000 m.
 
 // The rescue drone (an ability orb). Used by the player behind, it flies to the leader,
 // grabs them and drops them a little in front of you. Used by the leader (or in 1-player
@@ -153,6 +153,14 @@ const SNOWBALL = {
   skate: 20,         // alone: seconds of skating
   skateSpeed: 1.5,   // ...running this much faster on ice
   skateAccel: 4,     // ...and speeding up / turning this much quicker on it
+};
+
+// How often orbs come: never closer than `gap` tiles apart, and each section after that has this
+// chance weight of being an orb (each biome has its own, as each has a different mix of sections):
+// about 3 orbs per biome
+const ORBS = {
+  gap: 30,
+  weight: { prairie: 10, snow: 16, desert: 12, jungle: 15 },
 };
 
 const WIND = {
