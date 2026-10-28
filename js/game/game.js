@@ -551,8 +551,8 @@ const Game = (() => {
     // One at a time: if one is still in the air, the next waits for it.
     const leaderMeters = Math.max(...players.map((p) => p.x)) / TILE;
     if (world.wild) {
-      // Wild: one at the leader the whole time they're in the prairie, the next 1-2 seconds after the
-      // last one has exploded or flown off
+      // Wild: one at the leader the whole time they're in the prairie, the next as soon as the last
+      // one has exploded or flown off
       const leader = players.filter((p) => !p.dead && !p.caught).sort((a, b) => b.x - a.x)[0];
       if (!leader || level.biomeAt(Math.floor((leader.x + HITBOX_W / 2) / TILE)) !== "prairie" || world.missiles.length) world.nextWildMissile = null;
       else if (world.nextWildMissile === null) world.nextWildMissile = world.time + WILD.missileEvery[0] + Math.random() * (WILD.missileEvery[1] - WILD.missileEvery[0]);
