@@ -99,7 +99,7 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
-    this.sporeShrooms = []; // forest: big spore mushrooms { id, x (middle), gy, kind, seed }
+    this.sporeShrooms = []; // forest: big spore mushrooms { id, x (its foot), gy, kind, seed, lean (-1 left, 1 right) }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
     this.fires = [];      // desert: ground set alight by a firehawk's stick { x (middle), gy, t }
     this.turrets = [];    // jungle: ancient turrets buried in the ground { id, x (middle), gy, dir (-1 shoots left, 1 right), wait, state, t, h (how far up) }
@@ -309,7 +309,7 @@ class Level {
     for (let n = 0; n < SPORES.count; n++) {
       // (each falls at its own pace, from its own start: not an even curtain, so there are gaps)
       const u = (time / SPORES.fall) * (0.75 + hash(n, m.id + 5) * 0.5) + hash(n, m.id + 9) + m.seed, cycle = Math.floor(u), f = u - cycle;
-      const x = m.x + (hash(n + cycle * 7, m.id) - 0.5) * (SPORES.capW - 8) + Math.sin(f * 6 + n) * 2;
+      const x = m.x + (m.lean || 0) * SPORES.lean + (hash(n + cycle * 7, m.id) - 0.5) * (SPORES.capW - 8) + Math.sin(f * 6 + n) * 2; // (under the cap, which leans over)
       out.push({ x, y: top + 2 + f * (m.gy - top - 2), f });
     }
     return out;
@@ -1117,7 +1117,7 @@ const SECTIONS = {
   // The forest's: a big mushroom dropping spores (red: faster, blue: jump higher, green: poison, pink: float)
   sporeShroom() {
     this.flat(4);
-    this.sporeShrooms.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, kind: this.pickFrom(SPORES.kinds), seed: this.rng() });
+    this.sporeShrooms.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, kind: this.pickFrom(SPORES.kinds), seed: this.rng(), lean: this.rng() < 0.5 ? -1 : 1 });
     this.flat(6);
   },
 

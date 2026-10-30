@@ -1377,7 +1377,7 @@ const Game = (() => {
     for (const p of world.players) {
       if (p.dead || p.caught || p.held) continue;
       for (const m of level.sporeShrooms) {
-        if (Math.abs(m.x - (p.x + HITBOX_W / 2)) > SPORES.capW) continue;
+        if (Math.abs(m.x - (p.x + HITBOX_W / 2)) > SPORES.capW + SPORES.lean) continue;
         if (!level.sporesOf(m, world.time).some((sp) => overlaps(p.x - 1, p.y - 2, HITBOX_W + 2, 6, sp.x - 1, sp.y - 1, 2, 2))) continue; // (one has to land on your head)
         const fresh = m.kind === "green" ? p.poison <= 0 : !(p.spores[m.kind] > 0);
         if (m.kind === "green") { p.poison = SPORES.time; p.poisonMax = SPORES.time; }

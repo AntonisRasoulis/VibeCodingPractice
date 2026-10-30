@@ -303,7 +303,7 @@ const Renderer = (() => {
 
   function drawSporeShrooms(level, camX) {
     for (const m of level.sporeShrooms) {
-      const img = sprites.sporeShrooms[m.kind], x = Math.round(m.x - camX - img.width / 2);
+      const img = sprites.sporeShrooms[m.kind][m.lean > 0 ? 1 : 0], x = Math.round(m.x - camX - img.width / 2);
       if (x > VIEW_W || x + img.width < 0) continue;
       b.drawImage(img, x, m.gy - img.height);
     }

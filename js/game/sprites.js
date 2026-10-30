@@ -1118,29 +1118,39 @@ const SPORE_COLORS = {
   pink: { cap: "#ff5ac8", capHi: "#ffa0e6", capDk: "#b02a8a", spot: "#ffe8f8", spore: "#ff9af0" },
 };
 
-// A big spore mushroom: a pale stem with a skirt, gills, and a spotted dome cap (36 wide, 41 tall, its foot
-// at the bottom middle)
-function makeSporeShroom(kind) {
+// A big spore mushroom: a pale stem that bends like an S as it grows (leaning one way, `lean` -1 or 1),
+// a skirt, gills, and a spotted dome cap that droops at the rim and tips the way it leans. The canvas is
+// 54 wide and 42 tall, with the stem's foot at the bottom middle.
+function makeSporeShroom(kind, lean) {
   const k = SPORE_COLORS[kind], W = SPORES.capW, capH = SPORES.height - SPORES.stem, stemH = SPORES.stem;
-  const c = makeCanvas(W + 2, SPORES.height + 1);
+  const c = makeCanvas(54, SPORES.height + 2);
   const g = c.getContext("2d");
-  const cx = (W + 2) / 2, by = SPORES.height + 1;
+  const foot = 27, by = SPORES.height + 2;
+  // where the stem's middle is at each height: an S-curve ending SPORES.lean pixels over
+  const mid = (y) => { const u = y / stemH; return foot + lean * (SPORES.lean * u * u * (3 - 2 * u) - Math.sin(u * Math.PI * 2) * 2.5); };
   for (let y = 0; y < stemH; y++) {
-    const w = 7 + Math.round(Math.sin((y / stemH) * Math.PI) * 1.5) + (y < 3 ? 2 : 0);
-    px(g, "#e8dcf0", Math.round(cx - w / 2), by - y - 1, w, 1);
-    px(g, "#b8a8c8", Math.round(cx + w / 2) - 2, by - y - 1, 2, 1);
+    const w = 7 + Math.round(Math.sin((y / stemH) * Math.PI) * 1.5) + (y < 3 ? 2 : 0) - (y > stemH - 5 ? 1 : 0);
+    const x = Math.round(mid(y) - w / 2);
+    px(g, "#e8dcf0", x, by - y - 1, w, 1);
+    px(g, "#b8a8c8", x + (lean > 0 ? 0 : w - 2), by - y - 1, 2, 1); // shade on the inside of the bend
   }
-  px(g, "#d0c0e0", cx - 6, by - stemH + 8, 12, 2); // its skirt
-  const top = by - stemH - capH;
-  for (let x = -W / 2 + 2; x < W / 2 - 2; x++) px(g, x % 2 ? k.capDk : "#5a2a50", cx + x, top + capH, 1, 2); // gills
-  for (let y = 0; y < capH; y++) {
-    const half = Math.round((W / 2) * Math.sqrt(1 - ((capH - y) / capH) ** 2.2));
-    px(g, "#2a0e38", cx - half - 1, top + y, half * 2 + 2, 1);
-    px(g, y < 3 ? k.capHi : y > capH - 3 ? k.capDk : k.cap, cx - half, top + y, half * 2, 1);
+  px(g, "#d0c0e0", Math.round(mid(9) - 6), by - 10, 12, 2); // its skirt
+  const cx = mid(stemH), top = by - stemH - capH;
+  // the cap: a dome tipped toward the lean, with its rim drooping down at both ends
+  const shape = (x) => { const t = (x - cx) / (W / 2); if (Math.abs(t) > 1) return null; return Math.round(capH * (1 - Math.pow(Math.abs(t), 2)) * (1 + 0.3 * t * lean)); };
+  const droop = (x) => { const t = (x - cx) / (W / 2), a = Math.abs(t); return Math.round(Math.max(0, a - 0.55) * 11 * (1 - 0.35 * Math.sign(t) * lean)); }; // (more on the side it tips away from)
+  for (let x = Math.ceil(cx - W / 2); x <= cx + W / 2; x++) {
+    const h = shape(x);
+    if (h === null) continue;
+    const base = top + capH + droop(x), y0 = base - h;
+    px(g, "#2a0e38", x, y0 - 1, 1, h + 2);
+    for (let y = y0; y < base; y++) px(g, y - y0 < 3 ? k.capHi : base - y < 3 ? k.capDk : k.cap, x, y);
+    if (Math.abs(x - cx) < W / 2 - 2) px(g, Math.round(x) % 2 ? k.capDk : "#5a2a50", x, base + 1, 1, 2 - (droop(x) > 1 ? 1 : 0)); // gills
   }
-  px(g, "#2a0e38", cx - W / 2 - 1, top + capH, W + 2, 1);
-  px(g, k.capHi, cx - 9, top + 3, 5, 2);
-  for (const [dx, dy, w] of [[-10, 6, 4], [2, 3, 5], [8, 8, 3], [-3, 9, 3], [11, 4, 2]]) px(g, k.spot, cx + dx, top + dy, w, 2);
+  for (const [dx, dy, w] of [[-10, 6, 4], [2, 3, 5], [8, 8, 3], [-3, 9, 3], [11, 6, 2]]) {
+    const x = Math.round(cx + dx * 1), h = shape(x);
+    if (h !== null && dy < h + droop(x) - 1) px(g, k.spot, x, top + capH + droop(x) - h + dy - 1, w, 2);
+  }
   return c;
 }
 
@@ -1584,7 +1594,7 @@ function buildSprites() {
     forestTop: [0, 1, 2, 3].map((v) => makeForestTile(v, true)),
     forestSoil: [0, 1, 2, 3].map((v) => makeForestTile(v + 4, false)),
     forestThorns: [0, 1, 2].map(makeForestThorn),
-    sporeShrooms: Object.fromEntries(Object.keys(SPORE_COLORS).map((k) => [k, makeSporeShroom(k)])),
+    sporeShrooms: Object.fromEntries(Object.keys(SPORE_COLORS).map((k) => [k, [makeSporeShroom(k, -1), makeSporeShroom(k, 1)]])), // [leaning left, leaning right]
     glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow

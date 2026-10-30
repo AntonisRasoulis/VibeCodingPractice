@@ -450,6 +450,7 @@ const SPORES = {
   capW: 34,            // the cap's width (pixels)
   stem: 27,            // how high the cap's underside is
   height: 40,          // how tall it is
+  lean: 9,             // how far over its curved stem leans (the cap is this far to one side of its foot)
 };
 
 const SHOOTER = {
