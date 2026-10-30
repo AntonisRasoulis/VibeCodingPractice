@@ -2515,9 +2515,9 @@ const Renderer = (() => {
     for (const w of world.wisps) {
       const x = w.x - camX + Math.sin(w.t * 9 + w.ph) * 1.5;
       if (x < -6 || x > VIEW_W + 6) continue;
-      const left = w.t / w.max;
-      drawGlowAt(w.pink ? "pink" : "thorn", left > 0.5 ? 1 : 0, x, w.y, left * 0.6);
-      b.globalAlpha = Math.min(1, left * 1.5);
+      const left = w.t / w.max, faint = w.faint ? 0.5 : 1; // (the magic breaking a saw off is fainter still)
+      drawGlowAt(w.pink ? "pink" : "thorn", left > 0.5 && !w.faint ? 1 : 0, x, w.y, left * 0.6 * faint);
+      b.globalAlpha = Math.min(1, left * 1.5) * faint;
       b.fillStyle = left > 0.6 ? "#ffe0f8" : w.pink ? "#ff7ae0" : "#c070f0";
       b.fillRect(Math.round(x), Math.round(w.y), 1, 1);
       b.globalAlpha = 1;

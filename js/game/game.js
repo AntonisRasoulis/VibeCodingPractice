@@ -1381,8 +1381,13 @@ const Game = (() => {
           continue;
         }
         if (!s.creaked && world.time >= s.breakAt - FOREST.sawWarn) { s.creaked = true; Sound.play("sawCreak"); }
-        if (world.time < s.breakAt) continue;
         const c = level.sawPos(s, world.time);
+        // the forest's magic creeping in to where it's held, as it shakes (just a few faint wisps)
+        if (world.time >= s.breakAt - FOREST.sawWarn && Math.random() < dt * 14) {
+          const a = Math.random() * Math.PI * 2, t = 0.4 + Math.random() * 0.2;
+          world.wisps.push({ x: c.x + Math.cos(a) * (s.r + 6), y: c.y + Math.sin(a) * (s.r + 4), vx: -Math.cos(a) * (s.r + 6) / t, vy: -Math.sin(a) * (s.r + 4) / t, t, max: t, pink: Math.random() < 0.3, ph: Math.random() * 6, faint: true });
+        }
+        if (world.time < s.breakAt) continue;
         if (c.y > s.gy + 2 || !runners.length) { s.breakAt += 0.2; continue; } // (down in its pit: wait until it's up)
         const target = runners.reduce((a, q) => (Math.abs(q.x - c.x) < Math.abs(a.x - c.x) ? q : a));
         const dir = Math.sign(target.x + HITBOX_W / 2 - c.x) || -1;
@@ -1390,6 +1395,10 @@ const Game = (() => {
         // Never straight into a pit: only once it would land on ground with a clear run at them
         if (!clearRun(c.x, c.y, vy, dir)) { s.breakAt += 0.25; continue; } // (it keeps shaking)
         s.loose = { x: c.x, y: c.y, vy, dir, rolling: false, from: c.x, angle: 0 };
+        for (let k = 0; k < 8; k++) { // a soft puff of the magic that snapped it free
+          const a = (k / 8) * Math.PI * 2, t = 0.35 + Math.random() * 0.2;
+          world.wisps.push({ x: c.x, y: c.y, vx: Math.cos(a) * 45, vy: Math.sin(a) * 35 - 10, t, max: t, pink: k % 2 === 0, ph: k, faint: true });
+        }
         sawBurst(s, c.x, c.y, 30, ["#4a2468", "#8a5ab0", "#2c1640", "#ff7ae0", "#ffd0f4"], 200); // its pole (or slot) bursting apart
         world.quakes.push({ x: c.x, t: 0.4 });
         Sound.play("sawBreak");
