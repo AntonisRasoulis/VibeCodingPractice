@@ -149,6 +149,7 @@ const Game = (() => {
       updateFlytraps(dt);
       updateTurrets(dt);
       updateArrows(dt);
+      updateLooseSaws(dt);
     }
     updateMonkeys(dt);
     updateWarps(dt);
@@ -1353,6 +1354,50 @@ const Game = (() => {
       }
     }
     world.monkeys = world.monkeys.filter((mk) => !mk.done);
+  }
+
+  // ---- The enchanted forest's saws that break loose ----
+
+  // Some of the forest's saws break loose a while after someone first comes near: they shake and creak,
+  // then drop (off their pole, or out of their slot or pit) and roll straight at whoever is nearest,
+  // half sunk in the ground, until they fall into a pit or have rolled far enough
+  function updateLooseSaws(dt) {
+    const { level, players } = world;
+    const runners = players.filter((p) => !p.caught && !p.dead);
+    for (const s of level.saws) {
+      if (!s.breaks || s.gone) continue;
+      if (!s.loose) {
+        if (s.breakAt === undefined) {
+          if (runners.some((p) => Math.abs(p.x - s.x0) < VIEW_W * 0.5)) s.breakAt = world.time + FOREST.sawDelay[0] + Math.random() * (FOREST.sawDelay[1] - FOREST.sawDelay[0]);
+          continue;
+        }
+        if (!s.creaked && world.time >= s.breakAt - FOREST.sawWarn) { s.creaked = true; Sound.play("sawCreak"); }
+        if (world.time < s.breakAt) continue;
+        const c = level.sawPos(s, world.time);
+        if (c.y > s.gy + 2) { s.breakAt += 0.2; continue; } // (down in its pit: wait until it's up)
+        const target = runners.length ? runners.reduce((a, q) => (Math.abs(q.x - c.x) < Math.abs(a.x - c.x) ? q : a)) : null;
+        const dir = target ? Math.sign(target.x + HITBOX_W / 2 - c.x) || -1 : -1;
+        const ground = level.groundTop(c.x);
+        s.loose = { x: c.x, y: c.y, vy: 0, dir, rolling: ground !== null && c.y >= ground - 1, from: c.x, angle: 0 };
+        if (s.loose.rolling) s.loose.y = ground;
+        Sound.play("sawBreak");
+      }
+      const L = s.loose;
+      L.x += L.dir * FOREST.sawSpeed * (L.rolling ? 1 : 0.6) * dt;
+      L.angle += (L.dir * FOREST.sawSpeed * dt) / s.r;
+      const ground = level.groundTop(L.x);
+      if (L.rolling) {
+        if (ground === null || ground > L.y + 2) { L.rolling = false; L.vy = 0; } // off an edge: it falls
+        else L.y = ground; // (up a step, it hops up onto it)
+      } else {
+        L.vy += FOREST.sawGravity * dt;
+        const was = L.y;
+        L.y += L.vy * dt;
+        if (ground !== null && was <= ground && L.y >= ground) { L.y = ground; L.rolling = true; }
+      }
+      const far = runners.every((p) => Math.abs(p.x - L.x) > VIEW_W);
+      if (L.y > VIEW_H + s.r + 4 || Math.abs(L.x - L.from) > FOREST.sawRollFor || (far && runners.length)) { s.gone = true; s.loose = null; }
+    }
   }
 
   // ---- Purple catch-up orbs: portal gun, grapple and vine ----

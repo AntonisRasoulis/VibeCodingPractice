@@ -1401,7 +1401,7 @@ const Renderer = (() => {
 
   function drawPlatforms(level, player, camX, time) {
     for (const p of level.platforms) {
-      if (p.kind === "log" || p.kind === "flood") continue; // (drawn with their river, or the flood)
+      if (p.kind === "log" || p.kind === "flood" || p.kind === "float") continue; // (drawn with their river, the flood, or their floating shooter)
       const sx = Math.round(p.x - camX);
       if (sx > VIEW_W || sx + p.w < 0) continue;
 
@@ -1582,6 +1582,17 @@ const Renderer = (() => {
     const y = s.row * TILE;
     if (forest) {
       if (charge > 0) drawGlowAt("pink", 2, x + 4, y + 4, charge);
+      if (s.float) {
+        // floating by magic: a faint glow and sparkles drifting down from under it
+        drawGlowAt("pink", 1, x + 4, y + 10, 0.35);
+        for (let k = 0; k < 3; k++) {
+          const t = (time * 0.8 + k / 3 + s.x0 * 0.01) % 1;
+          b.fillStyle = k % 2 ? "#ff9af0" : "#d9a3ff";
+          b.globalAlpha = 1 - t;
+          b.fillRect(x + 1 + ((k * 3 + Math.floor(s.x0)) % 6), y + 9 + Math.round(t * 6), 1, 1);
+        }
+        b.globalAlpha = 1;
+      }
       b.fillStyle = "#2c1640";
       b.fillRect(x, y, 8, 8);
       b.fillStyle = "#4a2468";
@@ -2431,6 +2442,7 @@ const Renderer = (() => {
   // ---- Saw blades ----
 
   function sawOnScreen(s, camX) {
+    if (s.loose) return s.loose.x + s.r + 4 > camX && s.loose.x - s.r - 4 < camX + VIEW_W;
     return Math.max(s.x0, s.x1) + s.r + 4 > camX && Math.min(s.x0, s.x1) - s.r - 4 < camX + VIEW_W;
   }
 
@@ -2440,8 +2452,17 @@ const Renderer = (() => {
       if (!sawOnScreen(s, camX)) continue;
       const x0 = Math.round(s.x0 - camX);
       const forest = forestAt(level, s.x0);
+      const broken = s.loose || s.gone;
       if (s.kind === "slot") {
         drawSawSlot(x0 - s.r + 1, Math.round(s.x1 - camX) + s.r - 1, s.gy, forest);
+      } else if (broken) {
+        // its pole snapped: just a jagged stump left
+        const base = s.kind === "pit" ? VIEW_H : s.gy;
+        drawSawRail(x0, base - 9, base, forest);
+        b.fillStyle = forest ? "#2c1640" : "#3a3d44";
+        b.fillRect(x0 - 2, base - 10, 2, 2);
+        b.fillRect(x0 + 1, base - 11, 1, 2);
+        if (s.kind === "rail") drawSawSlot(x0 - s.r + 1, x0 + s.r - 1, s.gy, forest);
       } else {
         drawSawRail(x0, Math.round(s.y1) - s.r - 3, s.kind === "pit" ? VIEW_H : s.gy, forest);
         if (s.kind === "rail") drawSawSlot(x0 - s.r + 1, x0 + s.r - 1, s.gy, forest);
@@ -2452,10 +2473,13 @@ const Renderer = (() => {
   function drawSaws(level, camX, time) {
     for (const s of level.saws) {
       if (!sawOnScreen(s, camX)) continue;
-      const c = level.sawPos(s, time);
-      const cx = Math.round(c.x - camX);
-      const angle = s.spinDir * time * SAW.spin;
+      if (s.gone) continue;
       const look = forestAt(level, s.x0) ? SAW_LOOK.forest : SAW_LOOK.steel;
+      if (s.loose) { drawLooseSaw(s, level, camX, time, look); continue; }
+      const c = level.sawPos(s, time);
+      const shaking = s.breakAt !== undefined && time > s.breakAt - FOREST.sawWarn; // about to break loose
+      const cx = Math.round(c.x - camX) + (shaking ? (Math.floor(time * 40) % 2 ? 1 : -1) : 0);
+      const angle = s.spinDir * time * SAW.spin;
       if (s.kind === "pit") {
         drawSawBlade(cx, c.y, s.r, angle, look);
         continue;
@@ -2477,6 +2501,24 @@ const Renderer = (() => {
         b.fillRect(cx + side * (half + 2 + (k % 2)), s.gy - 2 - k, 1, 1);
       }
     }
+  }
+
+  // A forest saw that broke loose: rolling along half sunk in the ground (sparks flying where it cuts in),
+  // or falling
+  function drawLooseSaw(s, level, camX, time, look) {
+    const L = s.loose, cx = Math.round(L.x - camX);
+    if (!L.rolling) { drawSawBlade(cx, L.y, s.r, L.angle, look); return; }
+    b.save();
+    b.beginPath();
+    b.rect(cx - s.r - 2, L.y - s.r - 2, 2 * s.r + 4, s.r + 2);
+    b.clip();
+    drawSawBlade(cx, L.y, s.r, L.angle, look);
+    b.restore();
+    const k = Math.floor(time * 30) % 3, back = -L.dir; // sparks thrown out behind it
+    b.fillStyle = look.spark;
+    b.fillRect(cx + back * (s.r + 1 + k), L.y - 1 - (k % 2), 1, 1);
+    b.fillStyle = look.spark2;
+    b.fillRect(cx + back * (s.r + 2 + (k % 2)), L.y - 2 - k, 1, 1);
   }
 
   // A steel disc with raked teeth, turned by `angle`

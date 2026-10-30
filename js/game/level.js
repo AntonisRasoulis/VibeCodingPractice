@@ -149,6 +149,19 @@ class Level {
       p.dx = newX - p.x;
       p.x = newX;
     }
+    // the forest's floating shooters, and the platform on top of each that carries you along
+    for (const s of this.shooters) {
+      if (!s.float) continue;
+      s.x = this.shooterX(s, time);
+      const p = s.float.top, newX = s.x - TILE / 2;
+      p.dx = newX - p.x;
+      p.x = newX;
+    }
+  }
+
+  // Where a shooter is at time t: most stay put, but in the forest they float left and right
+  shooterX(s, t) {
+    return s.float ? s.x0 + s.float.amp * Math.sin(2 * Math.PI * (t / s.float.period + s.float.phase)) : s.x;
   }
 
   // A log on a river: worked out from the clock (like the moving platforms), so both players see the
@@ -181,6 +194,8 @@ class Level {
   // Where a saw blade's center is at a given time. It glides from (x0, y0) to (x1, y1)
   // and back, slowing down at each end. Worked out from the clock like the maces.
   sawPos(s, time) {
+    if (s.loose) return { x: s.loose.x, y: s.loose.y }; // (a forest saw that broke loose: it moves itself)
+    if (s.gone) return { x: -1e6, y: -1e6 };
     const t = 0.5 - 0.5 * Math.cos(2 * Math.PI * (time / s.period + s.phase));
     return { x: s.x0 + (s.x1 - s.x0) * t, y: s.y0 + (s.y1 - s.y0) * t };
   }
@@ -280,10 +295,20 @@ class Level {
     if (!ignoreTraps && this.ponds.some((p) => x + HITBOX_W > p.x0 - 2 && x < p.x1 + 2)) return true;
     if (!ignoreTraps && this.flytraps.some((f) => Math.abs(f.x - (x + HITBOX_W / 2)) < this.flytrapReach(f) + HITBOX_W / 2 + 2)) return true;
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
-    if (this.shooters.some((s) => Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
+    if (this.shooters.some((s) => s.float ? this.floatThreat(s, x, y) : Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
+  }
+
+  // Could a floating shooter's spikes reach someone standing at (x, y), from anywhere it floats to?
+  // (Its spikes fly diagonally: they reach you if you're as far off to the side as above or below it.)
+  floatThreat(s, x, y) {
+    const cx = x + HITBOX_W / 2;
+    const near = Math.max(0, Math.abs(cx - s.x0) - s.float.amp) - 8, far = Math.abs(cx - s.x0) + s.float.amp + 8;
+    const top = y - 4 - s.y, bottom = y + HITBOX_H + 4 - s.y;
+    const dyMin = top <= 0 && bottom >= 0 ? 0 : Math.min(Math.abs(top), Math.abs(bottom)), dyMax = Math.max(Math.abs(top), Math.abs(bottom));
+    return dyMin < SHOOTER.range * Math.SQRT1_2 && near <= dyMax && far >= dyMin;
   }
 
   // Does any of a shooter's 4 spike paths pass through someone standing at (x, y)? (with room to spare)
@@ -416,10 +441,17 @@ class Level {
   // How far each of the 4 spikes can fly before hitting the ground (worked out once)
   shooterReach(s) {
     if (s.dist) return s.dist;
-    const dist = SHOOTER_DIRS.map(([dx, dy]) => {
+    const dist = this.reachFrom(s.x, s.y, s);
+    // Only remember it once the ground it flies over has been built
+    if (Math.floor((s.x + SHOOTER.range) / TILE) < this.cols.length) s.dist = dist;
+    return dist;
+  }
+
+  reachFrom(x0, y0, s) {
+    return SHOOTER_DIRS.map(([dx, dy]) => {
       for (let d = 0; d < SHOOTER.range; d++) {
-        const x = s.x + dx * (4 + d * Math.SQRT1_2);
-        const y = s.y + dy * (4 + d * Math.SQRT1_2);
+        const x = x0 + dx * (4 + d * Math.SQRT1_2);
+        const y = y0 + dy * (4 + d * Math.SQRT1_2);
         if (y < -8 || y > VIEW_H) return d;
         const col = Math.floor(x / TILE);
         const row = Math.floor(y / TILE);
@@ -428,25 +460,36 @@ class Level {
       }
       return SHOOTER.range;
     });
-    // Only remember it once the ground it flies over has been built
-    if (Math.floor((s.x + SHOOTER.range) / TILE) < this.cols.length) s.dist = dist;
+  }
+
+  // A floating shooter fires each volley from wherever it was at the time: how far that volley's
+  // spikes go (remembered for the last few volleys)
+  volleyReach(s, k, x) {
+    const memo = (s.reaches ||= new Map());
+    if (memo.has(k)) return memo.get(k);
+    const dist = this.reachFrom(x, s.y, s);
+    if (Math.floor((x + SHOOTER.range) / TILE) < this.cols.length) {
+      memo.set(k, dist);
+      if (memo.size > 6) memo.delete(memo.keys().next().value);
+    }
     return dist;
   }
 
   // Every spike in the air from this shooter right now: [{x, y, dx, dy}]
   shooterSpikes(s, time) {
     const out = [];
-    const dist = this.shooterReach(s);
     const life = SHOOTER.range / SHOOTER.speed;
     let k = Math.floor(time / s.period - s.phase);
     for (; ; k--) {
-      const age = time - (k + s.phase) * s.period;
+      const fired = (k + s.phase) * s.period, age = time - fired;
       if (age > life) break;
+      const x0 = this.shooterX(s, fired); // (where it was when it fired)
+      const dist = s.float ? this.volleyReach(s, k, x0) : this.shooterReach(s);
       const d = age * SHOOTER.speed;
       SHOOTER_DIRS.forEach(([dx, dy], i) => {
         if (d >= dist[i]) return;
         const step = 4 + d * Math.SQRT1_2;
-        out.push({ x: s.x + dx * step, y: s.y + dy * step, dx, dy });
+        out.push({ x: x0 + dx * step, y: s.y + dy * step, dx, dy });
       });
     }
     return out;
@@ -464,6 +507,31 @@ class Level {
   }
 
   // ---- Building blocks ----
+
+  // Forest: n spike shooters floating left and right above the ground (in a stack if n > 1), each with a
+  // platform on top that carries you along. Flat ground under all of it, with room to wait on either side.
+  floatingShooters(d, n) {
+    const heights = n === 1 ? [this.pickFrom([1, 2, 3, 4, 5, 6])] : this.pickFrom(n === 2 ? [[1, 4], [2, 5], [3, 6], [2, 6]] : [[1, 3, 5], [2, 4, 6], [1, 4, 7]]);
+    const amps = heights.map(() => this.rand(FOREST.floatAmp[0], FOREST.floatAmp[1]));
+    const reach = Math.max(...amps) + Math.max(4, Math.max(...heights) + 4);
+    this.flat(reach);
+    const col = this.col;
+    this.flat(1);
+    heights.forEach((height, i) => {
+      const row = this.groundRow - height;
+      if (row < 1) return;
+      const amp = amps[i] * TILE, x0 = col * TILE + TILE / 2;
+      const s = {
+        col: -1, row, x: x0, x0, y: row * TILE + TILE / 2,
+        period: (2.1 + this.rng() * 0.7 - d * 0.4) * this.pace,
+        phase: this.rng(),
+        float: { amp, period: (2 * Math.PI * amp) / FOREST.floatSpeed, phase: this.rng() },
+      };
+      s.float.top = this.addPlatform("float", 0, row, 1, { x: x0 - TILE / 2 });
+      this.shooters.push(s);
+    });
+    this.flat(reach + 1);
+  }
 
   get col() {
     return this.cols.length;
@@ -551,6 +619,7 @@ class Level {
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
+    if (this.biome === "forest" && this.col > 60) weights.shooterStack = FOREST.stackWeight;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -1012,6 +1081,7 @@ const SECTIONS = {
   // A block that fires spikes in 4 diagonal directions. It can sit on the
   // ground, float at head height (jump over it) or hang higher up (run under it).
   shooter(d) {
+    if (this.biome === "forest") return this.floatingShooters(d, 1);
     const height = this.pickFrom([1, 1, 2, 3, 4, 5, 6]); // tiles above the ground
     // Its downward spikes land further out the higher it is: leave room to wait on either side
     this.flat(Math.max(4, height + 4));
@@ -1029,6 +1099,11 @@ const SECTIONS = {
     this.flat(Math.max(6, height + 5));
   },
 
+  // The forest's: a stack of floating shooters, each drifting its own way
+  shooterStack(d) {
+    this.floatingShooters(d, this.rand(FOREST.stack[0], FOREST.stack[1]));
+  },
+
   // A spinning saw blade. Sizes and speeds are random (a little faster later on), and
   // like the maces there may be two in a row later. The speed ranges were measured to
   // always leave a way through (see the README).
@@ -1040,6 +1115,7 @@ const SECTIONS = {
       const gy = this.groundRow * TILE;
       const kind = this.pickWeighted({ slot: 3, rail: 2, pit: 2 });
       const saw = { kind, r, gy, phase: this.rng(), spinDir: this.rng() < 0.5 ? -1 : 1 };
+      if (this.biome === "forest") saw.breaks = this.rng() < FOREST.sawBreaks; // (it'll break loose and roll at you)
       if (kind === "slot") {
         // slides left and right in a slot cut into the ground: only its top half shows
         const len = this.rand(3, 8) * TILE; // how far it slides

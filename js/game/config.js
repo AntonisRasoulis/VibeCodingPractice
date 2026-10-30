@@ -419,6 +419,20 @@ const BEAR = {
   tramplePop: 370,  // how hard it launches a player it runs over (that it isn't chasing) straight up
 };
 
+// The enchanted forest's twists on the usual obstacles
+const FOREST = {
+  sawBreaks: 0.2,        // share of its saws that break loose...
+  sawDelay: [0.8, 3],    // ...a while (seconds) after someone first comes near
+  sawWarn: 0.6,          // seconds it shakes and creaks first
+  sawSpeed: 140,         // then it rolls at you, half in the ground (you run at 96: jump it!)
+  sawGravity: 600,       // (falling off its pole, or out of its pit, first)
+  sawRollFor: 1400,      // pixels it rolls before it's gone, if no pit stops it first
+  floatAmp: [2, 10],     // tiles each way a floating shooter drifts
+  floatSpeed: 36,        // its top speed (pixels a second)
+  stack: [2, 3],         // shooters in a stack
+  stackWeight: 3,        // how often a stack comes, as a section (a single shooter is 5)
+};
+
 const SHOOTER = {
   speed: 80,    // how fast its spikes fly
   range: 160,   // how far a spike flies before it's gone

@@ -744,7 +744,8 @@ class Player {
 
     // Saw blades: hit if the blade touches the body (the very tips of the teeth are forgiven)
     for (const s of level.saws) {
-      if (cx < Math.min(s.x0, s.x1) - s.r - 8 || cx > Math.max(s.x0, s.x1) + s.r + 8) continue;
+      if (s.gone) continue;
+      if (!s.loose && (cx < Math.min(s.x0, s.x1) - s.r - 8 || cx > Math.max(s.x0, s.x1) + s.r + 8)) continue;
       const c = level.sawPos(s, level.time);
       const nearX = clamp(c.x, this.x, this.x + HITBOX_W);
       const nearY = clamp(c.y, this.y, this.y + HITBOX_H);
@@ -753,7 +754,7 @@ class Player {
 
     // Flying spikes from shooters
     for (const s of level.shooters) {
-      if (Math.abs(s.x - cx) > SHOOTER.range + 16) continue;
+      if (Math.abs(s.x - cx) > SHOOTER.range + 16 + (s.float ? 2 * s.float.amp : 0)) continue; // (a floating one fired from wherever it was)
       for (const spike of level.shooterSpikes(s, level.time)) {
         if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, spike.x - 1.5, spike.y - 1.5, 3, 3)) return this.die();
       }
