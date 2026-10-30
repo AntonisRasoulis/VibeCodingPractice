@@ -1118,7 +1118,7 @@ const SPORE_COLORS = {
   pink: { cap: "#ff5ac8", capHi: "#ffa0e6", capDk: "#b02a8a", spot: "#ffe8f8", spore: "#ff9af0" },
 };
 
-// A big spore mushroom: a pale stem that bows as it grows (leaning one way, `lean` -1 or 1),
+// A big spore mushroom: a pale stem that winds like an S as it grows (leaning one way, `lean` -1 or 1),
 // a skirt, gills, and a spotted dome cap that droops at the rim and tips the way it leans. The canvas is
 // 54 wide and 42 tall, with the stem's foot at the bottom middle.
 function makeSporeShroom(kind, lean) {
@@ -1126,8 +1126,9 @@ function makeSporeShroom(kind, lean) {
   const c = makeCanvas(54, SPORES.height + 2);
   const g = c.getContext("2d");
   const foot = 27, by = SPORES.height + 2;
-  // where the stem's middle is at each height: one smooth bow, out one way and then sweeping over under the cap
-  const mid = (y) => { const u = y / stemH; return foot + lean * (SPORES.lean * u * u - 3 * Math.sin(u * Math.PI)); };
+  // where the stem's middle is at each height: a smooth S, swinging one way and then back the other on its way up,
+  // ending up under the cap (which sits a little to one side)
+  const mid = (y) => { const u = y / stemH; return foot + lean * (SPORES.lean * u * u * (3 - 2 * u) - 5 * Math.sin(u * Math.PI * 2)); };
   for (let y = 0; y < stemH; y++) {
     const u = y / stemH, slope = mid(y + 0.5) - mid(y - 0.5);
     // thick and flared at the foot, thinner at the top; wider rows where it's steep, so it keeps its thickness
