@@ -29,7 +29,9 @@ const Renderer = (() => {
       const p = world.players[i];
       const target = p.x - VIEW_W * 0.35;
       cams[i] += (target - cams[i]) * Math.min(1, dt * 6);
-      const camX = Math.round(Math.max(-8, cams[i]));
+      let camX = Math.round(Math.max(-8, cams[i]));
+      // the ground shaking where a saw slams down (only if it's on this screen)
+      if (world.quakes.some((q) => Math.abs(q.x - (camX + VIEW_W / 2)) < VIEW_W * 0.6)) camX += (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 2));
 
       b.save();
       b.translate(0, i * (VIEW_H + DIVIDER));
@@ -133,6 +135,7 @@ const Renderer = (() => {
     if (!player.dead && player.y + HITBOX_H < 0) drawAboveMarker(player, camX); // flung up off the top of the screen
     for (const a of world.arrows) drawArrow(a, camX);
     drawSaws(world.level, camX, world.time);
+    for (const bit of world.sawBits) { b.fillStyle = bit.c; b.fillRect(Math.round(bit.x - camX), Math.round(bit.y), bit.big ? 2 : 1, bit.big ? 2 : 1); }
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
     if (player.power && !player.dead && !player.hiddenIn) drawCrackle(player, camX, world.time);
@@ -2477,8 +2480,8 @@ const Renderer = (() => {
       const look = forestAt(level, s.x0) ? SAW_LOOK.forest : SAW_LOOK.steel;
       if (s.loose) { drawLooseSaw(s, level, camX, time, look); continue; }
       const c = level.sawPos(s, time);
-      const shaking = s.breakAt !== undefined && time > s.breakAt - FOREST.sawWarn; // about to break loose
-      const cx = Math.round(c.x - camX) + (shaking ? (Math.floor(time * 40) % 2 ? 1 : -1) : 0);
+      const shaking = s.breakAt !== undefined && time > s.breakAt - FOREST.sawWarn; // about to break loose: shaking hard
+      const cx = Math.round(c.x - camX) + (shaking ? (Math.floor(time * 40) % 2 ? 2 : -2) : 0);
       const angle = s.spinDir * time * SAW.spin;
       if (s.kind === "pit") {
         drawSawBlade(cx, c.y, s.r, angle, look);

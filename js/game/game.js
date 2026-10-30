@@ -57,6 +57,8 @@ const Game = (() => {
       thrownSnowballs: [], // snowballs thrown with the snowball orb
       monsoon: null,   // the jungle's monsoon orb, flooding the course: { t, logs }
       monkeys: [],     // monkeys swinging in on their vines (the monkey orb)
+      sawBits: [],     // splinters, sparks and dirt thrown about by the forest's saws breaking loose
+      quakes: [],      // the ground shaking where one slams down: { x, t }
       nextCatchup: null, // when (world time) the next purple orb comes for whoever's fallen behind
       warps: [],       // portal gun: someone going into a portal and out of another one far ahead
       grapples: [],    // grapple hooks flying out to the leader, or reeling them back
@@ -103,6 +105,10 @@ const Game = (() => {
 
   function step(dt) {
     if (world.swapFlash > 0) world.swapFlash -= dt * 2;
+    for (const q of world.quakes) q.t -= dt;
+    world.quakes = world.quakes.filter((q) => q.t > 0);
+    for (const bit of world.sawBits) { bit.t -= dt; bit.vy += 500 * dt; bit.x += bit.vx * dt; bit.y += bit.vy * dt; }
+    world.sawBits = world.sawBits.filter((bit) => bit.t > 0 && bit.y < VIEW_H + 4);
 
     if (world.state === "countdown") {
       const before = Math.ceil(world.countdown);
@@ -1374,29 +1380,71 @@ const Game = (() => {
         if (!s.creaked && world.time >= s.breakAt - FOREST.sawWarn) { s.creaked = true; Sound.play("sawCreak"); }
         if (world.time < s.breakAt) continue;
         const c = level.sawPos(s, world.time);
-        if (c.y > s.gy + 2) { s.breakAt += 0.2; continue; } // (down in its pit: wait until it's up)
-        const target = runners.length ? runners.reduce((a, q) => (Math.abs(q.x - c.x) < Math.abs(a.x - c.x) ? q : a)) : null;
-        const dir = target ? Math.sign(target.x + HITBOX_W / 2 - c.x) || -1 : -1;
-        const ground = level.groundTop(c.x);
-        s.loose = { x: c.x, y: c.y, vy: 0, dir, rolling: ground !== null && c.y >= ground - 1, from: c.x, angle: 0 };
-        if (s.loose.rolling) s.loose.y = ground;
+        if (c.y > s.gy + 2 || !runners.length) { s.breakAt += 0.2; continue; } // (down in its pit: wait until it's up)
+        const target = runners.reduce((a, q) => (Math.abs(q.x - c.x) < Math.abs(a.x - c.x) ? q : a));
+        const dir = Math.sign(target.x + HITBOX_W / 2 - c.x) || -1;
+        const vy = -FOREST.sawJolt[s.kind];
+        // Never straight into a pit: only once it would land on ground with a clear run at them
+        if (!clearRun(c.x, c.y, vy, dir)) { s.breakAt += 0.25; continue; } // (it keeps shaking)
+        s.loose = { x: c.x, y: c.y, vy, dir, rolling: false, from: c.x, angle: 0 };
+        sawBurst(s, c.x, c.y, 30, ["#4a2468", "#8a5ab0", "#2c1640", "#ff7ae0", "#ffd0f4"], 200); // its pole (or slot) bursting apart
+        world.quakes.push({ x: c.x, t: 0.4 });
         Sound.play("sawBreak");
       }
       const L = s.loose;
-      L.x += L.dir * FOREST.sawSpeed * (L.rolling ? 1 : 0.6) * dt;
-      L.angle += (L.dir * FOREST.sawSpeed * dt) / s.r;
+      L.x += L.dir * FOREST.sawSpeed * dt;
+      L.angle += (L.dir * FOREST.sawSpeed * dt) / s.r * (L.rolling ? 1 : 1.6);
       const ground = level.groundTop(L.x);
       if (L.rolling) {
         if (ground === null || ground > L.y + 2) { L.rolling = false; L.vy = 0; } // off an edge: it falls
         else L.y = ground; // (up a step, it hops up onto it)
+        if (Math.random() < dt * 45) world.sawBits.push({ x: L.x - L.dir * s.r * 0.7, y: L.y - 1, vx: -L.dir * (40 + Math.random() * 80), vy: -70 - Math.random() * 100, t: 0.45, c: Math.random() < 0.5 ? "#3c2148" : "#a24cf0", big: Math.random() < 0.4 }); // dirt thrown up behind it
       } else {
         L.vy += FOREST.sawGravity * dt;
         const was = L.y;
         L.y += L.vy * dt;
-        if (ground !== null && was <= ground && L.y >= ground) { L.y = ground; L.rolling = true; }
+        if (ground !== null && was <= ground && L.y >= ground && L.vy > 0) {
+          // slams down into the ground, and tears off along it
+          L.y = ground;
+          L.rolling = true;
+          sawBurst(s, L.x, ground, 24, ["#3c2148", "#2a1634", "#a24cf0", "#ff9af0", "#ffd0f4"], 170);
+          world.quakes.push({ x: L.x, t: 0.35 });
+          Sound.play("sawSlam");
+        }
       }
       const far = runners.every((p) => Math.abs(p.x - L.x) > VIEW_W);
       if (L.y > VIEW_H + s.r + 4 || Math.abs(L.x - L.from) > FOREST.sawRollFor || (far && runners.length)) { s.gone = true; s.loose = null; }
+    }
+  }
+
+  // Would a saw thrown from (x, y) going up at vy (and along at its speed) land on ground, with a clear run
+  // from there (no pit, no drop) for FOREST.sawClear pixels?
+  function clearRun(x, y, vy, dir) {
+    const { level } = world, dt = STEP; // (the same steps the saw itself will take)
+    for (let k = 0; k < 480; k++) {
+      const was = y;
+      vy += FOREST.sawGravity * dt;
+      x += dir * FOREST.sawSpeed * dt;
+      y += vy * dt;
+      if (y > VIEW_H + 20) return false;
+      const g = level.groundTop(x);
+      if (g !== null && was <= g && y >= g && vy > 0) {
+        for (let d = 2; d <= FOREST.sawClear; d += 2) {
+          const g2 = level.groundTop(x + dir * d);
+          if (g2 === null || g2 > g + 2) return false;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // A burst of n bits flying out from (x, y)
+  function sawBurst(s, x, y, n, colors, speed) {
+    for (let k = 0; k < n; k++) {
+      const a = -Math.PI * (0.1 + 0.8 * Math.random());
+      const v = speed * (0.4 + Math.random() * 0.8);
+      world.sawBits.push({ x: x + (Math.random() - 0.5) * s.r, y: y - Math.random() * s.r * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0.5 + Math.random() * 0.5, c: colors[k % colors.length], big: k % 3 !== 2 });
     }
   }
 

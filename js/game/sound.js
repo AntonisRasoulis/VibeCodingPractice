@@ -232,7 +232,8 @@ const Sound = (() => {
     bonk: () => { tone({ f: 700, to: 260, dur: 0.14, type: "square", vol: 0.13 }); tone({ f: 1400, to: 900, dur: 0.5, type: "sine", vol: 0.06, at: 0.08, vibrato: 30 }); },
     monsoon: () => { noise({ filter: "lowpass", f: 3000, to: 1200, dur: 2.2, vol: 0.35, attack: 0.4 }); noise({ filter: "lowpass", f: 120, dur: 1.4, vol: 0.6, attack: 0.05, at: 0.2 }); }, // a downpour, and thunder
     sawCreak: () => { tone({ f: 140, to: 90, dur: 0.5, type: "sawtooth", vol: 0.08, vibrato: 25 }); noise({ filter: "bandpass", f: 600, to: 300, q: 4, dur: 0.5, vol: 0.12 }); },
-    sawBreak: () => { noise({ filter: "lowpass", f: 1800, to: 300, dur: 0.25, vol: 0.35 }); tone({ f: 900, to: 400, dur: 0.3, type: "square", vol: 0.06 }); },
+    sawBreak: () => { noise({ filter: "lowpass", f: 3000, to: 200, dur: 0.4, vol: 0.55 }); noise({ filter: "highpass", f: 2500, dur: 0.12, vol: 0.3 }); tone({ f: 1200, to: 300, dur: 0.35, type: "sawtooth", vol: 0.08 }); },
+    sawSlam: () => { tone({ f: 120, to: 40, dur: 0.3, type: "sine", vol: 0.35 }); noise({ filter: "lowpass", f: 900, to: 150, dur: 0.3, vol: 0.45 }); tone({ f: 1800, to: 900, dur: 0.5, type: "sawtooth", vol: 0.05, at: 0.05 }); },
     gotCatchup: () => notes([523, 659, 784, 1047], { gap: 0.06, dur: 0.1, type: "triangle", vol: 0.1 }),
     grappleThrow: () => { noise({ filter: "bandpass", f: 2000, to: 600, q: 2, dur: 0.3, vol: 0.2 }); tone({ f: 900, to: 300, dur: 0.25, type: "sine", vol: 0.08, vibrato: 30 }); },
     grappleHook: () => { tone({ f: 1400, to: 900, dur: 0.06, type: "square", vol: 0.08 }); tone({ f: 300, to: 700, dur: 0.4, type: "sawtooth", vol: 0.06, at: 0.05 }); },

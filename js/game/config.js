@@ -426,6 +426,8 @@ const FOREST = {
   sawWarn: 0.6,          // seconds it shakes and creaks first
   sawSpeed: 140,         // then it rolls at you, half in the ground (you run at 96: jump it!)
   sawGravity: 600,       // (falling off its pole, or out of its pit, first)
+  sawJolt: { slot: 170, rail: 120, pit: 230 }, // how hard it jerks up as it breaks (pixels a second, upwards)
+  sawClear: 96,          // it only breaks once it would land on ground with at least this far to roll (never straight into a pit)
   sawRollFor: 1400,      // pixels it rolls before it's gone, if no pit stops it first
   floatAmp: [2, 10],     // tiles each way a floating shooter drifts
   floatSpeed: 36,        // its top speed (pixels a second)
