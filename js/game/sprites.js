@@ -1002,6 +1002,113 @@ function makeJungleLayers() {
   return { far, mid, near };
 }
 
+// ---- Enchanted forest (a hidden biome: only through a magic portal) ----
+
+// Dark purple soil, with glowing purple grass on top if it's the surface
+function makeForestTile(variant, top) {
+  const c = makeCanvas(TILE, TILE);
+  const g = c.getContext("2d");
+  px(g, "#2a1634", 0, 0, TILE, TILE);
+  for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
+    const n = hash(x + variant * 29, y + variant * 13);
+    if (n < 0.1) px(g, "#1e0f26", x, y);
+    else if (n > 0.92) px(g, "#3c2148", x, y);
+  }
+  if (top) {
+    px(g, "#a24cf0", 0, 0, TILE, 2);
+    px(g, "#7a2ec0", 0, 2, TILE, 1);
+    for (let x = 0; x < TILE; x++) {
+      if (hash(x, variant + 3) < 0.45) px(g, "#7a2ec0", x, 3);
+      if (hash(x, variant + 7) < 0.35) px(g, "#e2a6ff", x, 0);
+    }
+  }
+  return c;
+}
+
+// The forest's spike: a thick thorny vine twisting up out of the ground, with glowing pink barbs
+const FOREST_THORN_ROWS = [
+  ["...w....", "...p....", "..oml...", ".p.oml..", "..ooml..", "...omlop", "...omll.", "p..oml..", ".ooomlo.", "..omml.."],
+  ["....w...", "....p...", "...oml..", "...oml.p", "..oomlo.", "po.oml..", ".ooomll.", "...omllp", "..oomlo.", "..omml.."],
+];
+const FOREST_THORN_PALETTE = { o: "#3a1448", m: "#8a3ab0", l: "#c070f0", p: "#ff7ae0", w: "#ffe0f8" };
+
+function makeForestThorn(variant) {
+  const img = spriteFromRows(FOREST_THORN_ROWS[variant % 2], FOREST_THORN_PALETTE);
+  return variant === 2 ? flipped(img) : img;
+}
+
+// A soft round glow (a few rings, getting fainter), to draw behind anything that shines
+function makeGlow(r, color) {
+  const c = makeCanvas(r * 2 + 1, r * 2 + 1);
+  const g = c.getContext("2d");
+  for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+    const d = Math.sqrt(x * x + y * y) / r;
+    if (d > 1) continue;
+    g.globalAlpha = Math.ceil((1 - d) * 4) / 4 * 0.7; // in steps, so it still looks like pixels
+    px(g, color, x + r, y + r);
+  }
+  return c;
+}
+
+// A glowing mushroom: white stem, a colored cap with spots (h pixels tall)
+function drawForestMushroom(g, x, base, h, cap) {
+  px(g, "#f0e0ff", x + 2, base - h + 3, 2, h - 3);
+  px(g, cap, x, base - h + 1, 6, 2);
+  px(g, cap, x + 1, base - h, 4, 1);
+  px(g, "#ffffff", x + 1, base - h + 1);
+  px(g, "#ffffff", x + 4, base - h);
+}
+
+const FOREST_SKY = ["#24123f", "#2f1850", "#3c1f62", "#4a2672", "#5a2e7e", "#743a88", "#8e4790", "#a65494", "#bf6299", "#d97aa0"];
+
+// The forest's background: a twilight sky, and three layers that each repeat sideways (parallax):
+// far treetops, twisted trees, and dark undergrowth with glowing mushrooms (where they glow from is kept)
+function makeForestLayers() {
+  // the sky: purple at the top to pink at the bottom, dithered in pixel steps
+  const sky = makeCanvas(VIEW_W, VIEW_H);
+  let g = sky.getContext("2d");
+  const bayer = [0, 0.5, 0.75, 0.25];
+  for (let y = 0; y < VIEW_H; y++) for (let x = 0; x < VIEW_W; x++) {
+    const level = (y / (VIEW_H - 1)) * (FOREST_SKY.length - 1), base = Math.floor(level);
+    const pick = level - base > bayer[(x % 2) + (y % 2) * 2] ? Math.min(base + 1, FOREST_SKY.length - 1) : base;
+    px(g, FOREST_SKY[pick], x, y);
+  }
+  const far = makeCanvas(400, VIEW_H);
+  g = far.getContext("2d");
+  for (let x = 0; x < 400; x++) {
+    const h = Math.round(34 + 9 * Math.sin(x * Math.PI * 2 / 100) + 5 * Math.sin(x * Math.PI * 2 / 40 + 1) + (hash(x, 3) < 0.2 ? 1 : 0));
+    px(g, "#3c1e5a", x, VIEW_H - h - 16, 1, h + 16);
+    px(g, "#4a2668", x, VIEW_H - h - 16, 1, 1);
+  }
+  const mid = makeCanvas(480, VIEW_H);
+  g = mid.getContext("2d");
+  for (const tx of [40, 190, 330]) {
+    // a twisting trunk, a couple of crooked branches, and a lumpy canopy
+    for (let y = 28; y < VIEW_H; y++) px(g, "#2c1640", tx + Math.round(Math.sin(y * 0.12 + tx) * 3), y, 4, 1);
+    for (const [by, dir] of [[48, -1], [60, 1]]) for (let k = 0; k < 10; k++) px(g, "#2c1640", tx + 2 + dir * (3 + k), by - Math.round(k * 0.6), 2, 1);
+    for (let k = 0; k < 70; k++) {
+      const a = hash(tx, k) * Math.PI * 2, r = hash(k, tx) * 18;
+      px(g, k % 6 ? "#4a2470" : "#6a3a9a", Math.round(tx + 2 + Math.cos(a) * r * 1.5), Math.round(28 + Math.sin(a) * r * 0.75), 3, 3);
+    }
+  }
+  const near = makeCanvas(420, VIEW_H);
+  g = near.getContext("2d");
+  for (let x = 0; x < 420; x++) {
+    const h = 6 + 3 * Math.sin(x * Math.PI * 2 / 35) + 2 * Math.sin(x * Math.PI * 2 / 12 + 1) + (hash(x, 7) < 0.3 ? 1 : 0);
+    px(g, "#2e1544", x, 96 - Math.round(h), 1, VIEW_H);
+    if (hash(x, 8) < 0.3) px(g, "#3e1d5c", x, 95 - Math.round(h));
+  }
+  const shrooms = [];
+  const caps = ["#ff6ad5", "#6af0ff", "#b8ff6a", "#ff6ad5", "#6af0ff"];
+  for (let i = 0, x = 24; x < 400; i++, x += 70 + Math.floor(hash(x, 4) * 40)) {
+    const h = 7 + Math.floor(hash(x, 5) * 4), cap = caps[i % caps.length];
+    drawForestMushroom(g, x, 96, h, cap);
+    if (hash(x, 6) < 0.5) drawForestMushroom(g, x + 7, 96, h - 3, cap); // a little one next to it
+    shrooms.push({ x: x + 3, y: 96 - h + 1, cap });
+  }
+  return { sky, far, mid, near, shrooms };
+}
+
 // ---- The jungle's orbs ----
 
 // The monsoon orb: a gold coin with blue raindrops falling on a wave
@@ -1438,6 +1545,11 @@ function buildSprites() {
     bamboo: Object.fromEntries(JUNGLE.bambooHeights.map((h) => [h, makeBamboo(h)])),
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
+    forest: makeForestLayers(),
+    forestTop: [0, 1, 2, 3].map((v) => makeForestTile(v, true)),
+    forestSoil: [0, 1, 2, 3].map((v) => makeForestTile(v + 4, false)),
+    forestThorns: [0, 1, 2].map(makeForestThorn),
+    glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow
     arrows: makeArrows(), // its arrows: [flying left, flying right]

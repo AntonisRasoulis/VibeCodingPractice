@@ -160,7 +160,7 @@ const SNOWBALL = {
 // about 3 orbs per biome
 const ORBS = {
   gap: 30,
-  weight: { prairie: 10, snow: 16, desert: 12, jungle: 15 },
+  weight: { prairie: 10, snow: 16, desert: 12, jungle: 15, forest: 12 },
 };
 
 // Purple catch-up orbs: they appear for a runner who has fallen off the leader's screen (alone: when
@@ -242,6 +242,9 @@ const MISSILE = {
 // The first race after opening the website always starts in the prairie;
 // after that a race can start in any biome.
 const BIOMES = ["prairie", "snow", "desert", "jungle"];
+// Hidden biomes: never in the normal rotation (you'll only get there through a magic portal)
+const SECRET_BIOMES = ["forest"];
+const BIOME_NAMES = { forest: "enchanted forest" }; // (the rest are shown as they are)
 const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
 
 const SNOW = {

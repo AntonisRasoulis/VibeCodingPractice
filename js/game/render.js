@@ -63,6 +63,7 @@ const Renderer = (() => {
       if (biome === "snow") drawSnowBackground(camX);
       else if (biome === "desert") drawDesertBackground(camX, world.time);
       else if (biome === "jungle") drawJungleBackground(camX);
+      else if (biome === "forest") drawForestBackground(camX, world.time);
       else drawBackground(camX);
     });
     b.globalAlpha = 1;
@@ -71,7 +72,7 @@ const Renderer = (() => {
     for (const d of world.decoys) drawEyes(d.kind, d.ex, d.ey, camX, decoyOpacity(d), d.t > d.blink && d.t < d.blink + 0.12 ? "shut" : "open");
     for (const j of world.jaguars) drawJaguarBack(j, world.level, camX, world.time); // eyes in a bush, leaping out
     drawTurrets(world.level, camX, world.time); // (before the ground, so it hides the part still underground)
-    drawTiles(world.level, camX);
+    drawTiles(world.level, camX, world.time);
     drawTurretDust(world.level, camX, world.time);
     drawSawTracks(world.level, camX);
     drawPalms(world.level, player, camX);
@@ -195,6 +196,79 @@ const Renderer = (() => {
     b.globalAlpha = fade;
     layer(sprites.jungle.mid, 0.4);
     layer(sprites.jungle.near, 0.6);
+  }
+
+  // ---- Enchanted forest ----
+
+  const GLOW_OF = { "#ff6ad5": "pink", "#6af0ff": "cyan", "#b8ff6a": "lime" };
+
+  // A glow from sprites.glows (size 0, 1 or 2), centered on (x, y)
+  function drawGlowAt(kind, size, x, y, alpha) {
+    const img = sprites.glows[kind][size];
+    const fade = b.globalAlpha;
+    b.globalAlpha = fade * alpha;
+    b.drawImage(img, Math.round(x - (img.width - 1) / 2), Math.round(y - (img.height - 1) / 2));
+    b.globalAlpha = fade;
+  }
+
+  function drawForestBackground(camX, time) {
+    const L = sprites.forest;
+    b.drawImage(L.sky, 0, 0);
+    const layer = (img, speed) => {
+      const off = ((camX * speed) % img.width + img.width) % img.width;
+      for (let x = -Math.round(off); x < VIEW_W; x += img.width) b.drawImage(img, x, 0);
+    };
+    layer(L.far, 0.15);
+    layer(L.mid, 0.4);
+    // the mushrooms' glow pulses slowly (each in its own time)
+    const off = ((camX * 0.6) % L.near.width + L.near.width) % L.near.width;
+    for (let x0 = -Math.round(off); x0 < VIEW_W; x0 += L.near.width) {
+      for (const m of L.shrooms) {
+        const sx = x0 + m.x;
+        if (sx < -12 || sx > VIEW_W + 12) continue;
+        drawGlowAt(GLOW_OF[m.cap], 2, sx, m.y + 2, 0.55 + 0.35 * Math.sin(time * 1.6 + m.x));
+      }
+      b.drawImage(L.near, x0, 0);
+    }
+    // fireflies drifting about, blinking on and off
+    for (let k = 0; k < 16; k++) {
+      const x = ((hash(k, 41) * VIEW_W * 2 - camX * 0.5 + Math.sin(time * 0.6 + k * 1.3) * 12) % VIEW_W + VIEW_W) % VIEW_W;
+      const y = 14 + hash(k, 42) * 72 + Math.sin(time * 0.9 + k * 2.1) * 6;
+      const on = Math.sin(time * 2.2 + k * 1.7);
+      if (on < -0.3) continue;
+      const bright = 0.4 + 0.6 * Math.max(0, on);
+      drawGlowAt("firefly", 1, x, y, bright);
+      b.globalAlpha = bright * 0.8;
+      b.fillStyle = "#f4ff6a";
+      b.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
+      b.fillRect(Math.round(x), Math.round(y) - 1, 1, 3);
+      b.globalAlpha = 1;
+      b.fillStyle = "#ffffe0";
+      b.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+  }
+
+  // Glowing grass tufts and tiny glowing mushrooms along the forest floor
+  function drawForestDecoration(c, sx, sy, time) {
+    const n = hash(c, 99);
+    if (n < 0.22) {
+      const fx = sx + 1 + Math.floor(hash(c, 5) * 4);
+      b.fillStyle = "#c070ff";
+      b.fillRect(fx, sy - 2, 1, 2);
+      b.fillRect(fx + 2, sy - 3, 1, 3);
+      b.fillStyle = "#ff9af0";
+      b.fillRect(fx + 2, sy - 3, 1, 1);
+    } else if (n < 0.3) {
+      const fx = sx + 1 + Math.floor(hash(c, 3) * 3);
+      const cap = ["#ff6ad5", "#6af0ff", "#b8ff6a"][Math.floor(hash(c, 4) * 3)];
+      drawGlowAt(GLOW_OF[cap], 1, fx + 2, sy - 3, 0.6 + 0.3 * Math.sin(time * 1.6 + c));
+      b.fillStyle = "#f0e0ff";
+      b.fillRect(fx + 1, sy - 2, 2, 2);
+      b.fillStyle = cap;
+      b.fillRect(fx, sy - 4, 4, 2);
+      b.fillStyle = "#ffffff";
+      b.fillRect(fx + 1, sy - 4, 1, 1);
+    }
   }
 
   // ---- Desert biome ----
@@ -512,7 +586,7 @@ const Renderer = (() => {
     }
   }
 
-  function drawTiles(level, camX) {
+  function drawTiles(level, camX, time) {
     const firstCol = Math.floor(camX / TILE);
     for (let c = firstCol; c <= firstCol + VIEW_W / TILE + 1; c++) {
       const sx = c * TILE - camX;
@@ -532,6 +606,9 @@ const Renderer = (() => {
               const img = sprites.thorns[n - 1];
               b.drawImage(img, sx - 3, sy + TILE - img.height);
             }
+          } else if (biome === "forest") {
+            drawGlowAt("thorn", 2, sx + 4, sy + 3, 0.45 + 0.2 * Math.sin(time * 2 + c));
+            b.drawImage(sprites.forestThorns[Math.floor(hash(c, 77) * 3)], sx, sy + TILE - 10);
           } else if (biome === "desert") {
             const h = level.cactusHeight(c);
             b.drawImage(sprites.cactus[h][Math.floor(hash(c, 78) * 3)], sx - 2, sy + TILE - h);
@@ -543,6 +620,11 @@ const Renderer = (() => {
           const above = level.tile(c, r - 1);
           b.drawImage(above === T_GROUND ? sprites.soil[variant] : sprites.mossTop[variant], sx, sy);
           if (above === T_EMPTY) drawJungleDecoration(c, sx, sy);
+        } else if (t === T_GROUND && biome === "forest") {
+          const variant = Math.floor(hash(c, r) * 4);
+          const above = level.tile(c, r - 1);
+          b.drawImage(above === T_GROUND ? sprites.forestSoil[variant] : sprites.forestTop[variant], sx, sy);
+          if (above === T_EMPTY) drawForestDecoration(c, sx, sy, time);
         } else if (t === T_GROUND && biome === "desert") {
           const variant = Math.floor(hash(c, r) * 4);
           const above = level.tile(c, r - 1);
@@ -2580,8 +2662,8 @@ const Renderer = (() => {
       // Entering a new biome: its name, fading out
       if (p.biomeBanner > 0) {
         ctx.globalAlpha = Math.min(1, p.biomeBanner * 2);
-        const name = p.biome.toUpperCase();
-        const color = { snow: "#e8f6ff", desert: "#ffcc66", jungle: "#5fe07a" }[p.biome] || "#8be070";
+        const name = (BIOME_NAMES[p.biome] || p.biome).toUpperCase();
+        const color = { snow: "#e8f6ff", desert: "#ffcc66", jungle: "#5fe07a", forest: "#e2a6ff" }[p.biome] || "#8be070";
         text(ctx, name, W / 2, top + 64, color, 18, "center");
         ctx.globalAlpha = 1;
       }

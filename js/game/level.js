@@ -311,6 +311,7 @@ class Level {
     const biome = this.biomeAt(c);
     if (biome === "desert") { const h = this.cactusHeight(c); return [c * TILE + 2, (r + 1) * TILE - h + 2, 4, h - 2]; }
     if (biome === "snow") return [c * TILE + 1.5, r * TILE + 1, 5, 7];
+    if (biome === "forest") return [c * TILE + 2, r * TILE + 2, 4, 6]; // a thorny vine: its stem and barbs
     if (biome === "jungle") {
       const kind = this.spikeKind[c];
       if (typeof kind === "number") return [c * TILE + 3, (r + 1) * TILE - kind + 1, 3, kind - 1];
