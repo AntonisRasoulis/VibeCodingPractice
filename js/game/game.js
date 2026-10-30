@@ -1547,16 +1547,23 @@ const Game = (() => {
     world.grapples = world.grapples.filter((g) => !g.done);
   }
 
-  // The vine: it drops down, swings you up and flings you far ahead. Where you land is up to luck.
+  // The vine: it drops down, swings you up and flings you to wherever the player ahead of you is
+  // (and lands you right where they are, whatever's there). Alone, or in the lead: far ahead, wherever.
   function launchVine(p) {
     world.level.ensure(p.x + VINE.distance[1] + VIEW_W * 2);
     const r = Math.max(60, p.y + 20); // (it hangs from just above the top of the screen)
     const dist = VINE.distance[0] + Math.random() * (VINE.distance[1] - VINE.distance[0]);
-    world.vines.push({ owner: p, t: 0, mode: "drop", ax: p.x + HITBOX_W / 2, ay: p.y - r, r, dist, from: { x: p.x, y: p.y } });
+    const target = world.players.find((q) => q !== p && !q.caught && q.trackX > p.trackX) || null;
+    world.vines.push({ owner: p, target, t: 0, mode: "drop", ax: p.x + HITBOX_W / 2, ay: p.y - r, r, dist, from: { x: p.x, y: p.y } });
     grab(p);
     p.facing = 1;
     p.spin = 0;
     Sound.play("vineSwing");
+  }
+
+  // Just above the player the vine takes you to (dead: where they'll come back)
+  function vineLanding(q) {
+    return q.dead ? { x: q.respawnX, y: q.respawnY - 20 } : { x: q.x, y: q.y - 20 };
   }
 
   function updateVines(dt) {
@@ -1579,10 +1586,16 @@ const Game = (() => {
           v.start = { x: p.x, y: p.y };
           const lx = v.from.x + v.dist, g = level.groundTop(lx + HITBOX_W / 2);
           v.land = { x: lx, y: (g ?? VIEW_H - 20) - HITBOX_H - 20 };
+          if (v.target && !v.target.caught) v.land = vineLanding(v.target);
+          else v.target = null;
+          // (a long way takes longer: never faster than the camera can follow)
+          v.flyTime = Math.max(VINE.fly, Math.abs(v.land.x - p.x) / VINE.topSpeed);
           Sound.play("vineFling");
         }
       } else if (v.mode === "fly") {
-        const u = Math.min(1, v.t / VINE.fly);
+        const q = v.target;
+        if (q && !q.caught) v.land = vineLanding(q); // follow them as they run
+        const u = Math.min(1, v.t / v.flyTime);
         const mid = (v.start.y + v.land.y) / 2, h = mid - VINE.peak;
         p.x = v.start.x + (v.land.x - v.start.x) * u;
         p.y = v.start.y + (v.land.y - v.start.y) * u - h * 4 * u * (1 - u);
@@ -1591,7 +1604,7 @@ const Game = (() => {
           // let go: fall onto whatever's there
           p.held = false;
           p.spin = 0;
-          p.vx = PHYSICS.runSpeed;
+          p.vx = v.target ? (v.target.dead ? 0 : v.target.vx) : PHYSICS.runSpeed;
           p.vy = 60;
           p.onGround = false;
           v.mode = "gone";

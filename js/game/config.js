@@ -190,10 +190,11 @@ const GRAPPLE = {
 };
 
 const VINE = {
-  distance: [1300, 1600], // how far forward it flings you (more than a portal; it can land you anywhere)
+  distance: [1300, 1600], // alone (or in the lead): how far forward it flings you. Otherwise it lands you where the other player is
   drop: 0.25,         // seconds for the vine to come down to you
   swing: 0.35,        // ...to swing you up
-  fly: 1.4,           // ...and flying through the air
+  fly: 1.4,           // ...and flying through the air (at least)
+  topSpeed: 1100,     // ...never faster than this (pixels a second), so the camera keeps up
   peak: -40,          // the top of the flight (above the top of the screen)
 };
 
