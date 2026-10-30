@@ -99,6 +99,7 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.sporeShrooms = []; // forest: big spore mushrooms { id, x (middle), gy, kind, seed }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
     this.fires = [];      // desert: ground set alight by a firehawk's stick { x (middle), gy, t }
     this.turrets = [];    // jungle: ancient turrets buried in the ground { id, x (middle), gy, dir (-1 shoots left, 1 right), wait, state, t, h (how far up) }
@@ -299,6 +300,19 @@ class Level {
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
+  }
+
+  // The spores drifting down from under a spore mushroom's cap right now: [{x, y, f (0 at the cap, 1 at the ground)}].
+  // Worked out from the clock, so both players see the same ones.
+  sporesOf(m, time) {
+    const out = [], top = m.gy - SPORES.stem;
+    for (let n = 0; n < SPORES.count; n++) {
+      // (each falls at its own pace, from its own start: not an even curtain, so there are gaps)
+      const u = (time / SPORES.fall) * (0.75 + hash(n, m.id + 5) * 0.5) + hash(n, m.id + 9) + m.seed, cycle = Math.floor(u), f = u - cycle;
+      const x = m.x + (hash(n + cycle * 7, m.id) - 0.5) * (SPORES.capW - 8) + Math.sin(f * 6 + n) * 2;
+      out.push({ x, y: top + 2 + f * (m.gy - top - 2), f });
+    }
+    return out;
   }
 
   // Could a floating shooter's spikes reach someone standing at (x, y), from anywhere it floats to?
@@ -620,6 +634,7 @@ class Level {
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
     if (this.biome === "forest" && this.col > 60) weights.shooterStack = FOREST.stackWeight;
+    if (this.biome === "forest") weights.sporeShroom = SPORES.weight;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -1097,6 +1112,13 @@ const SECTIONS = {
       phase: this.rng(),
     });
     this.flat(Math.max(6, height + 5));
+  },
+
+  // The forest's: a big mushroom dropping spores (red: faster, blue: jump higher, green: poison, pink: float)
+  sporeShroom() {
+    this.flat(4);
+    this.sporeShrooms.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, kind: this.pickFrom(SPORES.kinds), seed: this.rng() });
+    this.flat(6);
   },
 
   // The forest's: a stack of floating shooters, each drifting its own way

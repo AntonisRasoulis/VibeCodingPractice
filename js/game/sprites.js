@@ -1109,6 +1109,41 @@ function makeForestLayers() {
   return { sky, far, mid, near, shrooms };
 }
 
+// ---- The forest's spore mushrooms ----
+
+const SPORE_COLORS = {
+  red: { cap: "#e8344a", capHi: "#ff7a8a", capDk: "#a01a30", spot: "#ffe0e6", spore: "#ff6a7a" },
+  blue: { cap: "#2f7ae8", capHi: "#7ab8ff", capDk: "#1a4aa0", spot: "#e0f0ff", spore: "#6ab8ff" },
+  green: { cap: "#3ab83a", capHi: "#8af07a", capDk: "#1e7a24", spot: "#e8ffd8", spore: "#9aff6a" },
+  pink: { cap: "#ff5ac8", capHi: "#ffa0e6", capDk: "#b02a8a", spot: "#ffe8f8", spore: "#ff9af0" },
+};
+
+// A big spore mushroom: a pale stem with a skirt, gills, and a spotted dome cap (36 wide, 41 tall, its foot
+// at the bottom middle)
+function makeSporeShroom(kind) {
+  const k = SPORE_COLORS[kind], W = SPORES.capW, capH = SPORES.height - SPORES.stem, stemH = SPORES.stem;
+  const c = makeCanvas(W + 2, SPORES.height + 1);
+  const g = c.getContext("2d");
+  const cx = (W + 2) / 2, by = SPORES.height + 1;
+  for (let y = 0; y < stemH; y++) {
+    const w = 7 + Math.round(Math.sin((y / stemH) * Math.PI) * 1.5) + (y < 3 ? 2 : 0);
+    px(g, "#e8dcf0", Math.round(cx - w / 2), by - y - 1, w, 1);
+    px(g, "#b8a8c8", Math.round(cx + w / 2) - 2, by - y - 1, 2, 1);
+  }
+  px(g, "#d0c0e0", cx - 6, by - stemH + 8, 12, 2); // its skirt
+  const top = by - stemH - capH;
+  for (let x = -W / 2 + 2; x < W / 2 - 2; x++) px(g, x % 2 ? k.capDk : "#5a2a50", cx + x, top + capH, 1, 2); // gills
+  for (let y = 0; y < capH; y++) {
+    const half = Math.round((W / 2) * Math.sqrt(1 - ((capH - y) / capH) ** 2.2));
+    px(g, "#2a0e38", cx - half - 1, top + y, half * 2 + 2, 1);
+    px(g, y < 3 ? k.capHi : y > capH - 3 ? k.capDk : k.cap, cx - half, top + y, half * 2, 1);
+  }
+  px(g, "#2a0e38", cx - W / 2 - 1, top + capH, W + 2, 1);
+  px(g, k.capHi, cx - 9, top + 3, 5, 2);
+  for (const [dx, dy, w] of [[-10, 6, 4], [2, 3, 5], [8, 8, 3], [-3, 9, 3], [11, 4, 2]]) px(g, k.spot, cx + dx, top + dy, w, 2);
+  return c;
+}
+
 // ---- The jungle's orbs ----
 
 // The monsoon orb: a gold coin with blue raindrops falling on a wave
@@ -1549,6 +1584,7 @@ function buildSprites() {
     forestTop: [0, 1, 2, 3].map((v) => makeForestTile(v, true)),
     forestSoil: [0, 1, 2, 3].map((v) => makeForestTile(v + 4, false)),
     forestThorns: [0, 1, 2].map(makeForestThorn),
+    sporeShrooms: Object.fromEntries(Object.keys(SPORE_COLORS).map((k) => [k, makeSporeShroom(k)])),
     glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow

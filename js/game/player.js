@@ -79,6 +79,8 @@ class Player {
     this.stormHits = 0;           // ...and how many jumps we've cracked the ice with
     this.iceLock = 0;             // seconds left frozen by a snowball (no way out)
     this.skate = 0;               // seconds left on skates (faster on ice)
+    this.spores = { red: 0, blue: 0, pink: 0 }; // seconds left of each spore mushroom's effect (forest): faster, higher jumps, floating
+    this.poisonMax = TURRET.poison; // how long the poison we have lasts in all (for how it looks)
     this.flood = null;            // a monsoon's flood: { surface } (nothing can hurt us while it's up)
     this.inFlood = false;         // ...fell in: swept back by the current until we catch a log
     this.floodT = 0;
@@ -111,6 +113,7 @@ class Player {
     if (this.rescueBlock > 0) this.rescueBlock -= dt;
     if (this.honey > 0) this.honey -= dt;
     if (this.poison > 0) this.poison -= dt;
+    for (const k in this.spores) if (this.spores[k] > 0) this.spores[k] -= dt;
     if (this.blind > 0) this.blind -= dt;
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
@@ -266,7 +269,9 @@ class Player {
       const skating = this.skate > 0 && this.onGround && this.onIce;
       let accel = this.onGround ? (this.onIce ? SNOW.iceAccel * (skating ? SNOWBALL.skateAccel : 1) : PHYSICS.groundAccel) : PHYSICS.airAccel;
       if (Math.sign(this.vx) === -dir && !(this.onGround && this.onIce)) accel *= 2; // turn around quickly (not on ice)
-      const top = PHYSICS.runSpeed * (this.honey > 0 ? BEAR.honeySpeed : 1) * (skating ? SNOWBALL.skateSpeed : 1); // sticky honey slows you down; skates speed you up on ice
+      const fast = this.spores.red > 0 ? SPORES.speed : 1; // a red spore makes you faster
+      accel *= fast;
+      const top = PHYSICS.runSpeed * fast * (this.honey > 0 ? BEAR.honeySpeed : 1) * (skating ? SNOWBALL.skateSpeed : 1); // sticky honey slows you down; skates speed you up on ice
       this.vx = clamp(this.vx + dir * accel * dt, -top, top);
       this.facing = dir;
     } else if (this.onGround) {
@@ -280,12 +285,12 @@ class Player {
       // jumping off thin ice breaks it
       const pond = this.onGround && !this.standingOn && level.pondAt(this.x + HITBOX_W / 2);
       if (pond && pond.state === "ice") level.breakPond(pond, this.x + HITBOX_W / 2);
-      this.vy = -PHYSICS.jumpSpeed;
+      this.vy = -PHYSICS.jumpSpeed * this.jumpBoost();
       this.jumpBuffer = 0;
       this.coyote = 0;
       Sound.play("jump");
     }
-    const minRise = -PHYSICS.jumpSpeed * PHYSICS.jumpCut;
+    const minRise = -PHYSICS.jumpSpeed * this.jumpBoost() * PHYSICS.jumpCut;
     // (a thrown player isn't holding jump, so don't cut their throw short)
     if (this.noCut > 0) this.noCut -= dt;
     if (!input.jump && this.vy < minRise && this.stun <= 0 && this.noCut <= 0) this.vy = minRise;
@@ -293,8 +298,12 @@ class Player {
     // Ride moving platforms
     if (this.standingOn && this.vy >= 0) this.moveX(this.standingOn.dx, level);
 
-    // Gravity and movement
-    this.vy = Math.min(this.vy + PHYSICS.gravity * dt, PHYSICS.maxFall);
+    // Gravity and movement (a pink spore: no gravity, you drift slowly up instead)
+    if (this.spores.pink > 0) {
+      this.vy = this.y > 2 ? -SPORES.floatRise : 0;
+      this.onGround = false;
+      this.standingOn = null;
+    } else this.vy = Math.min(this.vy + PHYSICS.gravity * dt, PHYSICS.maxFall);
     this.moveX(this.vx * dt, level);
     if (this.windPush > 0) this.moveX(-this.windPush * dt, level); // a sandstorm blowing us back
     const prevBottom = this.y + HITBOX_H;
@@ -1016,6 +1025,7 @@ class Player {
     this.chill = 0;
     this.iceLock = 0;
     this.blind = 0;
+    this.spores = { red: 0, blue: 0, pink: 0 };
     this.inFlood = false;
     this.spin = 0;
     this.dashHold = 0;
@@ -1084,6 +1094,11 @@ class Player {
     this.showHit("ZAPPED!", "#bff4ff");
     Sound.play("zapped");
     this.die();
+  }
+
+  // A blue spore: jumps start faster, so they go SPORES.jump times as high
+  jumpBoost() {
+    return this.spores.blue > 0 ? Math.sqrt(SPORES.jump) : 1;
   }
 
   showHit(text, color) {

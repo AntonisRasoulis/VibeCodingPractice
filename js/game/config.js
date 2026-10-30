@@ -435,6 +435,23 @@ const FOREST = {
   stackWeight: 3,        // how often a stack comes, as a section (a single shooter is 5)
 };
 
+// The forest's spore mushrooms: spores drift down from under the cap all the time, and running
+// under one you'll most likely catch one on your head (about 9 times in 10). Each color does something different (they stack).
+const SPORES = {
+  weight: 12,          // how often one comes, as a section (about 4 per forest)
+  kinds: ["red", "blue", "green", "pink"],
+  time: 10,            // seconds red, blue and green last...
+  floatTime: 5,        // ...and pink
+  speed: 1.4,          // red: you run this much faster
+  jump: 1.5,           // blue: you jump this much higher
+  floatRise: 14,       // pink: you drift up this fast (pixels a second), still moving left and right
+  count: 5,            // spores falling under a cap at once
+  fall: 2.2,           // seconds a spore takes to fall from the cap to the ground
+  capW: 34,            // the cap's width (pixels)
+  stem: 27,            // how high the cap's underside is
+  height: 40,          // how tall it is
+};
+
 const SHOOTER = {
   speed: 80,    // how fast its spikes fly
   range: 160,   // how far a spike flies before it's gone

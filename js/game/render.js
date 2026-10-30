@@ -40,7 +40,7 @@ const Renderer = (() => {
       b.clip();
       drawView(world, p, world.players[1 - i], camX);
       b.restore();
-      if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time);
+      if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time, p.poisonMax);
     }
     const height = world.players.length === 1 ? VIEW_H : BUFFER_H; // 1 player: just the one view
     if (world.players.length > 1) {
@@ -93,6 +93,7 @@ const Renderer = (() => {
     drawPonds(world.level, world.players, camX, world.time);
     drawRivers(world.level, camX, world.time);
     drawFlytraps(world.level, camX, world.time);
+    drawSporeShrooms(world.level, camX);
     drawGroundFires(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
@@ -128,6 +129,8 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSnowIce(p, camX, world.time, p === other);
+    drawSpores(world.level, camX, world.time); // (in front of the runners, so you see them land on you)
+    for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSporeAura(p, camX, world.time, p === other);
     for (const sb of world.thrownSnowballs) b.drawImage(sprites.thrownSnowball, Math.round(sb.x - camX) - 2, Math.round(sb.y) - 2);
     for (const mk of world.monkeys) drawMonkey(mk, camX, world.time);
     for (const g of world.grapples) drawGrapple(g, camX, world.time);
@@ -294,6 +297,51 @@ const Renderer = (() => {
       b.fillStyle = "#ffffe0";
       b.fillRect(Math.round(x), Math.round(y), 1, 1);
     }
+  }
+
+  // ---- The forest's spore mushrooms ----
+
+  function drawSporeShrooms(level, camX) {
+    for (const m of level.sporeShrooms) {
+      const img = sprites.sporeShrooms[m.kind], x = Math.round(m.x - camX - img.width / 2);
+      if (x > VIEW_W || x + img.width < 0) continue;
+      b.drawImage(img, x, m.gy - img.height);
+    }
+  }
+
+  // Its spores drifting down, glowing, fading a little as they fall
+  function drawSpores(level, camX, time) {
+    for (const m of level.sporeShrooms) {
+      if (Math.abs(m.x - camX - VIEW_W / 2) > VIEW_W / 2 + 30) continue;
+      const color = SPORE_COLORS[m.kind].spore, glow = { red: "thorn", blue: "cyan", green: "lime", pink: "pink" }[m.kind];
+      for (const sp of level.sporesOf(m, time)) {
+        const x = Math.round(sp.x - camX), y = Math.round(sp.y);
+        drawGlowAt(glow, 0, x, y, 0.7 * (1 - sp.f * 0.5));
+        b.globalAlpha = 1 - sp.f * 0.4;
+        b.fillStyle = color;
+        b.fillRect(x, y, 2, 2);
+        b.fillStyle = "#ffffff";
+        b.fillRect(x, y, 1, 1);
+        b.globalAlpha = 1;
+      }
+    }
+  }
+
+  // While a spore's working on you: a few motes of its color circling you (and a glow while floating)
+  function drawSporeAura(p, camX, time, ghost) {
+    const on = Object.keys(p.spores).filter((k) => p.spores[k] > 0);
+    if (!on.length) return;
+    const cx = p.x + HITBOX_W / 2 - camX, cy = p.y + HITBOX_H / 2;
+    if (ghost) b.globalAlpha = 0.35;
+    if (p.spores.pink > 0) drawGlowAt("pink", 2, cx, cy, 0.5);
+    on.forEach((k, i) => {
+      b.fillStyle = SPORE_COLORS[k].spore;
+      for (let n = 0; n < 2; n++) {
+        const a = time * 4 + (n * Math.PI) + i * 2.1;
+        b.fillRect(Math.round(cx + Math.cos(a) * 6), Math.round(cy + Math.sin(a) * 7), 1, 1);
+      }
+    });
+    b.globalAlpha = 1;
   }
 
   // Glowing grass tufts and tiny glowing mushrooms along the forest floor
@@ -1259,8 +1307,8 @@ const Renderer = (() => {
 
   // Poisoned: your half of the screen goes green and wobbly, then swims, doubles up and changes
   // color, worse and worse... then clears in the last second
-  function drawPoison(y0, left, time) {
-    const s = Math.min(1, (TURRET.poison - left) / (TURRET.poison - 1)) * Math.min(1, left);
+  function drawPoison(y0, left, time, max) {
+    const s = Math.min(1, (max - left) / (max - 1)) * Math.min(1, left);
     if (s <= 0) return;
     const pg = poisonCopy.getContext("2d");
     pg.clearRect(0, 0, VIEW_W, VIEW_H);
@@ -2812,6 +2860,16 @@ const Renderer = (() => {
         const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE", firehawk: "FIREHAWK", snowball: "SNOWBALL", monkey: "MONKEY", portalgun: "PORTAL GUN", grapple: "GRAPPLE" }[p.power] || p.power.toUpperCase();
         const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#e8c090", portalgun: "#d9a3ff", grapple: "#d9a3ff" }[p.power] || "#ffffff";
         text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, color, 10);
+      }
+      // Spore mushroom effects, with the seconds left on each
+      const effects = [["red", "FAST"], ["blue", "HIGH JUMP"], ["pink", "FLOAT"]].filter(([k]) => p.spores[k] > 0);
+      if (p.poison > 0 && p.poisonMax === SPORES.time) effects.push(["green", "POISON"]);
+      let ex = 12;
+      for (const [k, name] of effects) {
+        const left = k === "green" ? p.poison : p.spores[k];
+        const label = `${name} ${Math.ceil(left)}`;
+        text(ctx, label, ex, top + (p.power ? 52 : 36), SPORE_COLORS[k].spore, 10);
+        ex += (label.length + 2) * 10;
       }
       if (p.flash > 0) {
         ctx.fillStyle = `rgba(220, 245, 255, ${Math.min(1, p.flash) * 0.45})`;

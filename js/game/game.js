@@ -159,6 +159,7 @@ const Game = (() => {
       updateTurrets(dt);
       updateArrows(dt);
       updateLooseSaws(dt);
+      updateSpores();
     }
     updateMonkeys(dt);
     updateWarps(dt);
@@ -1365,6 +1366,31 @@ const Game = (() => {
     world.monkeys = world.monkeys.filter((mk) => !mk.done);
   }
 
+  // ---- The enchanted forest's spore mushrooms ----
+
+  const SPORE_LOOK = { red: ["FAST!", "#ff6a7a"], blue: ["SUPER JUMP!", "#6ab8ff"], green: ["POISONED!", "#9aff6a"], pink: ["FLOATING!", "#ff9af0"] };
+
+  // A spore drifting down from a spore mushroom that lands on you gives you its effect (catching more of the same
+  // color just starts its time over; different colors stack)
+  function updateSpores() {
+    const { level } = world;
+    for (const p of world.players) {
+      if (p.dead || p.caught || p.held) continue;
+      for (const m of level.sporeShrooms) {
+        if (Math.abs(m.x - (p.x + HITBOX_W / 2)) > SPORES.capW) continue;
+        if (!level.sporesOf(m, world.time).some((sp) => overlaps(p.x - 1, p.y - 2, HITBOX_W + 2, 6, sp.x - 1, sp.y - 1, 2, 2))) continue; // (one has to land on your head)
+        const fresh = m.kind === "green" ? p.poison <= 0 : !(p.spores[m.kind] > 0);
+        if (m.kind === "green") { p.poison = SPORES.time; p.poisonMax = SPORES.time; }
+        else p.spores[m.kind] = m.kind === "pink" ? SPORES.floatTime : SPORES.time;
+        if (fresh) {
+          p.showHit(...SPORE_LOOK[m.kind]);
+          p.sparkle(SPORE_LOOK[m.kind][1]);
+          Sound.play(m.kind === "green" ? "poisoned" : "spore");
+        }
+      }
+    }
+  }
+
   // ---- The enchanted forest's saws that break loose ----
 
   // Some of the forest's saws break loose a while after someone first comes near: they shake and creak,
@@ -1986,6 +2012,7 @@ const Game = (() => {
         p.die();
       } else if (a.kind === "poison") {
         p.poison = TURRET.poison;
+        p.poisonMax = TURRET.poison;
         p.showHit("POISONED!", "#7dff4a");
         Sound.play("poisoned");
       } else if (a.kind === "sleep") {
