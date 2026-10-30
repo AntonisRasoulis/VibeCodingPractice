@@ -220,16 +220,16 @@ const Renderer = (() => {
   function drawForestPlatform(kind, x, y, w, time) {
     const fill = (c, xx, yy, ww, hh) => { b.fillStyle = c; b.fillRect(xx, yy, ww, hh); };
     if (kind === "static") {
-      fill("#6a4030", x, y + 1, w, 4);
-      fill("#3a2018", x, y + 4, w, 1);
-      for (let k = 2; k < w - 1; k += 5) fill("#4a2a20", x + k, y + 2 + (k % 2), 2, 1); // bark grooves
+      fill("#4a2468", x, y + 1, w, 4);
+      fill("#2c1640", x, y + 4, w, 1);
+      for (let k = 2; k < w - 1; k += 5) fill("#36194e", x + k, y + 2 + (k % 2), 2, 1); // bark grooves
       fill("#a24cf0", x, y, w, 2); // purple moss on top...
       for (let k = 0; k < w; k++) {
         if (hash(k, 61) < 0.35) fill("#7a2ec0", x + k, y + 2, 1, 1); // ...hanging over the edge
         if (hash(k, 62) < 0.3) fill("#e2a6ff", x + k, y, 1, 1);
       }
-      fill("#a07050", x, y + 2, 1, 2); // the cut ends
-      fill("#a07050", x + w - 1, y + 2, 1, 2);
+      fill("#8a5ab0", x, y + 2, 1, 2); // the cut ends
+      fill("#8a5ab0", x + w - 1, y + 2, 1, 2);
     } else if (kind === "move") {
       drawGlowAt("pink", 2, x + w / 2, y + 5, 0.5 + 0.2 * Math.sin(time * 2));
       fill("#ff6ad5", x, y, w, 3);
@@ -1582,11 +1582,11 @@ const Renderer = (() => {
     const y = s.row * TILE;
     if (forest) {
       if (charge > 0) drawGlowAt("pink", 2, x + 4, y + 4, charge);
-      b.fillStyle = "#3a2018";
+      b.fillStyle = "#2c1640";
       b.fillRect(x, y, 8, 8);
-      b.fillStyle = "#6a4030";
+      b.fillStyle = "#4a2468";
       b.fillRect(x + 1, y + 1, 6, 6);
-      b.fillStyle = "#a07050";
+      b.fillStyle = "#8a5ab0";
       b.fillRect(x + 1, y + 1, 6, 1);
       b.fillRect(x + 1, y + 1, 1, 6);
       b.fillStyle = "#a24cf0";
@@ -2520,31 +2520,31 @@ const Renderer = (() => {
   }
 
   // A groove cut into the ground, with metal caps at each end
-  // (in the forest: wooden caps)
+  // (in the forest: caps of dark purple wood)
   function drawSawSlot(x0, x1, gy, forest) {
     b.fillStyle = forest ? "#14081c" : "#1c1b22";
     b.fillRect(x0, gy, x1 - x0, 2);
-    b.fillStyle = forest ? "#6a4030" : "#8a8f99";
+    b.fillStyle = forest ? "#4a2468" : "#8a8f99";
     b.fillRect(x0 - 1, gy - 1, 2, 3);
     b.fillRect(x1 - 1, gy - 1, 2, 3);
-    b.fillStyle = forest ? "#a07050" : "#cfd4dc";
+    b.fillStyle = forest ? "#8a5ab0" : "#cfd4dc";
     b.fillRect(x0 - 1, gy - 1, 1, 1);
     b.fillRect(x1 - 1, gy - 1, 1, 1);
   }
 
-  // An upright metal rail from y0 (top) down to y1 (in the forest: a wooden pole wound with a vine)
+  // An upright metal rail from y0 (top) down to y1 (in the forest: a pole of dark purple wood wound with a vine)
   function drawSawRail(x, y0, y1, forest) {
-    b.fillStyle = forest ? "#3a2018" : "#3a3d44";
+    b.fillStyle = forest ? "#2c1640" : "#3a3d44";
     b.fillRect(x - 1, y0, 3, y1 - y0);
-    b.fillStyle = forest ? "#6a4030" : "#8a8f99";
+    b.fillStyle = forest ? "#5a2e7e" : "#8a8f99";
     b.fillRect(x, y0, 1, y1 - y0);
     if (forest) {
       b.fillStyle = "#4f8a3f";
       for (let y = y0 + 2; y < y1; y += 4) b.fillRect(x - 1 + ((y >> 2) % 2) * 2, y, 1, 2);
     }
-    b.fillStyle = forest ? "#4a2a20" : "#5c616b";
+    b.fillStyle = forest ? "#36194e" : "#5c616b";
     b.fillRect(x - 2, y0 - 1, 5, 2); // bracket at the top
-    b.fillStyle = forest ? "#a07050" : "#cfd4dc";
+    b.fillStyle = forest ? "#8a5ab0" : "#cfd4dc";
     b.fillRect(x - 1, y0 - 1, 1, 1);
   }
 
