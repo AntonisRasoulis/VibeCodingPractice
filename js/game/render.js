@@ -202,6 +202,50 @@ const Renderer = (() => {
 
   const GLOW_OF = { "#ff6ad5": "pink", "#6af0ff": "cyan", "#b8ff6a": "lime" };
 
+  // Is x (pixels) in the enchanted forest? There, the usual obstacles get the forest's look.
+  const forestAt = (level, x) => level.biomeAt(Math.floor(x / TILE)) === "forest";
+
+  // Colors for a mace's ball and a saw blade: steel, or the forest's (a thorny seed pod, a glowing thorn wheel)
+  const MACE_LOOK = {
+    steel: { edge: "#3a3d44", spike: "#5c616b", tip: "#b8bdc6", lit: "#cfd4dc", shade: "#6b707a", body: "#9aa0aa", studs: "#e8ebef" },
+    forest: { edge: "#2a0e38", spike: "#c070f0", tip: "#ff7ae0", lit: "#a65ad0", shade: "#4a1c62", body: "#6a2e8a", studs: "#ff9af0" },
+  };
+  const SAW_LOOK = {
+    steel: { edge: "#2b2d33", tooth: "#ffffff", toothDark: "#dfe3e9", bolt: "#cfd4dc", groove: "#6f7580", lit: "#b4bac3", body: "#8d939d", holes: "#3f434b", spark: "#ffd25a", spark2: "#ff8a2a" },
+    forest: { edge: "#2a0e38", tooth: "#ffd0f4", toothDark: "#ff7ae0", bolt: "#ffe0f8", groove: "#c070f0", lit: "#8a3ab0", body: "#6a2e8a", holes: "#3a1448", spark: "#ff9af0", spark2: "#c070f0" },
+  };
+
+  // The forest's platforms: a mossy log, a floating glowing mushroom cap (the moving one),
+  // and a rotten branch (the one that crumbles)
+  function drawForestPlatform(kind, x, y, w, time) {
+    const fill = (c, xx, yy, ww, hh) => { b.fillStyle = c; b.fillRect(xx, yy, ww, hh); };
+    if (kind === "static") {
+      fill("#6a4030", x, y + 1, w, 4);
+      fill("#3a2018", x, y + 4, w, 1);
+      for (let k = 2; k < w - 1; k += 5) fill("#4a2a20", x + k, y + 2 + (k % 2), 2, 1); // bark grooves
+      fill("#a24cf0", x, y, w, 2); // purple moss on top...
+      for (let k = 0; k < w; k++) {
+        if (hash(k, 61) < 0.35) fill("#7a2ec0", x + k, y + 2, 1, 1); // ...hanging over the edge
+        if (hash(k, 62) < 0.3) fill("#e2a6ff", x + k, y, 1, 1);
+      }
+      fill("#a07050", x, y + 2, 1, 2); // the cut ends
+      fill("#a07050", x + w - 1, y + 2, 1, 2);
+    } else if (kind === "move") {
+      drawGlowAt("pink", 2, x + w / 2, y + 5, 0.5 + 0.2 * Math.sin(time * 2));
+      fill("#ff6ad5", x, y, w, 3);
+      fill("#ffb0e8", x + 1, y, w - 2, 1);
+      fill("#c04aa0", x, y + 3, w, 1);
+      for (let k = 1; k < w; k += 2) fill("#8a2a80", x + k, y + 4, 1, 1); // the gills underneath
+      for (let k = 3; k < w - 2; k += 6) fill("#ffffff", x + k, y + 1, 2, 1); // spots
+    } else {
+      fill("#7a6a88", x, y, w, 5);
+      fill("#a898b8", x, y, w, 1);
+      fill("#4a3a58", x, y + 4, w, 1);
+      for (let k = 0; k < w; k += 8) { fill("#2e2238", x + k + 3, y + 1, 1, 2); fill("#2e2238", x + k + 4, y + 3, 1, 1); } // cracks
+      for (let k = 5; k < w - 1; k += 11) fill("#b8ff6a", x + k, y - 1, 2, 1); // a little glowing fungus
+    }
+  }
+
   // A glow from sprites.glows (size 0, 1 or 2), centered on (x, y)
   function drawGlowAt(kind, size, x, y, alpha) {
     const img = sprites.glows[kind][size];
@@ -1370,6 +1414,7 @@ const Renderer = (() => {
         const s = player.fallState.get(p.id);
         if (s && s.t < FALLING.shakeTime) shake = Math.floor(time * 40) % 2 ? 1 : -1;
       }
+      if (forestAt(level, p.x + p.w / 2)) { drawForestPlatform(p.kind, sx + shake, Math.round(y), p.w, time); continue; }
       const colors = {
         static: ["#e8b37a", "#a0663a", "#6e4325"],
         move: ["#dfe9f2", "#7a8fa6", "#4d5d70"],
@@ -1395,13 +1440,13 @@ const Renderer = (() => {
     }
   }
 
-  function drawPortal(x, y, outer, inner, time) {
+  function drawPortal(x, y, outer, inner, time, dark = "#1b2a4a") {
     for (let r = 0; r < 16; r++) {
       const half = Math.round(4 * Math.sqrt(1 - ((r - 7.5) / 8) ** 2));
       b.fillStyle = outer;
       b.fillRect(x + 4 - half, y + r, half * 2, 1);
       if (half > 1) {
-        b.fillStyle = "#1b2a4a";
+        b.fillStyle = dark;
         b.fillRect(x + 5 - half, y + r, half * 2 - 2, 1);
       }
     }
@@ -1415,11 +1460,17 @@ const Renderer = (() => {
   function drawPortals(level, camX, time) {
     for (const p of level.portals) {
       const sx = Math.round(p.x - camX);
-      if (sx > -10 && sx < VIEW_W) drawPortal(sx, p.y, "#3fa9f5", "#a6e1ff", time);
+      if (sx > -10 && sx < VIEW_W) {
+        if (forestAt(level, p.x)) drawPortal(sx, p.y, "#3ad0c0", "#b0fff0", time, "#2a0e38"); // (in the forest: teal in, pink out)
+        else drawPortal(sx, p.y, "#3fa9f5", "#a6e1ff", time);
+      }
     }
     for (const e of level.exits) {
       const sx = Math.round(e.x - camX);
-      if (sx > -10 && sx < VIEW_W) drawPortal(sx, e.y, "#ff8c1a", "#ffd27a", time);
+      if (sx > -10 && sx < VIEW_W) {
+        if (forestAt(level, e.x)) drawPortal(sx, e.y, "#ff6ad5", "#ffd0f0", time, "#2a0e38");
+        else drawPortal(sx, e.y, "#ff8c1a", "#ffd27a", time);
+      }
     }
   }
 
@@ -1517,16 +1568,37 @@ const Renderer = (() => {
     for (const s of level.shooters) {
       const sx = s.x - camX;
       if (sx < -SHOOTER.range - 8 || sx > VIEW_W + SHOOTER.range + 8) continue;
-      for (const spike of level.shooterSpikes(s, time)) drawFlyingSpike(spike.x - camX, spike.y, spike.dx, spike.dy);
-      drawShooterBlock(s, Math.round(sx), level.shooterCharge(s, time), time);
+      const forest = forestAt(level, s.x);
+      for (const spike of level.shooterSpikes(s, time)) drawFlyingSpike(spike.x - camX, spike.y, spike.dx, spike.dy, forest);
+      drawShooterBlock(s, Math.round(sx), level.shooterCharge(s, time), time, forest);
     }
   }
 
   // A stone block with a nozzle on each corner and a core that glows red before it fires
-  function drawShooterBlock(s, cx, charge, time) {
+  // (in the forest: a mossy hollow stump with thorns at its corners, glowing pink inside)
+  function drawShooterBlock(s, cx, charge, time, forest) {
     const shake = charge > 0.3 ? (Math.floor(time * 50) % 2 ? 1 : -1) : 0;
     const x = cx - 4 + shake;
     const y = s.row * TILE;
+    if (forest) {
+      if (charge > 0) drawGlowAt("pink", 2, x + 4, y + 4, charge);
+      b.fillStyle = "#3a2018";
+      b.fillRect(x, y, 8, 8);
+      b.fillStyle = "#6a4030";
+      b.fillRect(x + 1, y + 1, 6, 6);
+      b.fillStyle = "#a07050";
+      b.fillRect(x + 1, y + 1, 6, 1);
+      b.fillRect(x + 1, y + 1, 1, 6);
+      b.fillStyle = "#a24cf0";
+      b.fillRect(x, y, 8, 1); // moss on top
+      b.fillStyle = "#ff7ae0";
+      for (const [dx, dy] of SHOOTER_DIRS) b.fillRect(x + (dx > 0 ? 7 : 0) + dx, y + (dy > 0 ? 7 : 0) + dy, 1, 1);
+      b.fillStyle = "#1e0f26";
+      b.fillRect(x + 2, y + 2, 4, 4); // the hollow...
+      b.fillStyle = `rgb(${Math.round(90 + 165 * charge)}, ${Math.round(30 + 90 * charge)}, ${Math.round(110 + 110 * charge)})`;
+      b.fillRect(x + 3, y + 3, 2, 2); // ...and the glow deep inside
+      return;
+    }
     b.fillStyle = "#3a3d44";
     b.fillRect(x, y, 8, 8);
     b.fillStyle = "#6b707a";
@@ -1548,16 +1620,17 @@ const Renderer = (() => {
   }
 
   // A metal spike flying diagonally: a 2-pixel-thick shaft with a dark edge and a bright point
-  function drawFlyingSpike(x, y, dx, dy) {
+  // (in the forest: a purple thorn with a glowing tip)
+  function drawFlyingSpike(x, y, dx, dy, forest) {
     const tx = Math.round(x);
     const ty = Math.round(y);
     for (let k = 5; k >= 1; k--) {
-      b.fillStyle = "#3a3d44"; // dark edge so it shows against the sky and the grass
+      b.fillStyle = forest ? "#2a0e38" : "#3a3d44"; // dark edge so it shows against the sky and the grass
       b.fillRect(tx - k * dx, ty - (k - 1) * dy, 1, 1);
-      b.fillStyle = k > 3 ? "#7d828c" : "#b8bdc6";
+      b.fillStyle = forest ? (k > 3 ? "#8a3ab0" : "#c070f0") : k > 3 ? "#7d828c" : "#b8bdc6";
       b.fillRect(tx - k * dx, ty - k * dy, 1, 1);
     }
-    b.fillStyle = "#ffffff";
+    b.fillStyle = forest ? "#ffd0f4" : "#ffffff";
     b.fillRect(tx, ty, 1, 1);
   }
 
@@ -2366,11 +2439,12 @@ const Renderer = (() => {
     for (const s of level.saws) {
       if (!sawOnScreen(s, camX)) continue;
       const x0 = Math.round(s.x0 - camX);
+      const forest = forestAt(level, s.x0);
       if (s.kind === "slot") {
-        drawSawSlot(x0 - s.r + 1, Math.round(s.x1 - camX) + s.r - 1, s.gy);
+        drawSawSlot(x0 - s.r + 1, Math.round(s.x1 - camX) + s.r - 1, s.gy, forest);
       } else {
-        drawSawRail(x0, Math.round(s.y1) - s.r - 3, s.kind === "pit" ? VIEW_H : s.gy);
-        if (s.kind === "rail") drawSawSlot(x0 - s.r + 1, x0 + s.r - 1, s.gy);
+        drawSawRail(x0, Math.round(s.y1) - s.r - 3, s.kind === "pit" ? VIEW_H : s.gy, forest);
+        if (s.kind === "rail") drawSawSlot(x0 - s.r + 1, x0 + s.r - 1, s.gy, forest);
       }
     }
   }
@@ -2381,8 +2455,9 @@ const Renderer = (() => {
       const c = level.sawPos(s, time);
       const cx = Math.round(c.x - camX);
       const angle = s.spinDir * time * SAW.spin;
+      const look = forestAt(level, s.x0) ? SAW_LOOK.forest : SAW_LOOK.steel;
       if (s.kind === "pit") {
-        drawSawBlade(cx, c.y, s.r, angle);
+        drawSawBlade(cx, c.y, s.r, angle, look);
         continue;
       }
       // Sunk into the ground: only the part above it shows, with sparks where it cuts in
@@ -2390,22 +2465,22 @@ const Renderer = (() => {
       b.beginPath();
       b.rect(cx - s.r - 2, c.y - s.r - 2, 2 * s.r + 4, Math.max(0, s.gy - (c.y - s.r - 2)));
       b.clip();
-      drawSawBlade(cx, c.y, s.r, angle);
+      drawSawBlade(cx, c.y, s.r, angle, look);
       b.restore();
       if (c.y + s.r > s.gy + 2) {
         const half = Math.round(Math.sqrt(Math.max(0, s.r * s.r - (s.gy - c.y) ** 2)));
         const k = Math.floor(time * 30) % 3;
         const side = s.spinDir > 0 ? -1 : 1; // sparks fly off the way the teeth come up out of the ground
-        b.fillStyle = "#ffd25a";
+        b.fillStyle = look.spark;
         b.fillRect(cx + side * (half + 1 + k), s.gy - 1 - (k % 2), 1, 1);
-        b.fillStyle = "#ff8a2a";
+        b.fillStyle = look.spark2;
         b.fillRect(cx + side * (half + 2 + (k % 2)), s.gy - 2 - k, 1, 1);
       }
     }
   }
 
   // A steel disc with raked teeth, turned by `angle`
-  function drawSawBlade(cx, cy, r, angle) {
+  function drawSawBlade(cx, cy, r, angle, look = SAW_LOOK.steel) {
     const n = r <= 6 ? 8 : r <= 9 ? 10 : 12;
     const seg = (Math.PI * 2) / n;
     const depth = r <= 6 ? 2.2 : 3; // how deep the teeth are cut
@@ -2425,17 +2500,17 @@ const Renderer = (() => {
         const edge = !shape(x + 1, y) || !shape(x - 1, y) || !shape(x, y + 1) || !shape(x, y - 1);
         const d = Math.hypot(x, y);
         const lit = x + y < 0;
-        if (edge) b.fillStyle = "#2b2d33";
-        else if (k === 2) b.fillStyle = lit ? "#ffffff" : "#dfe3e9"; // sharp teeth
-        else if (d < Math.max(1.6, r * 0.25)) b.fillStyle = d < 0.8 ? "#cfd4dc" : "#2b2d33"; // bolt in the middle
-        else if (Math.abs(d - r * 0.62) < 0.5) b.fillStyle = "#6f7580"; // a groove ring
-        else b.fillStyle = lit ? "#b4bac3" : "#8d939d";
+        if (edge) b.fillStyle = look.edge;
+        else if (k === 2) b.fillStyle = lit ? look.tooth : look.toothDark; // sharp teeth
+        else if (d < Math.max(1.6, r * 0.25)) b.fillStyle = d < 0.8 ? look.bolt : look.edge; // bolt in the middle
+        else if (Math.abs(d - r * 0.62) < 0.5) b.fillStyle = look.groove; // a groove ring
+        else b.fillStyle = lit ? look.lit : look.body;
         b.fillRect(ox + x, oy + y, 1, 1);
       }
     }
     // three holes that turn with the blade (medium and large), so you can see it spin
     if (r > 6) {
-      b.fillStyle = "#3f434b";
+      b.fillStyle = look.holes;
       for (let k = 0; k < 3; k++) {
         const a = angle + (k * Math.PI * 2) / 3;
         const size = r > 9 ? 2 : 1;
@@ -2445,26 +2520,31 @@ const Renderer = (() => {
   }
 
   // A groove cut into the ground, with metal caps at each end
-  function drawSawSlot(x0, x1, gy) {
-    b.fillStyle = "#1c1b22";
+  // (in the forest: wooden caps)
+  function drawSawSlot(x0, x1, gy, forest) {
+    b.fillStyle = forest ? "#14081c" : "#1c1b22";
     b.fillRect(x0, gy, x1 - x0, 2);
-    b.fillStyle = "#8a8f99";
+    b.fillStyle = forest ? "#6a4030" : "#8a8f99";
     b.fillRect(x0 - 1, gy - 1, 2, 3);
     b.fillRect(x1 - 1, gy - 1, 2, 3);
-    b.fillStyle = "#cfd4dc";
+    b.fillStyle = forest ? "#a07050" : "#cfd4dc";
     b.fillRect(x0 - 1, gy - 1, 1, 1);
     b.fillRect(x1 - 1, gy - 1, 1, 1);
   }
 
-  // An upright metal rail from y0 (top) down to y1
-  function drawSawRail(x, y0, y1) {
-    b.fillStyle = "#3a3d44";
+  // An upright metal rail from y0 (top) down to y1 (in the forest: a wooden pole wound with a vine)
+  function drawSawRail(x, y0, y1, forest) {
+    b.fillStyle = forest ? "#3a2018" : "#3a3d44";
     b.fillRect(x - 1, y0, 3, y1 - y0);
-    b.fillStyle = "#8a8f99";
+    b.fillStyle = forest ? "#6a4030" : "#8a8f99";
     b.fillRect(x, y0, 1, y1 - y0);
-    b.fillStyle = "#5c616b";
+    if (forest) {
+      b.fillStyle = "#4f8a3f";
+      for (let y = y0 + 2; y < y1; y += 4) b.fillRect(x - 1 + ((y >> 2) % 2) * 2, y, 1, 2);
+    }
+    b.fillStyle = forest ? "#4a2a20" : "#5c616b";
     b.fillRect(x - 2, y0 - 1, 5, 2); // bracket at the top
-    b.fillStyle = "#cfd4dc";
+    b.fillStyle = forest ? "#a07050" : "#cfd4dc";
     b.fillRect(x - 1, y0 - 1, 1, 1);
   }
 
@@ -2473,19 +2553,35 @@ const Renderer = (() => {
       const sx = m.x - camX;
       if (sx < -m.length - 10 || sx > VIEW_W + m.length + 10) continue;
       const now = level.macePoints(m, time);
+      const forest = forestAt(level, m.x);
+      const look = forest ? MACE_LOOK.forest : MACE_LOOK.steel;
 
-      // Bolt in the sky the chain hangs from
-      b.fillStyle = "#3a3d44";
-      b.fillRect(Math.round(sx) - 3, m.y - 5, 7, 5);
-      b.fillStyle = "#8a8f99";
-      b.fillRect(Math.round(sx) - 2, m.y - 4, 5, 3);
-      b.fillStyle = "#cfd4dc";
-      b.fillRect(Math.round(sx) - 1, m.y - 4, 2, 1);
+      if (forest) {
+        // In the forest it hangs on a vine from a gnarled branch: a thorny seed pod
+        b.fillStyle = "#2c1640";
+        b.fillRect(Math.round(sx) - 7, m.y - 5, 15, 3);
+        b.fillRect(Math.round(sx) - 2, m.y - 3, 5, 3);
+        b.fillStyle = "#6a3a9a";
+        b.fillRect(Math.round(sx) - 7, m.y - 6, 3, 1);
+        b.fillRect(Math.round(sx) + 5, m.y - 6, 3, 1);
+      } else {
+        // Bolt in the sky the chain hangs from
+        b.fillStyle = "#3a3d44";
+        b.fillRect(Math.round(sx) - 3, m.y - 5, 7, 5);
+        b.fillStyle = "#8a8f99";
+        b.fillRect(Math.round(sx) - 2, m.y - 4, 5, 3);
+        b.fillStyle = "#cfd4dc";
+        b.fillRect(Math.round(sx) - 1, m.y - 4, 2, 1);
+      }
 
-      // Chain: alternating light and dark links
+      // Chain: alternating light and dark links (a vine, with a leaf now and then, in the forest)
       now.links.slice(0, -1).forEach((p, i) => {
-        b.fillStyle = i % 2 ? "#5c616b" : "#9aa0aa";
+        b.fillStyle = forest ? (i % 2 ? "#2f6a2f" : "#4f8a3f") : i % 2 ? "#5c616b" : "#9aa0aa";
         b.fillRect(Math.round(p.x - camX) - 1, Math.round(p.y) - 1, 2, 2);
+        if (forest && i % 4 === 2) {
+          b.fillStyle = "#7ac25a";
+          b.fillRect(Math.round(p.x - camX) + 1, Math.round(p.y) - 2, 2, 1);
+        }
       });
 
       // Faint after-images when it's swinging fast, so the swing reads as motion
@@ -2493,16 +2589,17 @@ const Renderer = (() => {
         for (const [delay, alpha] of [[0.06, 0.18], [0.03, 0.3]]) {
           const ghost = level.macePoints(m, time - delay);
           b.globalAlpha = alpha * now.speed;
-          drawMaceBall(ghost.ball.x - camX, ghost.ball.y, ghost.spin);
+          drawMaceBall(ghost.ball.x - camX, ghost.ball.y, ghost.spin, look);
         }
         b.globalAlpha = 1;
       }
-      drawMaceBall(now.ball.x - camX, now.ball.y, now.spin);
+      if (forest) drawGlowAt("thorn", 1, now.ball.x - camX, now.ball.y, 0.5);
+      drawMaceBall(now.ball.x - camX, now.ball.y, now.spin, look);
     }
   }
 
-  // A grey ball covered in spikes, rotated by `spin`
-  function drawMaceBall(cx, cy, spin) {
+  // A grey ball covered in spikes, rotated by `spin` (look: its colors)
+  function drawMaceBall(cx, cy, spin, look = MACE_LOOK.steel) {
     const x0 = Math.round(cx);
     const y0 = Math.round(cy);
 
@@ -2512,12 +2609,12 @@ const Renderer = (() => {
       const dx = Math.cos(a);
       const dy = Math.sin(a);
       // Wide dark base, narrowing to a bright point
-      b.fillStyle = "#3a3d44";
+      b.fillStyle = look.edge;
       b.fillRect(Math.round(x0 + dx * 4.5 - 1), Math.round(y0 + dy * 4.5 - 1), 2, 2);
-      b.fillStyle = "#5c616b";
+      b.fillStyle = look.spike;
       b.fillRect(Math.round(x0 + dx * 5.6), Math.round(y0 + dy * 5.6), 1, 1);
       b.fillRect(Math.round(x0 + dx * 6.4), Math.round(y0 + dy * 6.4), 1, 1);
-      b.fillStyle = "#b8bdc6";
+      b.fillStyle = look.tip;
       b.fillRect(Math.round(x0 + dx * 7.3), Math.round(y0 + dy * 7.3), 1, 1);
     }
 
@@ -2526,15 +2623,15 @@ const Renderer = (() => {
       for (let x = -4; x <= 4; x++) {
         const d = x * x + y * y;
         if (d > 19) continue;
-        if (d > 13) b.fillStyle = "#3a3d44";
-        else if (x + y <= -3) b.fillStyle = "#cfd4dc";
-        else if (x + y >= 3) b.fillStyle = "#6b707a";
-        else b.fillStyle = "#9aa0aa";
+        if (d > 13) b.fillStyle = look.edge;
+        else if (x + y <= -3) b.fillStyle = look.lit;
+        else if (x + y >= 3) b.fillStyle = look.shade;
+        else b.fillStyle = look.body;
         b.fillRect(x0 + x, y0 + y, 1, 1);
       }
     }
     // Studs on the ball's face that turn with the spin, so you can see it rotating
-    b.fillStyle = "#e8ebef";
+    b.fillStyle = look.studs;
     for (let k = 0; k < 3; k++) {
       const a = spin * 1.0 + (k * Math.PI * 2) / 3;
       b.fillRect(Math.round(x0 + Math.cos(a) * 2), Math.round(y0 + Math.sin(a) * 2), 1, 1);
