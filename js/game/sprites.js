@@ -1118,7 +1118,7 @@ const SPORE_COLORS = {
   pink: { cap: "#ff5ac8", capHi: "#ffa0e6", capDk: "#b02a8a", spot: "#ffe8f8", spore: "#ff9af0" },
 };
 
-// A big spore mushroom: a pale stem that bends like an S as it grows (leaning one way, `lean` -1 or 1),
+// A big spore mushroom: a pale stem that bows as it grows (leaning one way, `lean` -1 or 1),
 // a skirt, gills, and a spotted dome cap that droops at the rim and tips the way it leans. The canvas is
 // 54 wide and 42 tall, with the stem's foot at the bottom middle.
 function makeSporeShroom(kind, lean) {
@@ -1126,15 +1126,19 @@ function makeSporeShroom(kind, lean) {
   const c = makeCanvas(54, SPORES.height + 2);
   const g = c.getContext("2d");
   const foot = 27, by = SPORES.height + 2;
-  // where the stem's middle is at each height: an S-curve ending SPORES.lean pixels over
-  const mid = (y) => { const u = y / stemH; return foot + lean * (SPORES.lean * u * u * (3 - 2 * u) - Math.sin(u * Math.PI * 2) * 2.5); };
+  // where the stem's middle is at each height: one smooth bow, out one way and then sweeping over under the cap
+  const mid = (y) => { const u = y / stemH; return foot + lean * (SPORES.lean * u * u - 3 * Math.sin(u * Math.PI)); };
   for (let y = 0; y < stemH; y++) {
-    const w = 7 + Math.round(Math.sin((y / stemH) * Math.PI) * 1.5) + (y < 3 ? 2 : 0) - (y > stemH - 5 ? 1 : 0);
-    const x = Math.round(mid(y) - w / 2);
-    px(g, "#e8dcf0", x, by - y - 1, w, 1);
-    px(g, "#b8a8c8", x + (lean > 0 ? 0 : w - 2), by - y - 1, 2, 1); // shade on the inside of the bend
+    const u = y / stemH, slope = mid(y + 0.5) - mid(y - 0.5);
+    // thick and flared at the foot, thinner at the top; wider rows where it's steep, so it keeps its thickness
+    const w = (6 + 3 * (1 - u) ** 3 + (y < 2 ? 2 : 0)) * Math.sqrt(1 + slope * slope);
+    const x0 = Math.round(mid(y) - w / 2), x1 = Math.round(mid(y) + w / 2);
+    px(g, "#e8dcf0", x0, by - y - 1, x1 - x0, 1);
+    const inner = slope * lean > 0 ? x0 : x1 - 2; // shade along the inside of the curve, light along the outside
+    px(g, "#b8a8c8", inner, by - y - 1, 2, 1);
+    px(g, "#fff6ff", inner === x0 ? x1 - 1 : x0, by - y - 1, 1, 1);
   }
-  px(g, "#d0c0e0", Math.round(mid(9) - 6), by - 10, 12, 2); // its skirt
+  const sk = mid(9); px(g, "#d0c0e0", Math.round(sk - 5), by - 10, 10, 2); // its skirt
   const cx = mid(stemH), top = by - stemH - capH;
   // the cap: a dome tipped toward the lean, with its rim drooping down at both ends
   const shape = (x) => { const t = (x - cx) / (W / 2); if (Math.abs(t) > 1) return null; return Math.round(capH * (1 - Math.pow(Math.abs(t), 2)) * (1 + 0.3 * t * lean)); };
