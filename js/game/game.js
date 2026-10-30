@@ -59,6 +59,7 @@ const Game = (() => {
       monkeys: [],     // monkeys swinging in on their vines (the monkey orb)
       sawBits: [],     // splinters, sparks and dirt thrown about by the forest's saws breaking loose
       quakes: [],      // the ground shaking where one slams down: { x, t }
+      wisps: [],       // the magic trailing behind a loose saw: little glowing wisps drifting up and fading
       nextCatchup: null, // when (world time) the next purple orb comes for whoever's fallen behind
       warps: [],       // portal gun: someone going into a portal and out of another one far ahead
       grapples: [],    // grapple hooks flying out to the leader, or reeling them back
@@ -109,6 +110,8 @@ const Game = (() => {
     world.quakes = world.quakes.filter((q) => q.t > 0);
     for (const bit of world.sawBits) { bit.t -= dt; bit.vy += 500 * dt; bit.x += bit.vx * dt; bit.y += bit.vy * dt; }
     world.sawBits = world.sawBits.filter((bit) => bit.t > 0 && bit.y < VIEW_H + 4);
+    for (const w of world.wisps) { w.t -= dt; w.x += w.vx * dt; w.y += w.vy * dt; w.vx *= 1 - dt * 2; }
+    world.wisps = world.wisps.filter((w) => w.t > 0);
 
     if (world.state === "countdown") {
       const before = Math.ceil(world.countdown);
@@ -1392,6 +1395,11 @@ const Game = (() => {
         Sound.play("sawBreak");
       }
       const L = s.loose;
+      // the forest's magic driving it on: wisps streaming off behind it, curling up and fading
+      if (Math.random() < dt * 32) {
+        const t = 0.7 + Math.random() * 0.5;
+        world.wisps.push({ x: L.x - L.dir * s.r * (0.2 + Math.random() * 0.7), y: L.y - Math.random() * s.r, vx: -L.dir * (10 + Math.random() * 20), vy: -12 - Math.random() * 18, t, max: t, pink: Math.random() < 0.4, ph: Math.random() * 6 });
+      }
       L.x += L.dir * FOREST.sawSpeed * dt;
       L.angle += (L.dir * FOREST.sawSpeed * dt) / s.r * (L.rolling ? 1 : 1.6);
       const ground = level.groundTop(L.x);

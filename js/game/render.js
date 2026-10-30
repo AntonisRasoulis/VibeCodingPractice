@@ -136,6 +136,7 @@ const Renderer = (() => {
     for (const a of world.arrows) drawArrow(a, camX);
     drawSaws(world.level, camX, world.time);
     for (const bit of world.sawBits) { b.fillStyle = bit.c; b.fillRect(Math.round(bit.x - camX), Math.round(bit.y), bit.big ? 2 : 1, bit.big ? 2 : 1); }
+    drawWisps(world, camX);
     drawMaces(world.level, camX, world.time);
     drawShooters(world.level, camX, world.time);
     if (player.power && !player.dead && !player.hiddenIn) drawCrackle(player, camX, world.time);
@@ -2482,6 +2483,7 @@ const Renderer = (() => {
       const c = level.sawPos(s, time);
       const shaking = s.breakAt !== undefined && time > s.breakAt - FOREST.sawWarn; // about to break loose: shaking hard
       const cx = Math.round(c.x - camX) + (shaking ? (Math.floor(time * 40) % 2 ? 2 : -2) : 0);
+      if (shaking) drawGlowAt("thorn", 2, cx, c.y, Math.min(0.7, (time - (s.breakAt - FOREST.sawWarn)) / FOREST.sawWarn * 0.7)); // the forest waking it up
       const angle = s.spinDir * time * SAW.spin;
       if (s.kind === "pit") {
         drawSawBlade(cx, c.y, s.r, angle, look);
@@ -2508,8 +2510,23 @@ const Renderer = (() => {
 
   // A forest saw that broke loose: rolling along half sunk in the ground (sparks flying where it cuts in),
   // or falling
+  // The magic trailing behind a loose saw: wisps that wobble as they drift up, fading and shrinking
+  function drawWisps(world, camX) {
+    for (const w of world.wisps) {
+      const x = w.x - camX + Math.sin(w.t * 9 + w.ph) * 1.5;
+      if (x < -6 || x > VIEW_W + 6) continue;
+      const left = w.t / w.max;
+      drawGlowAt(w.pink ? "pink" : "thorn", left > 0.5 ? 1 : 0, x, w.y, left * 0.6);
+      b.globalAlpha = Math.min(1, left * 1.5);
+      b.fillStyle = left > 0.6 ? "#ffe0f8" : w.pink ? "#ff7ae0" : "#c070f0";
+      b.fillRect(Math.round(x), Math.round(w.y), 1, 1);
+      b.globalAlpha = 1;
+    }
+  }
+
   function drawLooseSaw(s, level, camX, time, look) {
     const L = s.loose, cx = Math.round(L.x - camX);
+    drawGlowAt("thorn", 2, cx, L.y - (L.rolling ? s.r * 0.4 : 0), 0.45 + 0.15 * Math.sin(time * 12)); // a dark-magic aura
     if (!L.rolling) { drawSawBlade(cx, L.y, s.r, L.angle, look); return; }
     b.save();
     b.beginPath();
