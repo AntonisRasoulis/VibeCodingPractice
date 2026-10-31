@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 84 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 85 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -106,6 +106,12 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   faster, blue = higher jumps, green = poison screen, 10 s; pink = float up for 5 s; they stack). At the
   end, fireflies (the background's too) swarm you into a ball of light and you wake on the main course
   at the same distance. No orbs in the forest; you can't use powers there (you keep them).
+- **Magic feet** (the forest's gift, `MAGIC_FEET`): coming out of the forest, you have it for the rest of
+  the race. Magic holds you up over every hole: pits and rivers get a magic bridge as you get near
+  (`updateBridges`); quicksand, sinkholes and thin ice still go off, then a bridge catches you
+  (`Player.magicCatch`). A bridge is an invisible platform (kind `bridge`, first in `level.platforms`);
+  all you see is the floating shooters' magic in a little stretch under whoever stands on it. Anyone can
+  use it: 2 s after you've left it (then a 1 s fade), never from under someone. Bear traps unchanged.
 
 ## Rules of thumb for designing
 
@@ -159,8 +165,6 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 
 ## Still to do / ideas parked
 
-- **The forest's boost:** getting through the forest should give a reward (the owner will design it).
-  Right now you come out at the same distance you'd have reached on the main course.
 - Maybe the forest's own two orbs (one gold, one light blue) and an animal / chaser.
 - The floating shooters' stumps and thorns are small and dark: could be made easier to see.
 - An **arcane ruins** biome (aurora sky, stone ruins with glowing runes, teal magic flames) was mocked
