@@ -113,6 +113,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   (`Player.magicCatch`). A bridge is an invisible platform (kind `bridge`, first in `level.platforms`);
   all you see is the floating shooters' magic in a little stretch under whoever stands on it. Anyone can
   use it: 2 s after you've left it (then a 1 s fade), never from under someone. Bear traps unchanged.
+- **The roots** (the forest's other gift, `ROOTS`, power `"roots"`): you come out holding them. Used, dark
+  wooden roots grab the other player anywhere (no dodge), one coiled round them and four stabbing in turn
+  for 5 s (mash jump: down to 2.5 s), fling them back onto safe ground and impale them on a last root
+  (`rootGrab`, `updateRoots`, `world.roots`; drawn by `drawRoots`). Alone: they go off when the fire is
+  close and hold it still for 5 s (`world.rootWall`).
 
 ## Rules of thumb for designing
 
@@ -166,7 +171,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 
 ## Still to do / ideas parked
 
-- Maybe the forest's own two orbs (one gold, one light blue) and an animal / chaser.
+- Maybe a forest animal / chaser (a shadow wolf or an owl were offered).
 - The floating shooters' stumps and thorns are small and dark: could be made easier to see.
 - An **arcane ruins** biome (aurora sky, stone ruins with glowing runes, teal magic flames) was mocked
   up and liked; saved for a later "secret" biome reached the same way as the forest.

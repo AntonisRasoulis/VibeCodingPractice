@@ -42,7 +42,7 @@ const Renderer = (() => {
       const course = p.realm || world.level, other = world.players[1 - i];
       const mine = (list) => list.filter((e) => (e.level || world.level) === course);
       const view = Object.assign(Object.create(world), { level: course, sawBits: mine(world.sawBits), wisps: mine(world.wisps), quakes: mine(world.quakes) });
-      if (p.realm) Object.assign(view, { inForest: true, monsoon: null, missiles: [], bears: [], jaguars: [], decoys: [], arrows: [], vultures: [], hawks: [], sticks: [], burns: [], drones: [], hands: [], bolts: [], monkeys: [], thrownSnowballs: [], grapples: [], vines: [], warps: [] });
+      if (p.realm) Object.assign(view, { inForest: true, monsoon: null, missiles: [], bears: [], jaguars: [], decoys: [], arrows: [], vultures: [], hawks: [], sticks: [], burns: [], drones: [], hands: [], roots: [], bolts: [], monkeys: [], thrownSnowballs: [], grapples: [], vines: [], warps: [] });
       drawView(view, p, other && other.realm === p.realm && !other.dream ? other : null, camX);
       drawDream(p, camX, world.time);
       b.restore();
@@ -135,6 +135,7 @@ const Renderer = (() => {
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawRiverFronts(world.level, camX, world.time); // ...and anyone in a river is up to their neck
     for (const p of [player, other]) if (p && !p.hiddenIn) drawBridgeMagic(p, camX, world.time, p === other); // held up over a hole by magic
+    for (const r of world.roots) drawRoots(r, camX, world.time); // (in front of whoever they've got hold of)
     drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
@@ -166,6 +167,7 @@ const Renderer = (() => {
     drawParticles(player, camX);
     if (snow > 0) drawSnowfall(camX, world.time, snow);
     drawFire(world.fire, player, camX, world.time);
+    if (world.rootWall) drawRootWall(world.rootWall, world.level, camX, world.time); // alone: the roots holding the fire back
     const storm = world.inForest ? 0 : Game.sandstormStrength(); // (the forest has its own weather)
     if (storm > 0) drawSandstorm(storm, world.time);
     const blizzard = world.inForest ? 0 : Game.snowstormStrength();
@@ -1614,6 +1616,110 @@ const Renderer = (() => {
     b.globalAlpha = fade;
   }
 
+  // ---- The enchanted forest's roots ----
+
+  // Weathered dark wood: charcoal bark, lighter ridges catching the light, darker grain, and a faint glow
+  const ROOT = { core: "#2f2934", dark: "#1d1922", grain: "#211c26", edge: "#51485b", hi: "#776b82", glow: "#a060ff", crack: "#a898b8" };
+
+  // Roots as [x0, y0 (where it comes out of the ground), x1, y1 (its sharp tip), w (how thick at the base),
+  // cx, cy (the point it curves towards)], in screen pixels. Drawn in passes so the glow stays behind them all.
+  function drawRootList(list) {
+    const px = (x, y, w, h, c, a = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    for (const pass of [0, 1, 2]) {
+      for (const [x0, y0, x1, y1, w0, cx, cy] of list) {
+        const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 1.5);
+        for (let i = 0; i <= n; i++) {
+          const t = i / n, u = 1 - t;
+          const x = u * u * x0 + 2 * u * t * cx + t * t * x1, y = u * u * y0 + 2 * u * t * cy + t * t * y1;
+          const w = Math.max(1, Math.round(w0 * (1 - t) + 0.6 * t)); // tapering to a sharp tip
+          if (pass === 0) px(x - w / 2 - 1, y - 1, w + 2, w + 2, ROOT.glow, 0.12);
+          else if (pass === 1) {
+            px(x - w / 2, y, w, w, t > 0.88 ? ROOT.dark : ROOT.core);
+            if (w > 1) px(x - w / 2, y, 1, 1, ROOT.edge);     // the lit side of the bark
+            if (w > 2) px(x + w / 2 - 1, y, 1, 1, ROOT.dark); // the shadowed side
+          } else {
+            if (w > 2 && i % 5 === 0) px(x - w / 2 + 1, y, 1, 1, ROOT.grain); // grain running along it
+            if (w > 1 && i % 7 === 3) px(x - w / 2, y, 1, 1, ROOT.hi);        // ridges
+            if (w > 2 && i === Math.floor(n * 0.4)) { px(x - w / 2, y, 2, 2, ROOT.dark); px(x - w / 2, y, 1, 1, ROOT.edge); } // a knot
+          }
+        }
+      }
+    }
+    b.globalAlpha = 1;
+  }
+
+  const lerp = (a, c, k) => a + (c - a) * k;
+
+  // Someone in the roots' grip: one thick root coiled tight round them, four more rearing back and stabbing
+  // in, two at a time; flung back, they sink away; then the last one, straight up through them
+  function drawRoots(r, camX, time) {
+    const px = (x, y, w, h, c, a = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    if (r.state === "grab" || r.state === "throw" || (r.state === "done" && !r.spike)) {
+      const grow = r.state === "grab" ? Math.min(1, r.t / ROOTS.rise) : Math.max(0, 1 - r.t / 0.25); // bursting up, or sinking away
+      if (grow <= 0) return;
+      const jolt = r.state === "grab" && r.jolt > 0 ? (Math.floor(time * 60) % 2 ? 1 : -1) : 0; // they're struggling: it creaks and shifts
+      const x = Math.round(r.x - camX) + jolt, y = Math.round(r.y), gy = r.gy, mid = x + 3;
+      const after = Math.max(0, r.t - ROOTS.rise), phase = Math.floor(after / ROOTS.stabEvery) % 2;
+      const thrust = Math.min(1, (after % ROOTS.stabEvery) / (ROOTS.stabEvery * 0.35)); // each stab: a quick strike, then held in
+      const stabs = [[-17, -1], [-11, -1], [10, 1], [16, 1]].map(([dx, side], i) => {
+        const bx = mid + dx;
+        const k = r.state === "grab" && r.t > ROOTS.rise && (i + phase) % 2 === 0 ? thrust : 0;
+        // reared back, tip up (k = 0) ... up, over and in, the tip in their side (k = 1)
+        const tx = lerp(bx - side * 3, mid + side * 5, k), ty = lerp(y - 1 - (i % 2) * 2, y + 4 + (i % 2) * 3, k);
+        const cx = lerp(bx + side * 4, bx + side, k), cy = lerp(y + 2, y - 8, k);
+        return [bx, gy, lerp(bx, tx, grow), lerp(gy, ty, grow), 3, lerp(bx, cx, grow), lerp(gy, cy, grow)];
+      });
+      drawRootList(stabs);
+      if (r.state !== "grab" || grow < 0.6) return;
+      // the coil: up out of the ground beside their feet, across their legs (rising), round the back (just its
+      // edges show at their sides), across the chest and out over a shoulder to a sharp tip
+      drawRootList([[x - 3, gy, x - 2, y + 9, 2, x - 4, gy - 2]]);
+      const band = (xa, ya, xb, yb) => {
+        for (let xx = xa; xx <= xb; xx++) {
+          const yy = Math.round(ya + (yb - ya) * (xx - xa) / Math.max(1, xb - xa));
+          px(xx, yy, 1, 1, ROOT.hi);
+          px(xx, yy + 1, 1, 1, (xx - xa) % 3 === 1 ? ROOT.grain : ROOT.core);
+          px(xx, yy + 2, 1, 1, ROOT.dark);
+        }
+      };
+      const turn = (tx, ya, yb) => { for (let yy = Math.min(ya, yb); yy <= Math.max(ya, yb) + 2; yy++) px(tx, yy, 1, 1, yy % 2 ? ROOT.core : ROOT.edge); };
+      band(x - 2, y + 9, x + 7, y + 7); turn(x + 8, y + 7, y + 5);
+      turn(x - 3, y + 5, y + 3); band(x - 2, y + 5, x + 7, y + 3); turn(x + 8, y + 3, y + 1);
+      drawRootList([[x + 8, y + 1, x + 4, y - 2, 2, x + 9, y - 2]]);
+      // strain: cracks flickering where it's creaking tight, and bark dust when they struggle
+      if (Math.floor(time * 6) % 3) { px(x + 1, y + 9, 1, 1, ROOT.crack); px(x + 5, y + 4, 1, 1, ROOT.crack); }
+      if (r.jolt > 0) { px(x + 9, y + 3, 1, 1, ROOT.hi, 0.8); px(x - 4, y + 6, 1, 1, ROOT.hi, 0.7); }
+      // sparks where the stabbing roots strike
+      if (r.t > ROOTS.rise && thrust >= 1 && after % ROOTS.stabEvery < ROOTS.stabEvery * 0.6) {
+        const sx = phase ? x + 7 : x - 2, sy = y + 4 + (phase ? 2 : 0);
+        px(sx, sy, 1, 1, "#e2a6ff"); px(sx + (phase ? 1 : -1), sy - 1, 1, 1, "#ffffff", 0.8);
+      }
+      b.globalAlpha = 1;
+      return;
+    }
+    // the last root: straight up out of the ground, through them, then sinking back
+    if (!r.spike) return;
+    const sx = r.spike.x - camX, gy = r.spike.gy, full = r.hitY - 4;
+    const top = r.state === "impale" ? lerp(gy, full, Math.min(1, r.t / ROOTS.impaleRise))
+      : r.t < ROOTS.linger ? full : lerp(full, gy, Math.min(1, (r.t - ROOTS.linger) / 0.3));
+    if (gy - top < 2) return;
+    drawRootList([[sx - 1, gy, sx + 1, top, 4, sx, (gy + top) / 2]]);
+  }
+
+  // Alone: a tangle of roots arching up out of the ground in front of the fire and back over the flames,
+  // tips jabbing at it, holding it back (rising up, swaying a little, then sinking away when they let go)
+  function drawRootWall(wall, level, camX, time) {
+    const grow = wall.t < ROOTS.wallTime ? Math.min(1, wall.t / 0.3) : Math.max(0, 1 - (wall.t - ROOTS.wallTime) / 0.6);
+    if (grow <= 0) return;
+    const x = wall.x - camX + 10, gy = level.groundTop(wall.x + 10) ?? VIEW_H - 8;
+    const list = [];
+    for (let i = 0; i < 10; i++) {
+      const bx = x + (i % 5) * 4, h = (34 + ((i * 29) % 50)) * grow, sway = Math.sin(time * 3 + i) * 1.5;
+      list.push([bx, gy, bx - (12 + (i % 3) * 4) * grow + sway, gy - h, 4 - (i % 2), bx + 6 + (i % 2) * 4, gy - h * 0.7]);
+    }
+    drawRootList(list);
+  }
+
   function drawPlatforms(level, player, camX, time) {
     for (const p of level.platforms) {
       if (p.kind === "log" || p.kind === "flood" || p.kind === "float" || p.kind === "bridge") continue; // (drawn with their river, the flood, their floating shooter, or the magic under someone's feet: drawBridgeMagic)
@@ -1968,6 +2074,7 @@ const Renderer = (() => {
         monkey: ["#e8c090", "#7a4a2a", "#c8946a", "#4a2a14"],
         portalgun: ["#5ff0d0", "#b04bff", "#ffffff", "#7b3fd0"],
         grapple: ["#ffffff", "#d9a3ff", "#b04bff", "#d9a3ff"],
+        roots: ["#a898b8", "#2f2934", "#a060ff", "#776b82"],
       }[p.power][k];
       b.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1);
     }
@@ -3040,8 +3147,8 @@ const Renderer = (() => {
       if (p.power) {
         const key = world.solo ? "S/DOWN" : i === 0 ? "S" : "DOWN";
         const arrow = p.facing > 0 ? ">>" : "<<"; // follows the way you're facing
-        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE", firehawk: "FIREHAWK", snowball: "SNOWBALL", monkey: "MONKEY", portalgun: "PORTAL GUN", grapple: "GRAPPLE" }[p.power] || p.power.toUpperCase();
-        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#e8c090", portalgun: "#d9a3ff", grapple: "#d9a3ff" }[p.power] || "#ffffff";
+        const label = { zap: "ZAP", hand: "HAND", wind: "WIND DASH", drone: "DRONE", firehawk: "FIREHAWK", snowball: "SNOWBALL", monkey: "MONKEY", portalgun: "PORTAL GUN", grapple: "GRAPPLE", roots: "ROOTS" }[p.power] || p.power.toUpperCase();
+        const color = { zap: "#fff27a", hand: "#c9a3ff", wind: "#ffffff", drone: "#4fc0ff", firehawk: "#ff7a1a", snowball: "#e8f8ff", monkey: "#e8c090", portalgun: "#d9a3ff", grapple: "#d9a3ff", roots: "#a898b8" }[p.power] || "#ffffff";
         text(ctx, `${label} ${arrow} press ${key}`, 12, top + 36, color, 10);
       }
       // Spore mushroom effects, with the seconds left on each

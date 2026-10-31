@@ -47,6 +47,8 @@ const Game = (() => {
       swapFlash: 0,
       bolts: [], // lightning bolts flying along the course
       hands: [], // mystic hands flying, grabbing or swatting
+      roots: [], // the enchanted forest's roots: holding someone and stabbing them, flinging them back, impaling them
+      rootWall: null, // alone: the roots holding the fire back { t, x }
       missiles: [], // missiles zooming in, locking on, flying or exploding
       bears: [],    // bears chasing a player (snow only)
       jaguars: [],  // jaguars and black panthers hunting the leader (jungle only)
@@ -128,7 +130,7 @@ const Game = (() => {
     world.time += dt;
     const { fire, level, players } = world;
     fire.speed = FIRE.startSpeed + FIRE.speedGain * world.time;
-    fire.x += fire.speed * dt;
+    if (!(world.rootWall && world.rootWall.t < ROOTS.wallTime)) fire.x += fire.speed * dt; // (alone: the roots can hold it back)
 
     level.ensure(Math.max(...players.map((p) => p.x)) + VIEW_W * 2);
     level.update(world.time);
@@ -150,6 +152,7 @@ const Game = (() => {
     const inputs = players.map((p, i) => readInput(i));
     players.forEach((p, i) => p.update(dt, inputs[i], p.realm || level)); // (each on their own course: the main one, or a forest)
     updateDreams(dt);
+    updateRootWall(dt);
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
     for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); levelSounds(); });
@@ -165,6 +168,7 @@ const Game = (() => {
     updateDrones(dt);
     updateBolts(dt);
     updateHands(dt);
+    updateRoots(dt, inputs);
     if (!flooded) {
       updateMissiles(dt);
       updateBears(dt);
@@ -353,6 +357,7 @@ const Game = (() => {
     else if (p.power === "firehawk") launchHawk(p);
     else if (p.power === "snowball") throwSnowball(p);
     else if (p.power === "monkey") launchMonkey(p);
+    else if (p.power === "roots") { if (!rootGrab(p, owner)) return; } // (nobody to grab: keep it)
     else if (p.power === "portalgun" || p.power === "grapple") {
       if (world.monsoon || p.flood) return; // (keep it for after the flood)
       if (!(p.power === "portalgun" ? firePortalGun(p) : throwGrapple(p))) return; // (nothing happened: keep it)
@@ -1446,8 +1451,9 @@ const Game = (() => {
         p.dream = null;
         p.held = false;
         p.lying = false;
-        if (d.kind === "fireflies") { // made it through the forest: its gift, for the rest of the race
+        if (d.kind === "fireflies") { // made it through the forest: its gifts, magic feet for the rest of the race, and its roots
           p.magicFeet = true;
+          p.power = "roots";
           p.showHit("MAGIC FEET!", "#e2a6ff");
           p.sparkle("#e2a6ff");
           Sound.play("magicFeet");
@@ -1524,6 +1530,94 @@ const Game = (() => {
       else br.idle += dt;
     }
     level.platforms = level.platforms.filter((br) => br.kind !== "bridge" || br.idle < M.stay + M.fade);
+  }
+
+  // ---- The enchanted forest's roots (a power you come out of the forest with) ----
+
+  // S / Down: roots burst out of the ground round the other player, wherever they are, and grab them.
+  // Not if there's nobody to grab right now (dead, in a forest, already held...): then you keep it.
+  function rootGrab(p, owner) {
+    const v = world.players[1 - owner];
+    if (!v || v.dead || v.caught || v.held || v.dream || v.realm || v.eatenBy || v.flood || world.monsoon) {
+      if (v && !world.solo) p.showHit("OUT OF REACH!", "#a898b8");
+      return false;
+    }
+    const level = world.level;
+    // pulled down onto the ground under them (or held where they stand, on a platform or over a hole)
+    const ground = level.groundTop(v.x + HITBOX_W / 2);
+    let gy = v.onGround ? v.y + HITBOX_H : ground !== null && ground >= v.y + HITBOX_H ? ground : null;
+    if (gy !== null) v.y = gy - HITBOX_H;
+    else gy = VIEW_H + 6; // (over a hole: the roots come up from below)
+    Object.assign(v, { held: true, vx: 0, vy: 0, spin: 0, standingOn: null, onGround: false, inQuick: false, inRiver: null, inSink: null, trapped: 0, hiddenIn: null, dashHold: 0, dashTime: 0, windTime: 0 });
+    v.showHit("ROOTED!", "#a898b8");
+    v.flash = 0.4;
+    world.roots.push({ owner, victim: v, state: "grab", t: 0, end: ROOTS.hold, gy, x: v.x, y: v.y, stab: 0, jolt: 0 });
+    Sound.play("rootGrab");
+    return true;
+  }
+
+  // Held and stabbed (mash jump to tear free sooner), then flung back onto safe ground, and impaled on a last
+  // root just before landing
+  function updateRoots(dt, inputs) {
+    const level = world.level;
+    for (const r of world.roots) {
+      const v = r.victim, i = world.players.indexOf(v);
+      r.t += dt;
+      if (r.jolt > 0) r.jolt -= dt;
+      if (r.state !== "done" && (v.caught || (v.dead && r.state !== "impale"))) { r.state = "done"; r.t = 0; v.held = false; continue; } // (the fire got them first)
+      if (r.state === "grab") {
+        Object.assign(v, { x: r.x, y: r.y, vx: 0, vy: 0, held: true });
+        if (inputs[i] && inputs[i].jumpPressed && r.t > ROOTS.rise) { // struggling: each press tears at the roots
+          r.end = Math.max(ROOTS.minHold, r.end - ROOTS.tear);
+          r.jolt = 0.12;
+          Sound.play("rootCreak");
+        }
+        const stab = Math.floor(Math.max(0, r.t - ROOTS.rise) / ROOTS.stabEvery);
+        if (stab > r.stab) {
+          r.stab = stab;
+          v.flash = 0.15;
+          v.sparkle("#e2a6ff");
+          Sound.play("rootStab");
+        }
+        if (r.t >= r.end) {
+          // flung back: about 3 tiles, or as far as it takes to reach safe ground
+          const spot = level.safeSpotBefore(v.x - ROOTS.throwBack, 600) || level.safeSpotBefore(v.x - ROOTS.throwBack, 4000) || level.safeSpotAfter(v.x) || { x: v.x, y: r.gy - HITBOX_H };
+          // (a longer throw, when the nearest safe ground is further back, takes a little longer)
+          const time = Math.max(ROOTS.throwTime, Math.abs(v.x - spot.x) / 300);
+          Object.assign(r, { state: "throw", t: 0, time, from: { x: v.x, y: v.y }, to: spot, spike: { x: spot.x + HITBOX_W / 2, gy: spot.y + HITBOX_H } });
+          Sound.play("rootFling");
+        }
+      } else if (r.state === "throw") {
+        const u = Math.min(1, r.t / r.time);
+        v.x = r.from.x + (r.to.x - r.from.x) * Math.min(1, u / ROOTS.impaleAt); // (right over the spot by the time the last root comes up)
+        v.y = r.from.y + (r.to.y - r.from.y) * u - ROOTS.throwArc * 4 * u * (1 - u);
+        v.spin = -u * Math.PI * 1.5;
+        if (u >= ROOTS.impaleAt) { r.state = "impale"; r.t = 0; r.hitY = v.y; Sound.play("rootImpale"); }
+      } else if (r.state === "impale") {
+        if (r.t >= ROOTS.impaleRise && !v.dead) {
+          v.held = false;
+          v.spin = 0;
+          v.showHit("IMPALED!", "#a898b8");
+          v.die();
+          r.state = "done";
+          r.t = 0;
+        }
+      }
+    }
+    world.roots = world.roots.filter((r) => !(r.state === "done" && r.t > ROOTS.linger + 0.3));
+  }
+
+  // Alone: once the fire gets close, the roots go off by themselves and hold it back for a while
+  function updateRootWall(dt) {
+    if (!world.solo) return;
+    const p = world.players[0];
+    if (!world.rootWall && p.power === "roots" && !p.caught && !p.dream && p.trackX - world.fire.x < ROOTS.fireNear) {
+      p.power = null;
+      world.rootWall = { t: 0, x: world.fire.x };
+      p.showHit("ROOTS!", "#a898b8");
+      Sound.play("rootGrab");
+    }
+    if (world.rootWall && (world.rootWall.t += dt) > ROOTS.wallTime + 0.6) world.rootWall = null;
   }
 
   // ---- The enchanted forest's spore mushrooms ----

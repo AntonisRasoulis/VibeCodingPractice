@@ -472,6 +472,28 @@ const MAGIC_FEET = {
   reach: 16,         // its magic shows in a little stretch under whoever's on it: this far each side of them (pixels)
 };
 
+// The enchanted forest's other gift: coming out of it, you're holding its roots (a power for S / Down; it
+// replaces whatever you held). Use it and roots of dark wood burst out of the ground round the other
+// player, wherever they are, and grab them: one coils round them tight while four more take turns
+// stabbing them. Mashing jump tears them free sooner. Then the roots fling them back onto safe ground, and
+// just before they land one last root shoots up out of it and impales them.
+// Alone (there's nobody to grab): once the fire gets close, the roots burst up and hold the fire back.
+const ROOTS = {
+  hold: 5,           // seconds they're held and stabbed...
+  minHold: 2.5,      // ...but mashing jump tears them free sooner, down to this
+  tear: 0.4,         // ...each jump press takes this much off
+  rise: 0.25,        // seconds the roots take to burst up and coil round them
+  stabEvery: 0.3,    // the stabbing roots take turns: a stab this often
+  throwBack: 24,     // then they're flung back about this far (pixels: 3 tiles), or as far as it takes to reach safe ground
+  throwTime: 0.6,    // ...taking this long...
+  throwArc: 22,      // ...this high
+  impaleAt: 0.85,    // the last root shoots up once the throw is this far along (they're just above the ground)...
+  impaleRise: 0.08,  // ...taking this long to reach them
+  linger: 0.8,       // then it stays a moment before sinking back
+  fireNear: 110,     // alone: the roots go off by themselves once the fire is this close (pixels)...
+  wallTime: 5,       // ...and hold it back for this long, then sink back into the ground
+};
+
 // The forest's spore mushrooms: spores drift down from under the cap all the time, and running
 // under one you'll most likely catch one on your head (about 9 times in 10). Each color does something different (they stack).
 const SPORES = {
