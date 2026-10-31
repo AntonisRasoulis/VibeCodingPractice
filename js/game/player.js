@@ -83,6 +83,7 @@ class Player {
     this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
     this.lying = false;           // just woken up, still lying down
     this.magicFeet = false;
+    this.rootGuard = false;       // alone: the forest's roots are watching over us, and burst up when the fire gets close
     this.rotState = new Map();    // the forest's rotten bouncy mushrooms *this* player has bounced on: seconds since (they pop)
     this.spinning = false;        // a super bounce off a bouncy mushroom: spinning, no steering until we land on solid ground       // made it out of the enchanted forest: magic holds us up over every hole (for the rest of the race)
     this.spores = { red: 0, blue: 0, pink: 0 }; // seconds left of each spore mushroom's effect (forest): faster, higher jumps, floating

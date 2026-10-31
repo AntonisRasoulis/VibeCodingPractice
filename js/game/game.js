@@ -1453,7 +1453,8 @@ const Game = (() => {
         p.lying = false;
         if (d.kind === "fireflies") { // made it through the forest: its gifts, magic feet for the rest of the race, and its roots
           p.magicFeet = true;
-          p.power = "roots";
+          if (world.solo) p.rootGuard = true; // (alone it isn't a power: the roots just guard you from the fire, and you keep yours)
+          else p.power = "roots";
           p.showHit("MAGIC FEET!", "#e2a6ff");
           p.sparkle("#e2a6ff");
           Sound.play("magicFeet");
@@ -1613,8 +1614,8 @@ const Game = (() => {
   function updateRootWall(dt) {
     if (!world.solo) return;
     const p = world.players[0];
-    if (!world.rootWall && p.power === "roots" && !p.caught && !p.dream && p.trackX - world.fire.x < ROOTS.fireNear) {
-      p.power = null;
+    if (!world.rootWall && p.rootGuard && !p.caught && !p.dream && p.trackX - world.fire.x < ROOTS.fireNear) {
+      p.rootGuard = false;
       world.rootWall = { t: 0, x: world.fire.x };
       p.showHit("ROOTS!", "#a898b8");
       Sound.play("rootGrab");

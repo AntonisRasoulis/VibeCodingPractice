@@ -3216,12 +3216,13 @@ const Renderer = (() => {
       // Spore mushroom effects, with the seconds left on each
       const effects = [["red", "FAST"], ["blue", "HIGH JUMP"], ["pink", "FLOAT"]].filter(([k]) => p.spores[k] > 0);
       if (p.poison > 0 && p.poisonMax === SPORES.time) effects.push(["green", "POISON"]);
+      if (p.rootGuard) effects.unshift(["roots", "ROOTS"]);       // (alone: the roots guarding you from the fire, till they're used)
       if (p.magicFeet) effects.unshift(["magic", "MAGIC FEET"]); // (the enchanted forest's gift: for good, so no countdown)
       let ex = 12;
       for (const [k, name] of effects) {
         const left = k === "green" ? p.poison : p.spores[k];
-        const label = k === "magic" ? name : `${name} ${Math.ceil(left)}`;
-        text(ctx, label, ex, top + (p.power ? 52 : 36), k === "magic" ? "#e2a6ff" : SPORE_COLORS[k].spore, 10);
+        const label = k === "magic" || k === "roots" ? name : `${name} ${Math.ceil(left)}`;
+        text(ctx, label, ex, top + (p.power ? 52 : 36), k === "magic" ? "#e2a6ff" : k === "roots" ? "#a898b8" : SPORE_COLORS[k].spore, 10);
         ex += (label.length + 2) * 10;
       }
       if (p.flash > 0) {
