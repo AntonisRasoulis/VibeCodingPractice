@@ -160,7 +160,7 @@ const SNOWBALL = {
 // about 3 orbs per biome
 const ORBS = {
   gap: 30,
-  weight: { prairie: 10, snow: 16, desert: 12, jungle: 15, forest: 12 },
+  weight: { prairie: 11, snow: 17, desert: 13, jungle: 16, forest: 12 },
 };
 
 // Purple catch-up orbs: they appear for a runner who has fallen off the leader's screen (alone: when
@@ -417,6 +417,25 @@ const BEAR = {
   swipeTime: 0.35,  // the swipe when it catches you
   approachSpeed: 170, // charging through the player behind's screen to get to the leader
   tramplePop: 370,  // how hard it launches a player it runs over (that it isn't chasing) straight up
+};
+
+// The giant sleep mushroom: the way into the enchanted forest. It stands on the main course (from 500 m
+// on, about once per biome), puffing a cloud of sleep spores now and then: walk into the cloud and you fall
+// asleep, and wake up in the forest. When it's resting you can slip past.
+const SLEEP_SHROOM = {
+  from: 500,           // not before this many meters
+  puff: [3, 10],       // it puffs for a random 3 to 10 seconds...
+  rest: 10,            // ...then rests this long, then picks again
+  warn: 0.6,           // its eyes open this long before it puffs
+  grow: 0.4,           // seconds for its cloud to billow out (and SLEEP_SHROOM.fade to clear)
+  fade: 0.6,
+  lean: 8,             // its cap is this far to one side of its foot (its stem winds)
+  cloudW: 36,          // the cloud: this far either side of the cap's middle...
+  cloudH: 26,          // ...and this far up and down from its middle
+  forest: [100, 250],  // how long the forest it sends you to is (tiles)
+  sleep: 0.75,         // falling asleep: seconds to fade to dark (with Zs)...
+  wake: 0.75,          // ...then waking up in the forest, lying down at first
+  fireflies: 1.3,      // the way out: fireflies swarm round you until there's nothing left but them...
 };
 
 // The enchanted forest's twists on the usual obstacles

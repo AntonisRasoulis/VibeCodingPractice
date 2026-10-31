@@ -1159,6 +1159,48 @@ function makeSporeShroom(kind, lean) {
   return c;
 }
 
+// ---- The giant sleep mushroom (the way into the enchanted forest) ----
+
+// About 6 runners tall: a winding pale stem with a sleepy face on it (eyes shut, or open: about to puff),
+// and a wide purple spotted cap. The stem's foot is at the bottom middle of the canvas.
+function makeSleepShroom(awake) {
+  const capW = 64, capH = 22, stemH = 48, lean = SLEEP_SHROOM.lean;
+  const c = makeCanvas(84, stemH + capH + 6);
+  const g = c.getContext("2d");
+  const foot = 42, by = c.height;
+  const mid = (y) => { const u = y / stemH; return foot + lean * u * u * (3 - 2 * u) - 5 * Math.sin(u * Math.PI * 2); };
+  for (let y = 0; y < stemH; y++) {
+    const slope = mid(y + 0.5) - mid(y - 0.5), w = (16 + 6 * (1 - y / stemH) ** 3 + (y < 3 ? 4 : 0)) * Math.sqrt(1 + slope * slope);
+    const x0 = Math.round(mid(y) - w / 2), x1 = Math.round(mid(y) + w / 2);
+    px(g, "#e0d0f0", x0, by - y - 1, x1 - x0, 1);
+    px(g, "#b098c8", x0, by - y - 1, 3, 1);
+    px(g, "#fff4ff", x1 - 2, by - y - 1, 1, 1);
+  }
+  // its sleepy face
+  const fx = Math.round(mid(26)), fy = by - 27;
+  if (awake) {
+    px(g, "#3a1448", fx - 6, fy, 4, 2); px(g, "#ffffff", fx - 5, fy, 1, 1);
+    px(g, "#3a1448", fx + 2, fy, 4, 2); px(g, "#ffffff", fx + 3, fy, 1, 1);
+    px(g, "#3a1448", fx - 2, fy + 5, 4, 3);
+  } else {
+    px(g, "#3a1448", fx - 6, fy + 1, 4, 1); px(g, "#3a1448", fx - 7, fy, 1, 1);
+    px(g, "#3a1448", fx + 2, fy + 1, 4, 1); px(g, "#3a1448", fx + 6, fy, 1, 1);
+    px(g, "#3a1448", fx - 1, fy + 6, 2, 1);
+  }
+  px(g, "#ff9af0", fx - 9, fy + 3, 2, 1);
+  px(g, "#ff9af0", fx + 7, fy + 3, 2, 1);
+  // the cap, drooping at the rim
+  const cx = mid(stemH), top = by - stemH - capH;
+  for (let x = -capW / 2; x <= capW / 2; x++) {
+    const t = x / (capW / 2), h = Math.round(capH * (1 - t * t)), droop = Math.abs(t) > 0.6 ? Math.round((Math.abs(t) - 0.6) * 12) : 0, base = top + capH + droop;
+    px(g, "#1e0830", Math.round(cx + x), base - h - 1, 1, h + 2);
+    for (let y = base - h; y < base; y++) px(g, y - (base - h) < 4 ? "#c070f0" : base - y < 4 ? "#4a1c72" : "#7a2ec0", Math.round(cx + x), y);
+    if (Math.abs(x) < capW / 2 - 3) px(g, x % 2 ? "#4a1c72" : "#2a0e38", Math.round(cx + x), base + 1, 1, 2);
+  }
+  for (const [dx, dy, w] of [[-20, 9, 6], [-6, 4, 7], [10, 7, 5], [20, 12, 4], [-14, 15, 4], [2, 13, 4]]) px(g, "#e0b0ff", Math.round(cx + dx), top + dy, w, 2);
+  return c;
+}
+
 // ---- The jungle's orbs ----
 
 // The monsoon orb: a gold coin with blue raindrops falling on a wave
@@ -1599,6 +1641,7 @@ function buildSprites() {
     forestTop: [0, 1, 2, 3].map((v) => makeForestTile(v, true)),
     forestSoil: [0, 1, 2, 3].map((v) => makeForestTile(v + 4, false)),
     forestThorns: [0, 1, 2].map(makeForestThorn),
+    sleepShroom: [makeSleepShroom(false), makeSleepShroom(true)], // [asleep, eyes open: about to puff]
     sporeShrooms: Object.fromEntries(Object.keys(SPORE_COLORS).map((k) => [k, [makeSporeShroom(k, -1), makeSporeShroom(k, 1)]])), // [leaning left, leaning right]
     glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big

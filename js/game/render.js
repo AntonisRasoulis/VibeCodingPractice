@@ -38,7 +38,13 @@ const Renderer = (() => {
       b.beginPath();
       b.rect(0, 0, VIEW_W, VIEW_H);
       b.clip();
-      drawView(world, p, world.players[1 - i], camX);
+      // Each player sees their own course: the main one, or the enchanted forest they're in
+      const course = p.realm || world.level, other = world.players[1 - i];
+      const mine = (list) => list.filter((e) => (e.level || world.level) === course);
+      const view = Object.assign(Object.create(world), { level: course, sawBits: mine(world.sawBits), wisps: mine(world.wisps), quakes: mine(world.quakes) });
+      if (p.realm) Object.assign(view, { inForest: true, monsoon: null, missiles: [], bears: [], jaguars: [], decoys: [], arrows: [], vultures: [], hawks: [], sticks: [], burns: [], drones: [], hands: [], bolts: [], monkeys: [], thrownSnowballs: [], grapples: [], vines: [], warps: [] });
+      drawView(view, p, other && other.realm === p.realm && !other.dream ? other : null, camX);
+      drawDream(p, camX, world.time);
       b.restore();
       if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time, p.poisonMax);
     }
@@ -94,6 +100,7 @@ const Renderer = (() => {
     drawRivers(world.level, camX, world.time);
     drawFlytraps(world.level, camX, world.time);
     drawSporeShrooms(world.level, camX);
+    drawSleepShrooms(world.level, camX, world.time);
     drawGroundFires(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
 
@@ -130,6 +137,7 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSnowIce(p, camX, world.time, p === other);
     drawSpores(world.level, camX, world.time); // (in front of the runners, so you see them land on you)
+    drawSleepClouds(world.level, camX, world.time);
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSporeAura(p, camX, world.time, p === other);
     for (const sb of world.thrownSnowballs) b.drawImage(sprites.thrownSnowball, Math.round(sb.x - camX) - 2, Math.round(sb.y) - 2);
     for (const mk of world.monkeys) drawMonkey(mk, camX, world.time);
@@ -155,11 +163,11 @@ const Renderer = (() => {
     drawParticles(player, camX);
     if (snow > 0) drawSnowfall(camX, world.time, snow);
     drawFire(world.fire, player, camX, world.time);
-    const storm = Game.sandstormStrength();
+    const storm = world.inForest ? 0 : Game.sandstormStrength(); // (the forest has its own weather)
     if (storm > 0) drawSandstorm(storm, world.time);
-    const blizzard = Game.snowstormStrength();
+    const blizzard = world.inForest ? 0 : Game.snowstormStrength();
     if (blizzard > 0) drawBlizzard(blizzard, world.time);
-    const monsoon = Game.monsoonStrength();
+    const monsoon = world.inForest ? 0 : Game.monsoonStrength();
     if (monsoon > 0) drawRain(monsoon, world.time);
     if (player.blind > 0 && !player.dead) drawMonkeyHands(player.blind);
   }
@@ -296,6 +304,83 @@ const Renderer = (() => {
       b.globalAlpha = 1;
       b.fillStyle = "#ffffe0";
       b.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+  }
+
+  // ---- The giant sleep mushroom (the way into the forest) ----
+
+  function drawSleepShrooms(level, camX, time) {
+    for (const g of level.sleepShrooms) {
+      const img = sprites.sleepShroom[level.sleepCloud(g, time).warn ? 1 : 0], x = Math.round(g.x - camX - img.width / 2);
+      if (x > VIEW_W || x + img.width < 0) continue;
+      b.drawImage(img, x, g.gy - img.height);
+    }
+  }
+
+  // Its cloud of sleep spores: swirling purple and pink, billowing out and clearing, with Zs rising from it
+  function drawSleepClouds(level, camX, time) {
+    const S = SLEEP_SHROOM;
+    for (const g of level.sleepShrooms) {
+      const cx = g.x + S.lean - camX, cy = g.gy - S.cloudH;
+      if (cx < -60 || cx > VIEW_W + 60) continue;
+      const c = level.sleepCloud(g, time);
+      if (c.strength <= 0) {
+        // resting: just a few spores drifting about under its cap
+        for (let k = 0; k < 4; k++) drawGlowAt("pink", 0, cx + Math.sin(time * 0.7 + k * 1.7) * 20, cy - 8 + Math.cos(time * 0.5 + k) * 6, 0.4);
+        continue;
+      }
+      for (let k = 0; k < 80; k++) {
+        const a = k * 2.399 + time * (k % 2 ? 0.6 : -0.5), r = (0.15 + 0.85 * ((k * 0.618) % 1)) * c.strength;
+        const x = cx + Math.cos(a) * S.cloudW * r, y = cy + Math.sin(a) * S.cloudH * r + Math.sin(time * 2 + k) * 2;
+        if (y > g.gy) continue;
+        drawGlowAt(k % 3 ? "thorn" : "pink", k % 4 ? 0 : 1, x, y, 0.45 * c.strength);
+        b.fillStyle = k % 3 ? "#e0b0ff" : "#ffd0f4";
+        b.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+      b.fillStyle = "#e0b0ff"; // Zs drifting up out of it
+      for (let k = 0; k < 3; k++) {
+        const u = (time * 0.4 + k / 3) % 1, zx = Math.round(cx + 10 + k * 6 + Math.sin(u * 6) * 3), zy = Math.round(g.gy - 70 - u * 30);
+        b.globalAlpha = c.strength * (1 - u);
+        b.fillRect(zx, zy, 3, 1); b.fillRect(zx + 1, zy + 1, 1, 1); b.fillRect(zx, zy + 2, 3, 1);
+      }
+      b.globalAlpha = 1;
+    }
+  }
+
+  // Falling asleep / waking up: your screen goes dark (Zs rising while you fall asleep), then clears.
+  // On the way out of the forest, fireflies swarm round you first, until they're all that's left.
+  function drawDream(p, camX, time) {
+    const d = p.dream;
+    if (!d) return;
+    const cx = p.x + HITBOX_W / 2 - camX, cy = p.y + HITBOX_H / 2;
+    if (d.kind === "fireflies" && !d.moved) {
+      const u = Math.min(1, d.t / SLEEP_SHROOM.fireflies);
+      if (u > 0.4) drawGlowAt("firefly", 2, cx, cy, (u - 0.4) * 1.4); // (all glowing together into one ball of light)
+      for (let k = 0; k < 40; k++) {
+        const a = k * 2.399 + time * (2 + (k % 3)), r = (24 - 17 * u) * (0.45 + 0.55 * ((k * 0.618) % 1)) + (k % 5 === 0 ? 3 * (1 - u) : 0);
+        const fx = cx + Math.cos(a) * r, fy = cy + Math.sin(a) * r * 0.85 - (1 - u) * 4 * Math.sin(k);
+        const on = Math.sin(time * 6 + k * 1.3) > -0.4 || u > 0.6; // (blinking, then all glowing together)
+        if (!on) continue;
+        drawGlowAt("firefly", u > 0.5 ? 1 : 0, fx, fy, 0.7 + 0.3 * u);
+        b.fillStyle = "#ffffe0";
+        b.fillRect(Math.round(fx), Math.round(fy), 1, 1);
+      }
+    }
+    const dark = Game.dreamDark(p);
+    if (dark > 0) {
+      b.fillStyle = `rgba(14, 6, 26, ${dark})`;
+      b.fillRect(0, 0, VIEW_W, VIEW_H);
+      if (d.kind === "sleep" && !d.moved) { // Zzz
+        b.fillStyle = "#e0b0ff";
+        for (let k = 0; k < 3; k++) {
+          const u = (d.t * 1.2 + k / 3) % 1, w = 5 + 2 * k, zx = Math.round(cx + 6 + k * 9 + Math.sin(u * 5) * 2), zy = Math.round(cy - 12 - k * 11 - u * 10);
+          b.globalAlpha = Math.min(1, dark * 1.5) * (1 - u * 0.6);
+          b.fillRect(zx, zy, w, 1); // a Z: top, the diagonal, bottom
+          for (let j = 1; j < w - 1; j++) b.fillRect(zx + w - 1 - j, zy + j, 1, 1);
+          b.fillRect(zx, zy + w - 1, w, 1);
+        }
+        b.globalAlpha = 1;
+      }
     }
   }
 
@@ -2757,6 +2842,21 @@ const Renderer = (() => {
     const shake = p.dashHold > 0 ? Math.round(Math.sin(p.dashHold * 90)) : 0; // trembling before a dash
     const x = Math.round(p.x - camX) - 1 + shake;
     const y = Math.round(p.y) - 1;
+    if (p.lying || (p.dream && p.dream.kind === "sleep")) { // asleep, or just woken up: lying on your back
+      b.save();
+      b.translate(x + 4, y + 12);
+      b.rotate(-Math.PI / 2 * (p.dream && p.dream.kind === "sleep" && !p.dream.moved ? Math.min(1, p.dream.t / 0.25) : 1));
+      b.drawImage(frame, -4, -12);
+      b.restore();
+      return;
+    }
+    if (p.dream && p.dream.kind === "fireflies") { // fading away inside the swarm
+      const fade = b.globalAlpha;
+      b.globalAlpha = fade * Math.max(0, 1 - p.dream.t / (SLEEP_SHROOM.fireflies * 0.8));
+      b.drawImage(p.facing < 0 ? sprites.runners[p.palette.name].idle : frame, x, y);
+      b.globalAlpha = fade;
+      return;
+    }
     if (p.warp) { // going into a portal, or coming out of one: shrinking or growing, and turning
       if (p.warp.scale <= 0.05) return;
       b.save();

@@ -77,6 +77,8 @@ class Level {
     this.colBiome = [];       // colBiome[x] = which biome each column is in
     this.ice = [];            // ice[x] = true where the ground's surface is slippery ice
     this.signs = [];          // wooden signs where a new biome starts
+    this.sleepShrooms = [];   // giant sleep mushrooms (the way into the enchanted forest): { id, x (its foot), gy, seed, forest }
+    this.realmEnd = options.realmEnd; // (an enchanted forest you're sent to: where it ends, pixels)
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
     this.bearSpots = [];      // twice per snow biome: when the leader gets here, a bear charges in
@@ -299,7 +301,29 @@ class Level {
     if (this.shooters.some((s) => s.float ? this.floatThreat(s, x, y) : Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
+    if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.cloudW + HITBOX_W)) return true; // (no waiting in its cloud)
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
+  }
+
+  // A sleep mushroom's cloud right now: { strength (0 none .. 1 full), warn (its eyes open: about to puff) }.
+  // Its puffs (3-10 s each, with a 10 s rest after) are worked out from the clock, so both players see the same.
+  sleepCloud(g, time) {
+    const S = SLEEP_SHROOM, len = (k) => S.puff[0] + hash(k, g.id) * (S.puff[1] - S.puff[0]);
+    const T = time + g.seed * (S.puff[1] + S.rest); // (each mushroom at its own point in its cycle)
+    let m = g.memo && g.memo.start <= T ? g.memo : { k: 0, start: 0 }; // (where the current puff started: time only goes forward)
+    while (T >= m.start + len(m.k) + S.rest) m = { k: m.k + 1, start: m.start + len(m.k) + S.rest };
+    g.memo = m;
+    const t = T - m.start, on = len(m.k);
+    const strength = t < on ? Math.min(1, t / S.grow) : Math.max(0, 1 - (t - on) / S.fade);
+    return { strength, warn: t < on || t > on + S.rest - S.warn };
+  }
+
+  // Is (x, y) in a sleep mushroom's cloud, as it is now?
+  inSleepCloud(g, x, y, time) {
+    const c = this.sleepCloud(g, time);
+    if (c.strength < 0.35) return false;
+    const r = c.strength, cx = g.x + SLEEP_SHROOM.lean, cy = g.gy - SLEEP_SHROOM.cloudH;
+    return ((x - cx) / (SLEEP_SHROOM.cloudW * r)) ** 2 + ((y - cy) / (SLEEP_SHROOM.cloudH * r)) ** 2 <= 1;
   }
 
   // The spores drifting down from under a spore mushroom's cap right now: [{x, y, f (0 at the cap, 1 at the ground)}].
@@ -615,6 +639,11 @@ class Level {
   // ---- Sections ----
 
   addSection() {
+    if (this.realmEnd !== undefined && this.col * TILE >= this.realmEnd) return this.flat(20, false); // (the forest's over: the fireflies come)
+    if (this.sleepAt !== undefined && this.col >= this.sleepAt) {
+      this.sleepAt = undefined;
+      if (this.col >= SLEEP_SHROOM.from) return SECTIONS.sleepShroom.call(this);
+    }
     if (this.col >= this.stretchEnd) {
       this.addBiomeEvents(MISSILE.stretch);
       this.stretchEnd += MISSILE.stretch;
@@ -626,7 +655,7 @@ class Level {
     const weights = { flat: 1, step: 2, spikes: 4, gap: 4, floating: 2, moving: 2, falling: 2, portal: 1, mace: 4 };
     if (this.col > 60) Object.assign(weights, { shooter: 5, saw: 5 });
     if (this.col > 60 && this.biome === "prairie") Object.assign(weights, { trap: 1, bush: 2 });
-    if (this.col > 120 && this.col - this.lastOrbCol > ORBS.gap) weights.orb = ORBS.weight[this.biome]; // about 3 orbs per biome
+    if (this.col > 120 && this.col - this.lastOrbCol > ORBS.gap && this.realmEnd === undefined) weights.orb = ORBS.weight[this.biome]; // about 3 orbs per biome (none in the forest)
     if (this.biome === "snow") Object.assign(weights, { ice: 4, icicles: 5, snowball: 3 });
     if (this.biome === "snow" && this.col > 60) weights.thinIce = 4;
     if (this.biome === "desert") Object.assign(weights, { quicksand: 5, tumbleweed: 4 });
@@ -944,6 +973,8 @@ class Level {
 
   // Each biome's special danger. Snow: two bears, at random spots in the biome (at least 70 m apart).
   addBiomeEvents(length) {
+    // somewhere in it, a giant sleep mushroom (not in the forest itself)
+    if (this.realmEnd === undefined && this.biome !== "forest") this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
     if (this.biome === "prairie") {
       // Missiles: usually 2 (MISSILE.perBiome), spread out across the biome
       const n = Number(this.pickWeighted(MISSILE.perBiome));
@@ -1112,6 +1143,13 @@ const SECTIONS = {
       phase: this.rng(),
     });
     this.flat(Math.max(6, height + 5));
+  },
+
+  // The way into the enchanted forest: a giant sleep mushroom, with flat ground all round it
+  sleepShroom() {
+    this.flat(14, false);
+    this.sleepShrooms.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, seed: this.rng(), forest: null });
+    this.flat(16, false);
   },
 
   // The forest's: a big mushroom dropping spores (red: faster, blue: jump higher, green: poison, pink: float)

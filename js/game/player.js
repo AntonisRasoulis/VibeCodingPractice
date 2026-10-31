@@ -79,6 +79,9 @@ class Player {
     this.stormHits = 0;           // ...and how many jumps we've cracked the ice with
     this.iceLock = 0;             // seconds left frozen by a snowball (no way out)
     this.skate = 0;               // seconds left on skates (faster on ice)
+    this.realm = null;            // the enchanted forest we're in (null: the main course)
+    this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
+    this.lying = false;           // just woken up, still lying down
     this.spores = { red: 0, blue: 0, pink: 0 }; // seconds left of each spore mushroom's effect (forest): faster, higher jumps, floating
     this.poisonMax = TURRET.poison; // how long the poison we have lasts in all (for how it looks)
     this.flood = null;            // a monsoon's flood: { surface } (nothing can hurt us while it's up)

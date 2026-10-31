@@ -132,9 +132,13 @@ const Game = (() => {
 
     level.ensure(Math.max(...players.map((p) => p.x)) + VIEW_W * 2);
     level.update(world.time);
+    for (const f of forests()) {
+      f.ensure(Math.max(...players.filter((p) => p.realm === f).map((p) => p.x)) + VIEW_W * 2);
+      f.update(world.time);
+    }
 
     if (world.state === "ending") {
-      for (const p of players) p.update(dt, NO_INPUT, level);
+      for (const p of players) p.update(dt, NO_INPUT, p.realm || level);
       world.endTimer -= dt;
       if (world.endTimer <= 0) {
         world.state = "over";
@@ -144,8 +148,17 @@ const Game = (() => {
     }
 
     const inputs = players.map((p, i) => readInput(i));
-    players.forEach((p, i) => p.update(dt, inputs[i], level));
-    players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
+    players.forEach((p, i) => p.update(dt, inputs[i], p.realm || level)); // (each on their own course: the main one, or a forest)
+    updateDreams(dt);
+    // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
+    onCourse(level, () => mainCourse(dt, inputs));
+    for (const f of forests()) onCourse(f, () => { updateLooseSaws(dt); updateSpores(); levelSounds(); });
+    checkFire();
+  }
+
+  function mainCourse(dt, inputs) {
+    world.players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
+    updateSleepShrooms();
     updateMonsoon(dt);
     const flooded = world.monsoon !== null; // (while it's flooded, every danger waits)
     updateDrones(dt);
@@ -180,7 +193,6 @@ const Game = (() => {
     checkThinIce();
     checkTrapRescue();
     levelSounds();
-    checkFire();
   }
 
   // Running into someone stuck in a bear trap knocks them out of it... and you're caught in it instead
@@ -256,7 +268,7 @@ const Game = (() => {
       if (orb.purple && world.monsoon) continue; // (not while it's flooded)
       for (const p of world.players) {
         const other = p === a ? b : a;
-        if (p.dead || p.held || (orb.kind === "swap" && other.dead)) continue;
+        if (p.dead || p.held || p.caught || (orb.kind === "swap" && (!other || other.dead || other.caught))) continue;
         if (overlaps(p.x, p.y, HITBOX_W, HITBOX_H, orb.x, orb.y, orb.w, orb.h)) {
           orb.used = true;
           if (orb.kind === "zap" || orb.kind === "hand" || orb.kind === "wind" || orb.kind === "drone" || orb.kind === "firehawk" || orb.kind === "snowball" || orb.kind === "monkey") {
@@ -1101,7 +1113,7 @@ const Game = (() => {
       if (st.t >= SANDSTORM.time) world.sandstorm = null;
     }
     const s = sandstormStrength();
-    for (const p of world.players) p.windPush = s * SANDSTORM.push * (st && p === st.owner ? SANDSTORM.ownPush : 1);
+    for (const p of world.players) p.windPush = p.caught ? 0 : s * SANDSTORM.push * (st && p === st.owner ? SANDSTORM.ownPush : 1);
   }
 
   // ---- The jungle's orbs: monsoon and monkey ----
@@ -1226,7 +1238,7 @@ const Game = (() => {
       level.platforms = level.platforms.filter((p) => !gone.includes(p));
     }
     if (!m.draining) fillFloodLogs();
-    for (const p of players) p.flood = { surface: surf };
+    for (const p of players) p.flood = p.caught ? null : { surface: surf };
   }
 
   // The monkey swings in from the top of the screen on its vine, sweeping through the other player
@@ -1366,6 +1378,116 @@ const Game = (() => {
     world.monkeys = world.monkeys.filter((mk) => !mk.done);
   }
 
+  // ---- Getting into the enchanted forest (the giant sleep mushroom) and out (the fireflies) ----
+
+  // The enchanted forests anyone is in right now (each is a course of its own, alongside the main one)
+  function forests() {
+    return [...new Set(world.players.map((p) => p.realm).filter(Boolean))];
+  }
+
+  // Run f with `course` as the course, and everyone who isn't on it (or is on their way between the two)
+  // counted as out of the race for a moment
+  function onCourse(course, f) {
+    const main = world.level, off = world.players.filter((p) => (p.realm || main) !== course || p.dream);
+    for (const p of off) { p.wasCaught = p.caught; p.caught = true; }
+    world.level = course;
+    try { f(); } finally {
+      world.level = main;
+      for (const p of off) p.caught = p.wasCaught;
+    }
+  }
+
+  // Walk into a sleep mushroom's cloud and you fall asleep
+  function updateSleepShrooms() {
+    const { level } = world;
+    for (const p of world.players) {
+      if (p.dead || p.caught || p.held || p.dream) continue;
+      const g = level.sleepShrooms.find((m) => Math.abs(m.x - p.x) < 80 && level.inSleepCloud(m, p.x + HITBOX_W / 2, p.y + HITBOX_H / 2, world.time));
+      if (!g) continue;
+      p.dream = { kind: "sleep", t: 0, gate: g };
+      p.held = true;
+      p.vx = p.vy = 0;
+      p.inQuick = false;
+      p.inRiver = null;
+      p.trapped = 0;
+      Sound.play("fallAsleep");
+    }
+  }
+
+  // Falling asleep and waking up in the forest, and the fireflies taking you back out at its end
+  function updateDreams(dt) {
+    const S = SLEEP_SHROOM;
+    for (const p of world.players) {
+      if (!p.dream) {
+        // the end of the forest: the fireflies come for you
+        if (p.realm && !p.dead && !p.caught && !p.held && p.x >= p.realm.realmEnd) {
+          p.dream = { kind: "fireflies", t: 0 };
+          p.held = true;
+          p.vx = p.vy = 0;
+          Sound.play("fireflies");
+        }
+        continue;
+      }
+      const d = p.dream;
+      d.t += dt;
+      if (p.caught) { p.dream = null; continue; } // (the fire got you while you slept)
+      const out = d.kind === "fireflies" ? S.fireflies : 0; // (the fireflies first, then the same fade as falling asleep)
+      if (!d.moved && d.t >= out + S.sleep) {
+        d.moved = true;
+        if (d.kind === "sleep") {
+          if (!d.gate.forest) d.gate.forest = makeForest(d.gate);
+          moveTo(p, d.gate.forest, p.x);
+        } else moveTo(p, null, p.x);
+        p.lying = true;
+        Sound.play("wakeUp");
+      }
+      if (d.t >= out + S.sleep + S.wake) {
+        p.dream = null;
+        p.held = false;
+        p.lying = false;
+      }
+    }
+  }
+
+  // How dark someone's screen is (0..1) while they fall asleep or wake up
+  function dreamDark(p) {
+    const d = p.dream, S = SLEEP_SHROOM;
+    if (!d) return 0;
+    const t = d.t - (d.kind === "fireflies" ? S.fireflies : 0);
+    if (t < 0) return 0;
+    return t < S.sleep ? t / S.sleep : Math.max(0, 1 - (t - S.sleep) / S.wake);
+  }
+
+  // A new enchanted forest for a sleep mushroom: it covers the same stretch as the main course from where
+  // the mushroom stands (calm ground where you wake up), 100-250 tiles long, then flat ground (the fireflies)
+  function makeForest(g) {
+    const c0 = Math.floor(g.x / TILE) + 20;
+    const len = Math.round(SLEEP_SHROOM.forest[0] + Math.random() * (SLEEP_SHROOM.forest[1] - SLEEP_SHROOM.forest[0]));
+    const f = new Level(Math.floor(Math.random() * 1e9), "forest", { solo: world.solo, biomes: false, wild: world.wild, realmEnd: (c0 + len) * TILE });
+    f.flat(Math.max(1, c0 - f.col), false);
+    f.update(world.time);
+    return f;
+  }
+
+  // Put someone on a course (realm: a forest, or null for the main course) at x, on safe ground near there
+  function moveTo(p, realm, x) {
+    const course = realm || world.level;
+    course.ensure(x + VIEW_W * 2);
+    const g = course.groundTop(x + HITBOX_W / 2);
+    let spot = g !== null && course.groundTop(x + 1) === g && course.groundTop(x + HITBOX_W - 1) === g && !course.threatened(x, g - HITBOX_H) ? { x, y: g - HITBOX_H } : null;
+    if (!spot) {
+      const before = course.safeSpotBefore(x), after = course.safeSpotAfter(x);
+      spot = before && (!after || x - before.x <= after.x - x) ? before : after || before || { x, y: 40 };
+    }
+    p.realm = realm;
+    Object.assign(p, { x: spot.x, y: spot.y, vx: 0, vy: 0, onGround: true, standingOn: null, inQuick: false, inRiver: null, inSink: null, inPond: null, onPond: null, hiddenIn: null, eatenBy: null, trapped: 0 });
+    p.safeSpots = [{ x: spot.x, y: spot.y }];
+    // (the things each player keeps track of on a course belong to the one they've left)
+    for (const m of [p.fallState, p.icicleState, p.coconutState, p.trapState, p.tumbleStarted, p.snowballStarted]) m.clear();
+    p.tumbleweeds = [];
+    p.snowballs = [];
+  }
+
   // ---- The enchanted forest's spore mushrooms ----
 
   const SPORE_LOOK = { red: ["FAST!", "#ff6a7a"], blue: ["SUPER JUMP!", "#6ab8ff"], green: ["POISONED!", "#9aff6a"], pink: ["FLOATING!", "#ff9af0"] };
@@ -1411,7 +1533,7 @@ const Game = (() => {
         // the forest's magic creeping in to where it's held, as it shakes (just a few faint wisps)
         if (world.time >= s.breakAt - FOREST.sawWarn && Math.random() < dt * 14) {
           const a = Math.random() * Math.PI * 2, t = 0.4 + Math.random() * 0.2;
-          world.wisps.push({ x: c.x + Math.cos(a) * (s.r + 6), y: c.y + Math.sin(a) * (s.r + 4), vx: -Math.cos(a) * (s.r + 6) / t, vy: -Math.sin(a) * (s.r + 4) / t, t, max: t, pink: Math.random() < 0.3, ph: Math.random() * 6, faint: true });
+          world.wisps.push({ level: world.level, x: c.x + Math.cos(a) * (s.r + 6), y: c.y + Math.sin(a) * (s.r + 4), vx: -Math.cos(a) * (s.r + 6) / t, vy: -Math.sin(a) * (s.r + 4) / t, t, max: t, pink: Math.random() < 0.3, ph: Math.random() * 6, faint: true });
         }
         if (world.time < s.breakAt) continue;
         if (c.y > s.gy + 2 || !runners.length) { s.breakAt += 0.2; continue; } // (down in its pit: wait until it's up)
@@ -1423,17 +1545,17 @@ const Game = (() => {
         s.loose = { x: c.x, y: c.y, vy, dir, rolling: false, from: c.x, angle: 0 };
         for (let k = 0; k < 8; k++) { // a soft puff of the magic that snapped it free
           const a = (k / 8) * Math.PI * 2, t = 0.35 + Math.random() * 0.2;
-          world.wisps.push({ x: c.x, y: c.y, vx: Math.cos(a) * 45, vy: Math.sin(a) * 35 - 10, t, max: t, pink: k % 2 === 0, ph: k, faint: true });
+          world.wisps.push({ level: world.level, x: c.x, y: c.y, vx: Math.cos(a) * 45, vy: Math.sin(a) * 35 - 10, t, max: t, pink: k % 2 === 0, ph: k, faint: true });
         }
         sawBurst(s, c.x, c.y, 30, ["#4a2468", "#8a5ab0", "#2c1640", "#ff7ae0", "#ffd0f4"], 200); // its pole (or slot) bursting apart
-        world.quakes.push({ x: c.x, t: 0.4 });
+        world.quakes.push({ level: world.level, x: c.x, t: 0.4 });
         Sound.play("sawBreak");
       }
       const L = s.loose;
       // the forest's magic driving it on: wisps streaming off behind it, curling up and fading
       if (Math.random() < dt * 32) {
         const t = 0.7 + Math.random() * 0.5;
-        world.wisps.push({ x: L.x - L.dir * s.r * (0.2 + Math.random() * 0.7), y: L.y - Math.random() * s.r, vx: -L.dir * (10 + Math.random() * 20), vy: -12 - Math.random() * 18, t, max: t, pink: Math.random() < 0.4, ph: Math.random() * 6 });
+        world.wisps.push({ level: world.level, x: L.x - L.dir * s.r * (0.2 + Math.random() * 0.7), y: L.y - Math.random() * s.r, vx: -L.dir * (10 + Math.random() * 20), vy: -12 - Math.random() * 18, t, max: t, pink: Math.random() < 0.4, ph: Math.random() * 6 });
       }
       L.x += L.dir * FOREST.sawSpeed * dt;
       L.angle += (L.dir * FOREST.sawSpeed * dt) / s.r * (L.rolling ? 1 : 1.6);
@@ -1441,7 +1563,7 @@ const Game = (() => {
       if (L.rolling) {
         if (ground === null || ground > L.y + 2) { L.rolling = false; L.vy = 0; } // off an edge: it falls
         else L.y = ground; // (up a step, it hops up onto it)
-        if (Math.random() < dt * 45) world.sawBits.push({ x: L.x - L.dir * s.r * 0.7, y: L.y - 1, vx: -L.dir * (40 + Math.random() * 80), vy: -70 - Math.random() * 100, t: 0.45, c: Math.random() < 0.5 ? "#3c2148" : "#a24cf0", big: Math.random() < 0.4 }); // dirt thrown up behind it
+        if (Math.random() < dt * 45) world.sawBits.push({ level: world.level, x: L.x - L.dir * s.r * 0.7, y: L.y - 1, vx: -L.dir * (40 + Math.random() * 80), vy: -70 - Math.random() * 100, t: 0.45, c: Math.random() < 0.5 ? "#3c2148" : "#a24cf0", big: Math.random() < 0.4 }); // dirt thrown up behind it
       } else {
         L.vy += FOREST.sawGravity * dt;
         const was = L.y;
@@ -1451,7 +1573,7 @@ const Game = (() => {
           L.y = ground;
           L.rolling = true;
           sawBurst(s, L.x, ground, 24, ["#3c2148", "#2a1634", "#a24cf0", "#ff9af0", "#ffd0f4"], 170);
-          world.quakes.push({ x: L.x, t: 0.35 });
+          world.quakes.push({ level: world.level, x: L.x, t: 0.35 });
           Sound.play("sawSlam");
         }
       }
@@ -1487,7 +1609,7 @@ const Game = (() => {
     for (let k = 0; k < n; k++) {
       const a = -Math.PI * (0.1 + 0.8 * Math.random());
       const v = speed * (0.4 + Math.random() * 0.8);
-      world.sawBits.push({ x: x + (Math.random() - 0.5) * s.r, y: y - Math.random() * s.r * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0.5 + Math.random() * 0.5, c: colors[k % colors.length], big: k % 3 !== 2 });
+      world.sawBits.push({ level: world.level, x: x + (Math.random() - 0.5) * s.r, y: y - Math.random() * s.r * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0.5 + Math.random() * 0.5, c: colors[k % colors.length], big: k % 3 !== 2 });
     }
   }
 
@@ -1765,7 +1887,7 @@ const Game = (() => {
       if (st.t >= SNOWSTORM.time) world.snowstorm = null;
     }
     const on = snowstormStrength() >= 0.5;
-    for (const p of world.players) p.snowstorm = on;
+    for (const p of world.players) p.snowstorm = on && !p.caught;
   }
 
   // Thrown the way you face, from about shoulder height, in a short low arc
@@ -1802,7 +1924,7 @@ const Game = (() => {
 
   // Off it goes: out to the other player with a burning stick, or (alone) to circle you
   function launchHawk(p) {
-    const other = world.players.find((q) => q !== p);
+    const other = world.players.find((q) => q !== p && !q.caught);
     const guard = world.solo || !other;
     world.hawks.push({ mode: guard ? "guard" : "attack", owner: p, target: other, x: p.x + HITBOX_W / 2, y: p.y - 6, t: 0, angle: -Math.PI / 2, facing: 1, flap: 0 });
     Sound.play("hawkScreech");
@@ -2408,6 +2530,7 @@ const Game = (() => {
   }
 
   return {
+    dreamDark,
     sandstormStrength,
     floodSurface,
     monsoonStrength: () => (world.monsoon ? Math.max(0, Math.min(1, world.monsoon.t / 0.6, (MONSOON.time - world.monsoon.t) / 0.6)) : 0),
