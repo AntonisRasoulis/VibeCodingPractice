@@ -134,8 +134,7 @@ const Renderer = (() => {
     drawIceBlocks(world.level, camX); // anyone frozen in a pond, in their block of ice
     drawQuicksand(world.level, camX, world.time); // on top, so anyone stuck in it looks half sunk
     drawRiverFronts(world.level, camX, world.time); // ...and anyone in a river is up to their neck
-    drawBridges(world.level, camX, world.time); // magic bridges: over the water and the quicksand
-    for (const p of [player, other]) if (p && p.magicFeet && !p.dead && !p.caught && !p.hiddenIn) drawMagicFeet(p, camX, world.time);
+    for (const p of [player, other]) if (p && !p.hiddenIn) drawBridgeMagic(p, camX, world.time, p === other); // held up over a hole by magic
     drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
@@ -1560,9 +1559,7 @@ const Renderer = (() => {
 
   // ---- The enchanted forest's gift: magic bridges ----
 
-  let bridgeStyle = "light"; // (mockups: "light", "runes" or "fireflies")
-
-  // How solid a magic bridge looks: fading in, then (once everyone's left it) flickering as it fades away
+  // How strong a magic bridge's magic is: fading in, then (once everyone's left it) flickering as it fades away
   function bridgeAlpha(br) {
     const M = MAGIC_FEET;
     const fadeIn = Math.min(1, br.t / M.fadeIn);
@@ -1571,82 +1568,28 @@ const Renderer = (() => {
     return fadeIn * (1 - u) * (Math.floor(br.idle * 14) % 2 ? 0.45 : 1);
   }
 
-  function drawBridges(level, camX, time) {
-    const px = (c, x, y, w = 1, h = 1) => { b.fillStyle = c; b.fillRect(x, y, w, h); };
-    for (const br of level.platforms) {
-      if (br.kind !== "bridge") continue;
-      const x0 = Math.round(br.x - camX), y = Math.round(br.y), w = br.w;
-      if (x0 > VIEW_W + 8 || x0 + w < -8) continue;
-      const fade = b.globalAlpha;
-      b.globalAlpha = fade * bridgeAlpha(br);
-      // it fades in from the middle out to both banks
-      const grow = Math.min(1, br.t / MAGIC_FEET.fadeIn);
-      const half = Math.ceil((w / 2) * (0.25 + 0.75 * grow));
-      const a = x0 + Math.floor(w / 2) - half, len = half * 2;
-      if (bridgeStyle === "light") {
-        // a band of purple light, bright on top, with a soft shimmer hanging under it and sparkles running along it
-        for (let k = 0; k < len; k++) {
-          const x = a + k;
-          for (let d = 4; d < 10; d++) if (hash(x + camX + 977 * Math.floor(time * 6), d) < 0.5 - d * 0.045) px("#9a66ff", x, y + d);
-        }
-        px("#3a1d6e", a, y + 4, len, 1);
-        px("#8a5cff", a, y + 3, len, 1);
-        px("#c792ff", a, y + 1, len, 2);
-        px("#f6e6ff", a, y, len, 1);
-        for (let k = 0; k < len; k += 9) {
-          const s = (k * 7 + Math.floor(time * 20)) % len;
-          if (Math.sin(time * 9 + k) > 0) px("#ffffff", a + s, y + 1, 1, 1);
-        }
-        px("#f6e6ff", a - 1, y - 1, 1, 5); // glowing ends
-        px("#f6e6ff", a + len, y - 1, 1, 5);
-        drawGlowAt("pink", 0, a, y + 1, 0.6);
-        drawGlowAt("pink", 0, a + len, y + 1, 0.6);
-      } else if (bridgeStyle === "runes") {
-        // a row of floating stepping stones, each with a glowing rune, bobbing out of step
-        for (let k = 0; k + 6 <= len; k += 8) {
-          const bob = Math.round(Math.sin(time * 3 + k * 0.7) * 0.6);
-          const sx = a + k + 1, sy = y + bob;
-          drawGlowAt("pink", 0, sx + 3, sy + 2, 0.5);
-          px("#1e1238", sx, sy, 6, 4);
-          px("#4a2e86", sx, sy, 6, 1);
-          px("#2e1d58", sx, sy + 1, 6, 2);
-          const r = Math.floor(hash(k, 9) * 3);
-          px("#f0c8ff", sx + 1 + r, sy + 1, 1, 1);
-          px("#e2a6ff", sx + 2, sy + 2, 2, 1);
-          if (Math.sin(time * 5 + k) > 0.3) px("#ffffff", sx + 1 + r, sy + 1, 1, 1);
-        }
-      } else {
-        // fireflies holding hands: a twinkling line of little lights
-        b.globalAlpha = fade * bridgeAlpha(br) * 0.35;
-        px("#f4ff6a", a, y + 1, len, 1);
-        b.globalAlpha = fade * bridgeAlpha(br);
-        for (let k = 0; k < len; k += 2) {
-          const tw = Math.sin(time * 7 + hash(k, 5) * 20);
-          const dy = Math.round(Math.sin(time * 4 + k * 0.5));
-          px(tw > 0.5 ? "#ffffff" : tw > -0.3 ? "#f4ff6a" : "#9fd84a", a + k, y + dy + (k % 4 ? 0 : 1), 1, 1);
-        }
-        for (let k = 4; k < len; k += 12) drawGlowAt("firefly", 0, a + k, y + 1, 0.5);
-      }
-      b.globalAlpha = fade;
+  // Someone held up over a hole by a magic bridge: no bridge to see, just the same magic that keeps the
+  // forest's spike shooters afloat (a faint pink glow, sparkles drifting down), right under their feet
+  function drawBridgeMagic(p, camX, time, ghost) {
+    const br = p.standingOn;
+    if (!br || br.kind !== "bridge" || p.dead || p.caught) return;
+    const fade = b.globalAlpha;
+    b.globalAlpha = fade * bridgeAlpha(br) * (ghost ? 0.6 : 1);
+    const x = Math.round(p.x - camX), y = Math.round(br.y);
+    drawGlowAt("pink", 1, x + HITBOX_W / 2, y + 3, 0.35);
+    const strength = b.globalAlpha;
+    for (let k = 0; k < 5; k++) {
+      const t = (time * 1.2 + k / 5) % 1;
+      b.fillStyle = k % 2 ? "#ff9af0" : "#d9a3ff";
+      b.globalAlpha = strength * (1 - t);
+      b.fillRect(x - 2 + Math.floor(hash(Math.floor(time * 1.2 + k / 5), k) * (HITBOX_W + 4)), y + 1 + Math.round(t * 7), 1, 1);
     }
-  }
-
-  // Magic feet: little purple sparkles at your feet now and then
-  function drawMagicFeet(p, camX, time) {
-    const x = Math.round(p.x - camX), y = Math.round(p.y + HITBOX_H);
-    for (let i = 0; i < 3; i++) {
-      const u = (time * 1.6 + i / 3) % 1;
-      const sx = x + Math.round(hash(Math.floor(time * 1.6 + i / 3), i) * (HITBOX_W + 2)) - 1;
-      b.globalAlpha = (1 - u) * 0.9;
-      b.fillStyle = i ? "#e2a6ff" : "#ffffff";
-      b.fillRect(sx, y - 1 - Math.round(u * 4), 1, 1);
-    }
-    b.globalAlpha = 1;
+    b.globalAlpha = fade;
   }
 
   function drawPlatforms(level, player, camX, time) {
     for (const p of level.platforms) {
-      if (p.kind === "log" || p.kind === "flood" || p.kind === "float" || p.kind === "bridge") continue; // (drawn with their river, the flood, their floating shooter, or drawBridges)
+      if (p.kind === "log" || p.kind === "flood" || p.kind === "float" || p.kind === "bridge") continue; // (drawn with their river, the flood, their floating shooter, or the magic under someone's feet: drawBridgeMagic)
       const sx = Math.round(p.x - camX);
       if (sx > VIEW_W || sx + p.w < 0) continue;
 
@@ -3121,5 +3064,5 @@ const Renderer = (() => {
     }
   }
 
-  return { init, render, resetCameras, swapCameras, camera: (i) => cams[i], setBridgeStyle: (s) => (bridgeStyle = s) };
+  return { init, render, resetCameras, swapCameras, camera: (i) => cams[i] };
 })();
