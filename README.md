@@ -40,6 +40,9 @@ js/game/player.js     A runner: running, jumping, collisions, dying and respawni
 js/game/sprites.js    The pixel art (drawn as text, one letter per pixel)
 js/game/render.js     Draws everything
 js/game/game.js       The game loop: keyboard, fire, swap orbs, who wins
+tools/bundle.py       Bundles everything into one HTML file (for publishing)
+tools/smoke-test.mjs  Starts a race in a headless browser and checks for errors
+CLAUDE.md             A guide for working on the game (how it's built, rules of thumb, what's next)
 ```
 
 ## How the endless level works
