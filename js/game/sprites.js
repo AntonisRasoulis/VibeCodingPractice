@@ -1112,6 +1112,7 @@ function makeForestLayers() {
 // ---- The forest's spore mushrooms ----
 
 const SPORE_COLORS = {
+  sleep: { cap: "#7a2ec0", capHi: "#c070f0", capDk: "#4a1c72", spot: "#e0b0ff", spore: "#d9a3ff" }, // (the sleep mushroom)
   red: { cap: "#e8344a", capHi: "#ff7a8a", capDk: "#a01a30", spot: "#ffe0e6", spore: "#ff6a7a" },
   blue: { cap: "#2f7ae8", capHi: "#7ab8ff", capDk: "#1a4aa0", spot: "#e0f0ff", spore: "#6ab8ff" },
   green: { cap: "#3ab83a", capHi: "#8af07a", capDk: "#1e7a24", spot: "#e8ffd8", spore: "#9aff6a" },
@@ -1121,14 +1122,14 @@ const SPORE_COLORS = {
 // A big spore mushroom: a pale stem that winds like an S as it grows (leaning one way, `lean` -1 or 1),
 // a skirt, gills, and a spotted dome cap that droops at the rim and tips the way it leans. The canvas is
 // 54 wide and 42 tall, with the stem's foot at the bottom middle.
-function makeSporeShroom(kind, lean) {
-  const k = SPORE_COLORS[kind], W = SPORES.capW, capH = SPORES.height - SPORES.stem, stemH = SPORES.stem;
-  const c = makeCanvas(54, SPORES.height + 2);
+function makeSporeShroom(kind, lean, size = SPORES) {
+  const k = SPORE_COLORS[kind], W = size.capW, capH = size.height - size.stem, stemH = size.stem;
+  const c = makeCanvas(W + 2 * size.lean + 2, size.height + 2);
   const g = c.getContext("2d");
-  const foot = 27, by = SPORES.height + 2;
+  const foot = c.width / 2, by = size.height + 2;
   // where the stem's middle is at each height: a smooth S, swinging one way and then back the other on its way up,
   // ending up under the cap (which sits a little to one side)
-  const mid = (y) => { const u = y / stemH; return foot + lean * (SPORES.lean * u * u * (3 - 2 * u) - 5 * Math.sin(u * Math.PI * 2)); };
+  const mid = (y) => { const u = y / stemH; return foot + lean * (size.lean * u * u * (3 - 2 * u) - 5 * Math.sin(u * Math.PI * 2)); };
   for (let y = 0; y < stemH; y++) {
     const u = y / stemH, slope = mid(y + 0.5) - mid(y - 0.5);
     // thick and flared at the foot, thinner at the top; wider rows where it's steep, so it keeps its thickness
@@ -1153,51 +1154,9 @@ function makeSporeShroom(kind, lean) {
     if (Math.abs(x - cx) < W / 2 - 2) px(g, Math.round(x) % 2 ? k.capDk : "#5a2a50", x, base + 1, 1, 2 - (droop(x) > 1 ? 1 : 0)); // gills
   }
   for (const [dx, dy, w] of [[-10, 6, 4], [2, 3, 5], [8, 8, 3], [-3, 9, 3], [11, 6, 2]]) {
-    const x = Math.round(cx + dx * 1), h = shape(x);
+    const x = Math.round(cx + dx * W / 34), h = shape(x);
     if (h !== null && dy < h + droop(x) - 1) px(g, k.spot, x, top + capH + droop(x) - h + dy - 1, w, 2);
   }
-  return c;
-}
-
-// ---- The giant sleep mushroom (the way into the enchanted forest) ----
-
-// About 6 runners tall: a winding pale stem with a sleepy face on it (eyes shut, or open: about to puff),
-// and a wide purple spotted cap. The stem's foot is at the bottom middle of the canvas.
-function makeSleepShroom(awake) {
-  const capW = 64, capH = 22, stemH = 48, lean = SLEEP_SHROOM.lean;
-  const c = makeCanvas(84, stemH + capH + 6);
-  const g = c.getContext("2d");
-  const foot = 42, by = c.height;
-  const mid = (y) => { const u = y / stemH; return foot + lean * u * u * (3 - 2 * u) - 5 * Math.sin(u * Math.PI * 2); };
-  for (let y = 0; y < stemH; y++) {
-    const slope = mid(y + 0.5) - mid(y - 0.5), w = (16 + 6 * (1 - y / stemH) ** 3 + (y < 3 ? 4 : 0)) * Math.sqrt(1 + slope * slope);
-    const x0 = Math.round(mid(y) - w / 2), x1 = Math.round(mid(y) + w / 2);
-    px(g, "#e0d0f0", x0, by - y - 1, x1 - x0, 1);
-    px(g, "#b098c8", x0, by - y - 1, 3, 1);
-    px(g, "#fff4ff", x1 - 2, by - y - 1, 1, 1);
-  }
-  // its sleepy face
-  const fx = Math.round(mid(26)), fy = by - 27;
-  if (awake) {
-    px(g, "#3a1448", fx - 6, fy, 4, 2); px(g, "#ffffff", fx - 5, fy, 1, 1);
-    px(g, "#3a1448", fx + 2, fy, 4, 2); px(g, "#ffffff", fx + 3, fy, 1, 1);
-    px(g, "#3a1448", fx - 2, fy + 5, 4, 3);
-  } else {
-    px(g, "#3a1448", fx - 6, fy + 1, 4, 1); px(g, "#3a1448", fx - 7, fy, 1, 1);
-    px(g, "#3a1448", fx + 2, fy + 1, 4, 1); px(g, "#3a1448", fx + 6, fy, 1, 1);
-    px(g, "#3a1448", fx - 1, fy + 6, 2, 1);
-  }
-  px(g, "#ff9af0", fx - 9, fy + 3, 2, 1);
-  px(g, "#ff9af0", fx + 7, fy + 3, 2, 1);
-  // the cap, drooping at the rim
-  const cx = mid(stemH), top = by - stemH - capH;
-  for (let x = -capW / 2; x <= capW / 2; x++) {
-    const t = x / (capW / 2), h = Math.round(capH * (1 - t * t)), droop = Math.abs(t) > 0.6 ? Math.round((Math.abs(t) - 0.6) * 12) : 0, base = top + capH + droop;
-    px(g, "#1e0830", Math.round(cx + x), base - h - 1, 1, h + 2);
-    for (let y = base - h; y < base; y++) px(g, y - (base - h) < 4 ? "#c070f0" : base - y < 4 ? "#4a1c72" : "#7a2ec0", Math.round(cx + x), y);
-    if (Math.abs(x) < capW / 2 - 3) px(g, x % 2 ? "#4a1c72" : "#2a0e38", Math.round(cx + x), base + 1, 1, 2);
-  }
-  for (const [dx, dy, w] of [[-20, 9, 6], [-6, 4, 7], [10, 7, 5], [20, 12, 4], [-14, 15, 4], [2, 13, 4]]) px(g, "#e0b0ff", Math.round(cx + dx), top + dy, w, 2);
   return c;
 }
 
@@ -1641,8 +1600,8 @@ function buildSprites() {
     forestTop: [0, 1, 2, 3].map((v) => makeForestTile(v, true)),
     forestSoil: [0, 1, 2, 3].map((v) => makeForestTile(v + 4, false)),
     forestThorns: [0, 1, 2].map(makeForestThorn),
-    sleepShroom: [makeSleepShroom(false), makeSleepShroom(true)], // [asleep, eyes open: about to puff]
-    sporeShrooms: Object.fromEntries(Object.keys(SPORE_COLORS).map((k) => [k, [makeSporeShroom(k, -1), makeSporeShroom(k, 1)]])), // [leaning left, leaning right]
+    sleepShroom: makeSporeShroom("sleep", 1, SLEEP_SHROOM), // (like the spore mushrooms, a bit bigger, purple)
+    sporeShrooms: Object.fromEntries(SPORES.kinds.map((k) => [k, [makeSporeShroom(k, -1), makeSporeShroom(k, 1)]])), // [leaning left, leaning right]
     glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow

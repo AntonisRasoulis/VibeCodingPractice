@@ -1402,7 +1402,7 @@ const Game = (() => {
     const { level } = world;
     for (const p of world.players) {
       if (p.dead || p.caught || p.held || p.dream) continue;
-      const g = level.sleepShrooms.find((m) => Math.abs(m.x - p.x) < 80 && level.inSleepCloud(m, p.x + HITBOX_W / 2, p.y + HITBOX_H / 2, world.time));
+      const g = level.sleepShrooms.find((m) => Math.abs(m.x - p.x) < 80 && level.sleepSporeHits(m, p.x, p.y, world.time));
       if (!g) continue;
       p.dream = { kind: "sleep", t: 0, gate: g };
       p.held = true;

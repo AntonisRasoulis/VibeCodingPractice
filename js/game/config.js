@@ -420,18 +420,20 @@ const BEAR = {
 };
 
 // The giant sleep mushroom: the way into the enchanted forest. It stands on the main course (from 500 m
-// on, about once per biome), puffing a cloud of sleep spores now and then: walk into the cloud and you fall
-// asleep, and wake up in the forest. When it's resting you can slip past.
+// on, about once per biome), and now and then lets a slow, light rain of sleep spores fall: one touches you
+// and you fall asleep, and wake up in the forest. When it's resting you can slip past.
 const SLEEP_SHROOM = {
   from: 500,           // not before this many meters
   puff: [3, 10],       // it puffs for a random 3 to 10 seconds...
   rest: 10,            // ...then rests this long, then picks again
-  warn: 0.6,           // its eyes open this long before it puffs
-  grow: 0.4,           // seconds for its cloud to billow out (and SLEEP_SHROOM.fade to clear)
-  fade: 0.6,
-  lean: 8,             // its cap is this far to one side of its foot (its stem winds)
-  cloudW: 36,          // the cloud: this far either side of the cap's middle...
-  cloudH: 26,          // ...and this far up and down from its middle
+  warn: 0.8,           // its cap starts to glow this long before it puffs
+  capW: 42,            // like the spore mushrooms, a bit bigger: its cap's width...
+  height: 48,          // ...how tall it is...
+  stem: 32,            // ...how high the cap's underside is...
+  lean: 9,             // ...and how far over its stem winds
+  rate: 12,            // while it puffs, spores drop from under its cap (this many a second)...
+  fall: 14,            // ...and float slowly down (pixels a second)...
+  drift: 9,            // ...drifting off to one side (left or right, each puff its own way)
   forest: [100, 250],  // how long the forest it sends you to is (tiles)
   sleep: 0.75,         // falling asleep: seconds to fade to dark (with Zs)...
   wake: 0.75,          // ...then waking up in the forest, lying down at first

@@ -301,29 +301,40 @@ class Level {
     if (this.shooters.some((s) => s.float ? this.floatThreat(s, x, y) : Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
-    if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.cloudW + HITBOX_W)) return true; // (no waiting in its cloud)
+    if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.capW / 2 + SLEEP_SHROOM.drift * SLEEP_SHROOM.stem / SLEEP_SHROOM.fall + HITBOX_W)) return true; // (no waiting where its spores fall)
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
 
-  // A sleep mushroom's cloud right now: { strength (0 none .. 1 full), warn (its eyes open: about to puff) }.
-  // Its puffs (3-10 s each, with a 10 s rest after) are worked out from the clock, so both players see the same.
-  sleepCloud(g, time) {
+  // Where a sleep mushroom is in its puffs: { k (which puff), t (seconds since it started), on (how long it lasts),
+  // dir (the way its spores drift: -1 or 1), warn (about to puff) }. Its puffs (3-10 s each, with a 10 s rest after)
+  // are worked out from the clock, so both players see the same.
+  sleepPhase(g, time) {
     const S = SLEEP_SHROOM, len = (k) => S.puff[0] + hash(k, g.id) * (S.puff[1] - S.puff[0]);
     const T = time + g.seed * (S.puff[1] + S.rest); // (each mushroom at its own point in its cycle)
     let m = g.memo && g.memo.start <= T ? g.memo : { k: 0, start: 0 }; // (where the current puff started: time only goes forward)
     while (T >= m.start + len(m.k) + S.rest) m = { k: m.k + 1, start: m.start + len(m.k) + S.rest };
     g.memo = m;
     const t = T - m.start, on = len(m.k);
-    const strength = t < on ? Math.min(1, t / S.grow) : Math.max(0, 1 - (t - on) / S.fade);
-    return { strength, warn: t < on || t > on + S.rest - S.warn };
+    return { k: m.k, t, on, dir: hash(m.k, g.id + 3) < 0.5 ? -1 : 1, puffing: t < on, warn: t > on + S.rest - S.warn };
   }
 
-  // Is (x, y) in a sleep mushroom's cloud, as it is now?
-  inSleepCloud(g, x, y, time) {
-    const c = this.sleepCloud(g, time);
-    if (c.strength < 0.35) return false;
-    const r = c.strength, cx = g.x + SLEEP_SHROOM.lean, cy = g.gy - SLEEP_SHROOM.cloudH;
-    return ((x - cx) / (SLEEP_SHROOM.cloudW * r)) ** 2 + ((y - cy) / (SLEEP_SHROOM.cloudH * r)) ** 2 <= 1;
+  // The sleep spores falling from a sleep mushroom right now: a slow, light rain while it puffs (the last ones
+  // still floating down after it stops), drifting off to one side. [{x, y, f (0 just dropped .. 1 landing)}]
+  sleepSpores(g, time) {
+    const S = SLEEP_SHROOM, ph = this.sleepPhase(g, time), out = [];
+    const top = g.gy - S.stem + 2, life = (S.stem - 2) / S.fall, cx = g.x + S.lean;
+    for (let i = Math.max(0, Math.ceil((ph.t - life) * S.rate)); i <= Math.floor(Math.min(ph.t, ph.on) * S.rate); i++) {
+      const age = ph.t - i / S.rate;
+      if (age < 0 || age > life) continue;
+      const x = cx + (hash(i, g.id + ph.k * 13) - 0.5) * (S.capW - 6) + ph.dir * S.drift * age + Math.sin(age * 2 + i) * 2;
+      out.push({ x, y: top + age * S.fall, f: age / life });
+    }
+    return out;
+  }
+
+  // Does a sleep spore touch someone at (x, y)?
+  sleepSporeHits(g, x, y, time) {
+    return this.sleepSpores(g, time).some((s) => s.x > x - 1 && s.x < x + HITBOX_W + 1 && s.y > y - 1 && s.y < y + HITBOX_H + 1);
   }
 
   // The spores drifting down from under a spore mushroom's cap right now: [{x, y, f (0 at the cap, 1 at the ground)}].

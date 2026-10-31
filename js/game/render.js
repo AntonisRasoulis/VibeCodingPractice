@@ -310,40 +310,31 @@ const Renderer = (() => {
   // ---- The giant sleep mushroom (the way into the forest) ----
 
   function drawSleepShrooms(level, camX, time) {
+    const S = SLEEP_SHROOM, img = sprites.sleepShroom;
     for (const g of level.sleepShrooms) {
-      const img = sprites.sleepShroom[level.sleepCloud(g, time).warn ? 1 : 0], x = Math.round(g.x - camX - img.width / 2);
+      const x = Math.round(g.x - camX - img.width / 2);
       if (x > VIEW_W || x + img.width < 0) continue;
+      // its cap glows softly as it's about to let its spores fall, and while they do
+      const ph = level.sleepPhase(g, time), glow = ph.puffing ? 0.5 : ph.warn ? 0.5 * (ph.t - (ph.on + S.rest - S.warn)) / S.warn : 0;
+      if (glow > 0) drawGlowAt("thorn", 2, g.x + S.lean - camX, g.gy - S.stem - 6, glow);
       b.drawImage(img, x, g.gy - img.height);
     }
   }
 
-  // Its cloud of sleep spores: swirling purple and pink, billowing out and clearing, with Zs rising from it
+  // Its sleep spores: a slow, light rain, floating down and drifting off to one side
   function drawSleepClouds(level, camX, time) {
-    const S = SLEEP_SHROOM;
     for (const g of level.sleepShrooms) {
-      const cx = g.x + S.lean - camX, cy = g.gy - S.cloudH;
-      if (cx < -60 || cx > VIEW_W + 60) continue;
-      const c = level.sleepCloud(g, time);
-      if (c.strength <= 0) {
-        // resting: just a few spores drifting about under its cap
-        for (let k = 0; k < 4; k++) drawGlowAt("pink", 0, cx + Math.sin(time * 0.7 + k * 1.7) * 20, cy - 8 + Math.cos(time * 0.5 + k) * 6, 0.4);
-        continue;
+      if (Math.abs(g.x - camX - VIEW_W / 2) > VIEW_W / 2 + 60) continue;
+      for (const sp of level.sleepSpores(g, time)) {
+        const x = Math.round(sp.x - camX), y = Math.round(sp.y);
+        drawGlowAt("thorn", 0, x, y, 0.6 * (1 - sp.f * 0.4));
+        b.globalAlpha = 1 - sp.f * 0.3;
+        b.fillStyle = "#d9a3ff";
+        b.fillRect(x, y, 2, 2);
+        b.fillStyle = "#ffffff";
+        b.fillRect(x, y, 1, 1);
+        b.globalAlpha = 1;
       }
-      for (let k = 0; k < 80; k++) {
-        const a = k * 2.399 + time * (k % 2 ? 0.6 : -0.5), r = (0.15 + 0.85 * ((k * 0.618) % 1)) * c.strength;
-        const x = cx + Math.cos(a) * S.cloudW * r, y = cy + Math.sin(a) * S.cloudH * r + Math.sin(time * 2 + k) * 2;
-        if (y > g.gy) continue;
-        drawGlowAt(k % 3 ? "thorn" : "pink", k % 4 ? 0 : 1, x, y, 0.45 * c.strength);
-        b.fillStyle = k % 3 ? "#e0b0ff" : "#ffd0f4";
-        b.fillRect(Math.round(x), Math.round(y), 1, 1);
-      }
-      b.fillStyle = "#e0b0ff"; // Zs drifting up out of it
-      for (let k = 0; k < 3; k++) {
-        const u = (time * 0.4 + k / 3) % 1, zx = Math.round(cx + 10 + k * 6 + Math.sin(u * 6) * 3), zy = Math.round(g.gy - 70 - u * 30);
-        b.globalAlpha = c.strength * (1 - u);
-        b.fillRect(zx, zy, 3, 1); b.fillRect(zx + 1, zy + 1, 1, 1); b.fillRect(zx, zy + 2, 3, 1);
-      }
-      b.globalAlpha = 1;
     }
   }
 
