@@ -235,7 +235,7 @@ const Renderer = (() => {
 
   // The forest's platforms: a mossy log, a floating glowing mushroom cap (the moving one),
   // and a rotten branch (the one that crumbles)
-  function drawForestPlatform(kind, x, y, w, time) {
+  function drawForestPlatform(kind, x, y, w, time, crack = 0) {
     const fill = (c, xx, yy, ww, hh) => { b.fillStyle = c; b.fillRect(xx, yy, ww, hh); };
     if (kind === "static") {
       fill("#4a2468", x, y + 1, w, 4);
@@ -260,6 +260,12 @@ const Renderer = (() => {
       fill("#a898b8", x, y, w, 1);
       fill("#4a3a58", x, y + 4, w, 1);
       for (let k = 0; k < w; k += 8) { fill("#2e2238", x + k + 3, y + 1, 1, 2); fill("#2e2238", x + k + 4, y + 3, 1, 1); } // cracks
+      // stood on: a split spreading out from the middle, wider and wider until it snaps
+      if (crack > 0) {
+        const mid = x + Math.floor(w / 2), reach = Math.round(crack * (w / 2 - 2));
+        for (let k = -reach; k <= reach; k++) fill("#1a1222", mid + k, y + 2 + (Math.abs(k) % 3 === 1 ? 1 : 0), 1, 1);
+        fill("#1a1222", mid, y, 1, 5);
+      }
       for (let k = 5; k < w - 1; k += 11) fill("#b8ff6a", x + k, y - 1, 2, 1); // a little glowing fungus
     }
   }
@@ -1616,14 +1622,19 @@ const Renderer = (() => {
 
       let y = p.y;
       let shake = 0;
+      let crack = 0;
       if (p.kind === "fall") {
         const top = player.platformTop(p);
         if (top === null) continue;
         y = top;
         const s = player.fallState.get(p.id);
-        if (s && s.t < FALLING.shakeTime) shake = Math.floor(time * 40) % 2 ? 1 : -1;
+        if (s && s.snap) {
+          // a rotten branch: cracks spread as you stand on it, and it creaks and shakes just before it snaps
+          crack = s.on / FOREST.branchHold;
+          if (player.standingOn === p && s.on > FOREST.branchHold - FOREST.branchCreak) shake = Math.floor(time * 50) % 2 ? 1 : -1;
+        } else if (s && s.t < FALLING.shakeTime) shake = Math.floor(time * 40) % 2 ? 1 : -1;
       }
-      if (forestAt(level, p.x + p.w / 2)) { drawForestPlatform(p.kind, sx + shake, Math.round(y), p.w, time); continue; }
+      if (forestAt(level, p.x + p.w / 2)) { drawForestPlatform(p.kind, sx + shake, Math.round(y), p.w, time, crack); continue; }
       const colors = {
         static: ["#e8b37a", "#a0663a", "#6e4325"],
         move: ["#dfe9f2", "#7a8fa6", "#4d5d70"],

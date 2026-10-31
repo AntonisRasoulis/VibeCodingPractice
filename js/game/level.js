@@ -1134,7 +1134,7 @@ const SECTIONS = {
     const count = this.rand(3, 4);
     for (let i = 0; i < count; i++) {
       this.empty(2);
-      this.addPlatform("fall", this.col, this.groundRow - this.rand(0, 1), 4);
+      this.addPlatform("fall", this.col, this.groundRow - this.rand(0, 1), 4, this.biome === "forest" ? { snap: true } : {}); // (the forest's rotten branches snap instead of falling)
       this.empty(4);
     }
     this.empty(2);

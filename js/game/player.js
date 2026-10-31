@@ -706,8 +706,8 @@ class Player {
         this.onGround = true;
         this.standingOn = p;
         if (p.kind === "fall" && !this.fallState.has(p.id)) {
-          this.fallState.set(p.id, { t: 0, dy: 0, vy: 0 });
-          Sound.play("crumble");
+          this.fallState.set(p.id, { t: 0, dy: 0, vy: 0, snap: !!p.snap, on: 0, broken: false });
+          Sound.play(p.snap ? "branchCreak" : "crumble");
         }
         return;
       }
@@ -721,11 +721,28 @@ class Player {
     if (p.kind !== "fall") return p.y;
     const s = this.fallState.get(p.id);
     if (!s) return p.y;
+    if (s.snap) return s.broken ? null : p.y; // (a rotten branch: there until it snaps, then gone)
     return s.dy > VIEW_H ? null : p.y + s.dy;
   }
 
   updateFallingPlatforms(dt) {
-    for (const s of this.fallState.values()) {
+    for (const [id, s] of this.fallState) {
+      if (s.snap) {
+        // The forest's rotten branches don't fall: they snap once we've stood on them too long, and we drop
+        const p = this.standingOn;
+        if (s.broken || !p || p.id !== id || this.dead) continue;
+        s.on += dt;
+        if (s.on >= FOREST.branchHold) {
+          s.broken = true;
+          this.standingOn = null;
+          this.onGround = false;
+          Sound.play("branchSnap");
+          for (let i = 0; i < 14; i++) {
+            this.particles.push({ x: p.x + Math.random() * p.w, y: p.y + 1 + Math.random() * 3, vx: (Math.random() - 0.5) * 60, vy: -Math.random() * 50, life: 0.5 + Math.random() * 0.3, size: i % 4 ? 1 : 2, color: ["#7a6a88", "#a898b8", "#4a3a58"][i % 3] });
+          }
+        } else if (s.on >= FOREST.branchHold - FOREST.branchCreak && s.on - dt < FOREST.branchHold - FOREST.branchCreak) Sound.play("branchCreak");
+        continue;
+      }
       s.t += dt;
       if (s.t > FALLING.shakeTime && s.dy <= VIEW_H) {
         s.vy += FALLING.gravity * dt;

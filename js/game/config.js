@@ -454,6 +454,9 @@ const FOREST = {
   floatSpeed: 36,        // its top speed (pixels a second)
   stack: [2, 3],         // shooters in a stack
   stackWeight: 3,        // how often a stack comes, as a section (a single shooter is 5)
+  branchHold: 0.7,       // its rotten branches (the crumbling platforms) don't fall: stand on one this long in all
+                         // (stepping off doesn't reset it) and it snaps in two, and you drop straight down
+  branchCreak: 0.3,      // ...it starts creaking and shaking this long before it snaps (cracks spread all the while)
 };
 
 // The enchanted forest's gift: whoever makes it out has magic feet for the rest of the race. Magic holds

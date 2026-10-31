@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 86 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 87 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -102,7 +102,8 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   a twilight forest 100-250 tiles long (fireflies, glowing mushrooms, thorn-vine spikes, all obstacles
   restyled in dark purple wood: no brown). The forest is "secretly out to get you": 1 in 5 saws breaks
   loose with a faint magic, bursts out and rolls at you half-buried with a magic trail; spike shooters
-  float left and right (rideable), sometimes stacked 2-3 high; **spore mushrooms** (curvy S stems; red =
+  float left and right (rideable), sometimes stacked 2-3 high; crumbling platforms are rotten branches that
+  snap after 0.7 s of standing on them in all (`FOREST.branchHold`, `snap` platforms) and you drop; **spore mushrooms** (curvy S stems; red =
   faster, blue = higher jumps, green = poison screen, 10 s; pink = float up for 5 s; they stack). At the
   end, fireflies (the background's too) swarm you into a ball of light and you wake on the main course
   at the same distance. No orbs in the forest; you can't use powers there (you keep them).
