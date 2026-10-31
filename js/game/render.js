@@ -3095,9 +3095,14 @@ const Renderer = (() => {
     const x = Math.round(p.x - camX) - 1 + shake;
     const y = Math.round(p.y) - 1;
     if (p.lying || (p.dream && p.dream.kind === "sleep")) { // asleep, or just woken up: lying on your back
+      // dozing off you tip over backwards (over 0.25 s); waking up, the same in reverse at the very end: you sit back up
+      const d = p.dream, S = SLEEP_SHROOM;
+      let tilt = 1;
+      if (d && d.kind === "sleep" && !d.moved) tilt = Math.min(1, d.t / 0.25);
+      else if (d && d.moved) tilt = Math.max(0, Math.min(1, ((d.kind === "fireflies" ? S.fireflies : 0) + S.sleep + S.wake - d.t) / 0.25));
       b.save();
       b.translate(x + 4, y + 12);
-      b.rotate(-Math.PI / 2 * (p.dream && p.dream.kind === "sleep" && !p.dream.moved ? Math.min(1, p.dream.t / 0.25) : 1));
+      b.rotate(-Math.PI / 2 * tilt);
       b.drawImage(frame, -4, -12);
       b.restore();
       return;
