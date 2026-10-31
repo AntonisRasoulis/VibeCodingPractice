@@ -1420,7 +1420,7 @@ const Game = (() => {
     for (const p of world.players) {
       if (!p.dream) {
         // the end of the forest: the fireflies come for you
-        if (p.realm && !p.dead && !p.caught && !p.held && p.x >= p.realm.realmEnd) {
+        if (p.realm && !p.dead && !p.caught && !p.held && p.realm.realmExit !== undefined && p.x >= p.realm.realmExit) {
           p.dream = { kind: "fireflies", t: 0 };
           p.held = true;
           p.vx = p.vy = 0;

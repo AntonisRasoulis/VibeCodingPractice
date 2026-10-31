@@ -35,7 +35,7 @@ class Player {
     this.dashTime = 0;       // seconds left in a dash
     this.windTime = 0;       // seconds left in a wind dash
     this.windDir = 1;        // which way the wind dash goes
-    this.power = null;       // stored power for S / Down: "zap" or "hand" (newest replaces old)
+    this.power = null;       // the power stored for S / Down ("zap", "wind", "drone", "portalgun"...): one at a time, the newest replaces the old
     this.held = false;       // caught by a mystic hand: the hand moves us, not physics
     this.spin = 0;           // how far the runner is turned while being swung or thrown
     this.stun = 0;           // seconds of no control after being thrown

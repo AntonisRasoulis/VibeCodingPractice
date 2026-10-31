@@ -269,7 +269,7 @@ const WILD = {
   struggleFade: 3.2,    // ...and your presses wear off faster (normal 2.4)
   speedUp: 0.85,        // saws, maces and shooters: their swings / volleys take this much of the normal time
   bigOdds: { 0: 1, 1: 1, 2: 2 }, // traps, sinkholes and flytraps: small / medium / large odds (normal: all even)
-  flytrapWindup: 0.28,  // flytraps snap quicker (normal 0.35)...$
+  flytrapWindup: 0.28,  // flytraps snap quicker (normal 0.35)...
   flytrapChewNothing: 0.9, // ...and get over a miss quicker (normal 1.2)
   jaguarGap: 0.6,       // jungle: the next jaguar comes this soon after the last one gives up
   turretShots: 3,       // jungle: turrets fire 3 arrows before they sink back (normal 1-2)...

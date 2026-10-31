@@ -79,6 +79,7 @@ class Level {
     this.signs = [];          // wooden signs where a new biome starts
     this.sleepShrooms = [];   // giant sleep mushrooms (the way into the enchanted forest): { id, x (its foot), gy, seed, forest }
     this.realmEnd = options.realmEnd; // (an enchanted forest you're sent to: where it ends, pixels)
+    this.realmExit = undefined;       // ...and where its calm ground at the end starts, once it's built (the fireflies come there)
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
     this.bearSpots = [];      // twice per snow biome: when the leader gets here, a bear charges in
@@ -650,7 +651,12 @@ class Level {
   // ---- Sections ----
 
   addSection() {
-    if (this.realmEnd !== undefined && this.col * TILE >= this.realmEnd) return this.flat(20, false); // (the forest's over: the fireflies come)
+    if (this.realmEnd !== undefined && this.col * TILE >= this.realmEnd) {
+      // The forest's over: calm ground from here on, and the fireflies come once you reach it. (The last
+      // section can run a little past realmEnd, so this is where they come, not realmEnd itself: never mid-obstacle.)
+      if (this.realmExit === undefined) this.realmExit = this.col * TILE;
+      return this.flat(20, false);
+    }
     if (this.sleepAt !== undefined && this.col >= this.sleepAt) {
       this.sleepAt = undefined;
       if (this.col >= SLEEP_SHROOM.from) return SECTIONS.sleepShroom.call(this);
