@@ -419,11 +419,11 @@ const BEAR = {
   tramplePop: 370,  // how hard it launches a player it runs over (that it isn't chasing) straight up
 };
 
-// The giant sleep mushroom: the way into the enchanted forest. It stands on the main course (from 500 m
+// The giant sleep mushroom: the way into the enchanted forest. It stands on the main course (from 400 m
 // on, about once per biome), and now and then lets a slow, light rain of sleep spores fall: one touches you
 // and you fall asleep, and wake up in the forest. When it's resting you can slip past.
 const SLEEP_SHROOM = {
-  from: 500,           // not before this many meters
+  from: 400,           // not before this many meters
   puff: [3, 10],       // it puffs for a random 3 to 10 seconds...
   rest: 10,            // ...then rests this long, then picks again
   warn: 0.8,           // its cap starts to glow this long before it puffs

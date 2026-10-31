@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 85 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 86 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -98,7 +98,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   both: portal gun, grapple (2 players only), vine.
 - **The enchanted forest** (a hidden biome, never in the normal rotation): reached by falling asleep
   under a **sleep mushroom** (purple, spore-mushroom style, on the main course about once per biome from
-  500 m; a slow light rain of spores for 3-10 s, then 10 s rest; its cap glows just before). You wake in
+  400 m; a slow light rain of spores for 3-10 s, then 10 s rest; its cap glows just before). You wake in
   a twilight forest 100-250 tiles long (fireflies, glowing mushrooms, thorn-vine spikes, all obstacles
   restyled in dark purple wood: no brown). The forest is "secretly out to get you": 1 in 5 saws breaks
   loose with a faint magic, bursts out and rolls at you half-buried with a magic trail; spike shooters
