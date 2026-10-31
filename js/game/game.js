@@ -13,7 +13,7 @@ const Game = (() => {
   // Everything that makes up "where a player is" gets swapped by a swap orb
   const SWAP_FIELDS = ["x", "y", "vx", "vy", "facing", "onGround", "standingOn", "coyote",
     "portalCooldown", "safeSpots", "fallState", "icicleState", "coconutState", "snowballs", "snowballStarted", "onIce", "biome",
-    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond", "inRiver", "eatenBy"];
+    "inQuick", "sink", "quickSurface", "tumbleweeds", "tumbleStarted", "trapState", "trapped", "trapId", "lastWiggle", "wiggleHeld", "hiddenIn", "inSink", "sinkT", "sinkFrom", "inPond", "pondHits", "onPond", "inRiver", "eatenBy", "rotState", "spinning", "spin"];
 
   let canvas, ctx, callbacks;
   let world;
@@ -1496,7 +1496,9 @@ const Game = (() => {
     Object.assign(p, { x: spot.x, y: spot.y, vx: 0, vy: 0, onGround: true, standingOn: null, inQuick: false, inRiver: null, inSink: null, inPond: null, onPond: null, hiddenIn: null, eatenBy: null, trapped: 0 });
     p.safeSpots = [{ x: spot.x, y: spot.y }];
     // (the things each player keeps track of on a course belong to the one they've left)
-    for (const m of [p.fallState, p.icicleState, p.coconutState, p.trapState, p.tumbleStarted, p.snowballStarted]) m.clear();
+    for (const m of [p.fallState, p.icicleState, p.coconutState, p.trapState, p.tumbleStarted, p.snowballStarted, p.rotState]) m.clear();
+    p.spinning = false;
+    p.spin = 0;
     p.tumbleweeds = [];
     p.snowballs = [];
   }

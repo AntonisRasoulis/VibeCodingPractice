@@ -102,6 +102,7 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.bouncies = [];   // forest: bouncy mushrooms over gaps { id, x0 (its cap's middle), y (the cap's top), amp, period, phase (swaying), rotten, seed, bouncedAt }
     this.sporeShrooms = []; // forest: big spore mushrooms { id, x (its foot), gy, kind, seed, lean (-1 left, 1 right) }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
     this.fires = [];      // desert: ground set alight by a firehawk's stick { x (middle), gy, t }
@@ -161,6 +162,11 @@ class Level {
       p.dx = newX - p.x;
       p.x = newX;
     }
+  }
+
+  // Where a bouncy mushroom's cap is (its middle) at time t: some sway left and right
+  bouncyX(m, t) {
+    return m.x0 + (m.amp ? m.amp * Math.sin(2 * Math.PI * (t / m.period + m.phase)) : 0);
   }
 
   // Where a shooter is at time t: most stay put, but in the forest they float left and right
@@ -681,6 +687,7 @@ class Level {
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
     if (this.biome === "forest" && this.col > 60) weights.shooterStack = FOREST.stackWeight;
     if (this.biome === "forest") weights.sporeShroom = SPORES.weight;
+    if (this.biome === "forest" && this.col > 40) weights.bouncy = BOUNCY.weight;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -1209,6 +1216,34 @@ const SECTIONS = {
     this.flat(4);
     this.sporeShrooms.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, kind: this.pickFrom(SPORES.kinds), seed: this.rng(), lean: this.rng() < 0.5 ? -1 : 1 });
     this.flat(6);
+  },
+
+  // The forest's: a wide gap with 2-4 bouncy mushrooms growing up out of it on long twisting stems. Each is
+  // placed so an ordinary bounce off the one before (or a jump off the bank) always reaches it, even at the
+  // worst point of its sway, with room to spare
+  bouncy() {
+    this.iceBias = false;
+    this.flat(4, false);
+    const B = BOUNCY, gy = this.groundRow * TILE, x0 = this.col * TILE;
+    // how far a runner carries going up at v and coming down dy higher than they started (pixels)
+    const reach = (v, dy) => PHYSICS.runSpeed * (v + Math.sqrt(Math.max(0, v * v - 2 * PHYSICS.gravity * dy))) / PHYSICS.gravity;
+    const n = this.rand(B.count[0], B.count[1]);
+    let x = x0, prev = { h: 0, amp: 0, rotten: false };
+    for (let i = 0; i < n; i++) {
+      let dist = i === 0 ? this.rand(B.edge[0], B.edge[1]) : this.rand(B.spacing[0], B.spacing[1]);
+      let h = this.rand(B.heights[0], B.heights[1]);
+      const sway = i > 0 && !prev.rotten && this.rng() < B.swayChance; // (never right after a rotten one: you couldn't bounce on the spot waiting for it)
+      const amp = sway ? this.rand(B.swayAmp[0], B.swayAmp[1]) : 0;
+      const v = i === 0 ? PHYSICS.jumpSpeed : B.bounce, room = 10;
+      while (h > B.heights[0] && dist + amp + prev.amp > reach(v, h - prev.h) - room) h -= 2;
+      dist = Math.min(dist, Math.floor(reach(v, h - prev.h) - room - amp - prev.amp));
+      x += dist;
+      const m = { id: this.nextId++, x0: x, y: gy - h, amp, period: this.rand(B.swayPeriod[0] * 10, B.swayPeriod[1] * 10) / 10, phase: this.rng(), rotten: this.rng() < B.rotChance, seed: this.rng() * 100, bouncedAt: -9 };
+      this.bouncies.push(m);
+      prev = { h, amp, rotten: m.rotten };
+    }
+    this.empty(Math.ceil((x + this.rand(B.edge[0], B.edge[1]) - x0) / TILE));
+    this.flat(4, false); // a landing you can stop on
   },
 
   // The forest's: a stack of floating shooters, each drifting its own way

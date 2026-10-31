@@ -494,6 +494,32 @@ const ROOTS = {
   wallTime: 5,       // ...and hold it back for this long, then sink back into the ground
 };
 
+// The enchanted forest's bouncy mushrooms: now and then a wide gap has 2-4 giant orange mushrooms growing up
+// out of it on long twisting stems. Land on one and it bounces you: the faster you land, the higher you go
+// (and you can always bounce on the spot while you wait). Press jump just as you land for a super bounce:
+// much higher, but you spin round and round and can't steer until you land on solid ground. Some sway
+// left and right; some are rotten and pop after one bounce (each player has their own, like the crumbling
+// platforms, and they come back when you respawn).
+const BOUNCY = {
+  weight: 20,          // how often a gap of them comes, as a forest section (about 2-3 per forest)
+  count: [2, 4],       // mushrooms in a gap
+  spacing: [36, 46],   // pixels from one cap's middle to the next (an ordinary bounce carries you about 50)
+  heights: [10, 26],   // how far above the banks their caps are (pixels)
+  edge: [22, 30],      // from the edge of a bank to the middle of the nearest cap (pixels)
+  capW: 22,            // a cap's width (pixels)
+  bounce: 240,         // the gentlest bounce sends you up this fast (a jump is 265)...
+  keep: 0.9,           // ...landing faster bounces you up at this share of the speed you came down at...
+  maxBounce: 330,      // ...up to this
+  superBounce: 1.35,   // press jump just as you land (PHYSICS.jumpBuffer): this much higher, and you spin
+  spin: 14,            // ...this fast (turns a second, in radians), with no steering until you're on solid ground
+  swayChance: 0.3,     // share that sway left and right...
+  swayAmp: [5, 9],     // ...this far each way (pixels)...
+  swayPeriod: [2.4, 3.4], // ...taking this long to swing there and back
+  rotChance: 0.25,     // share that are rotten...
+  rotWobble: 0.3,      // ...wobbling this long after your bounce, then gone (for you)
+  squash: 0.25,        // seconds a cap squashes and springs back after a bounce
+};
+
 // The forest's spore mushrooms: spores drift down from under the cap all the time, and running
 // under one you'll most likely catch one on your head (about 9 times in 10). Each color does something different (they stack).
 const SPORES = {

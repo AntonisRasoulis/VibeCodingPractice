@@ -93,6 +93,7 @@ const Renderer = (() => {
     for (const bear of world.bears) drawBear(bear, camX, world.time);
     for (const j of world.jaguars) drawJaguar(j, camX, world.time);
     for (const v of world.vultures) drawVultureShadow(v, world.level, camX);
+    drawBouncies(world.level, player, camX, world.time);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
     drawOrbs(world.level, camX, world.time);
@@ -1720,6 +1721,67 @@ const Renderer = (() => {
     drawRootList(list);
   }
 
+  // ---- The enchanted forest's bouncy mushrooms ----
+
+  const BOUNCY_LOOK = {
+    cap: "#ff9a2e", hi: "#ffd08a", rim: "#ffe6b8", dark: "#c45a1e", gill: "#8a2a3a", spot: "#fff0d8", glow: "255,170,60",
+    rot: { cap: "#a08a98", hi: "#bca6b4", rim: "#ccb8c4", dark: "#6a5466", spot: "#2a1a30" }, // (rotten: dull, with holes)
+    stem: ["#efe4f2", "#c8b4d4", "#8a72a0"], // the twist's light streak, the stem, its shadow
+  };
+
+  // Giant orange mushrooms on long twisting stems coming up from far below: squashing and springing back
+  // (the stem wobbling) when someone bounces; a rotten one wobbles after your bounce, then it's gone (for you)
+  function drawBouncies(level, player, camX, time) {
+    const px = (x, y, w, h, c, a = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    const L0 = BOUNCY_LOOK;
+    for (const m of level.bouncies) {
+      const cx0 = level.bouncyX(m, level.time) - camX;
+      if (cx0 < -40 || cx0 > VIEW_W + 40) continue;
+      const rot = m.rotten && player.rotState.get(m.id), popped = rot !== undefined && rot >= BOUNCY.rotWobble;
+      const P = m.rotten ? { ...L0, ...L0.rot } : L0;
+      const since = time - m.bouncedAt;
+      const squash = !popped && since < BOUNCY.squash ? Math.round(2 * Math.sin(Math.PI * since / BOUNCY.squash)) : 0; // squashing down and springing back
+      const wob = since < 0.8 ? Math.sin(since * 28) * 2.5 * (1 - since / 0.8) : 0; // the stem twanging after a bounce
+      const shake = rot !== undefined && !popped ? (Math.floor(time * 40) % 2 ? 1 : -1) : 0; // a rotten one, about to go
+      const cx = Math.round(cx0) + shake, w = BOUNCY.capW + squash * 2, capY = m.y + squash;
+      // the glow round its cap, in steps
+      if (!popped) for (let r = 4; r >= 1; r--) {
+        const rx = w / 2 + r * 3, ry = 3 + r * 2.2;
+        for (let yy = -Math.floor(ry); yy <= ry; yy++) { const half = Math.floor(rx * Math.sqrt(1 - (yy / ry) ** 2)); px(cx - half, capY + 3 + yy, half * 2, 1, `rgb(${L0.glow})`, m.rotten ? 0.03 : 0.07); }
+      }
+      // the stem: winding down in an S (at least two curves), a light streak twisting round it, swaying with its cap
+      const top = capY + 5, len = VIEW_H + 4 - top, seed = m.seed;
+      for (let yy = popped ? top + 3 : top; yy < VIEW_H + 4; yy++) {
+        const d = (yy - top) / len, k = 1 - d;
+        const curl = Math.sin(d * Math.PI * 2 * Math.max(1.2, len / 26) + seed) * (2 + d * 2.5);
+        const sx = Math.round(cx - 1 + curl - Math.sin(seed) * 2 * d + (level.bouncyX(m, level.time) - m.x0) * -(1 - k * k) + wob * k);
+        const tw = Math.floor((yy + seed * 10) / 3) % 3;
+        px(sx, yy, 3, 1, L0.stem[1]);
+        px(sx + tw, yy, 1, 1, L0.stem[0]);
+        px(sx + (tw + 2) % 3, yy, 1, 1, L0.stem[2]);
+      }
+      if (popped) { // just a torn stump of stem left
+        const sx = Math.round(cx - 1 + Math.sin(seed) * 2);
+        px(sx - 1, top + 2, 1, 1, L0.stem[2]); px(sx + 3, top + 2, 1, 1, L0.stem[2]); px(sx + 1, top + 1, 1, 1, L0.stem[1]);
+        continue;
+      }
+      const h = squash ? 6 - squash : 6, droop = m.rotten;
+      // the cap: wide and flat, a lighter rim, gills underneath, a few spots (rotten: holes and a drooping rim)
+      px(cx - w / 2 + 3, capY, w - 6, 1, P.hi);
+      px(cx - w / 2 + 1, capY + 1, w - 2, 1, P.cap);
+      px(cx - w / 2, capY + 2, w, h - 3, P.cap);
+      px(cx - w / 2, capY + h - 1, w, 1, P.rim);
+      px(cx - w / 2 + 2, capY + h, w - 4, 1, L0.gill);
+      px(cx - w / 2, capY + 2, 1, h - 3, P.dark);
+      px(cx + w / 2 - 1, capY + 2, 1, h - 3, P.dark);
+      if (droop) { px(cx - w / 2, capY + h, 2, 2, P.rim); px(cx + w / 2 - 2, capY + h, 2, 1, P.rim); }
+      for (const [dx, dy] of [[-w / 4, 1], [2, 2], [w / 4, 1]]) px(cx + dx, capY + dy + 1, m.rotten ? 1 : 2, 1, P.spot);
+      if (m.rotten) { px(cx - 2, capY + 3, 1, 1, P.spot); px(cx + w / 2 - 4, capY + 2, 1, 2, P.spot); }
+      if (squash) { px(cx - w / 2 - 2, capY + 1, 1, 1, P.hi); px(cx + w / 2 + 1, capY + 1, 1, 1, P.hi); } // a springy twang
+    }
+    b.globalAlpha = 1;
+  }
+
   function drawPlatforms(level, player, camX, time) {
     for (const p of level.platforms) {
       if (p.kind === "log" || p.kind === "flood" || p.kind === "float" || p.kind === "bridge") continue; // (drawn with their river, the flood, their floating shooter, or the magic under someone's feet: drawBridgeMagic)
@@ -3058,7 +3120,7 @@ const Renderer = (() => {
       return;
     }
     // Swung by a hand, or tumbling backwards after being thrown
-    const spin = p.held ? p.spin : p.stun > 0 && !p.onGround ? -(HAND.stun - p.stun) * 14 : 0;
+    const spin = p.held || p.spinning ? p.spin : p.stun > 0 && !p.onGround ? -(HAND.stun - p.stun) * 14 : 0; // (or spinning after a super bounce)
     if (spin) {
       b.save();
       b.translate(x + 4, y + 6);

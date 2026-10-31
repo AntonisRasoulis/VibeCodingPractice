@@ -82,7 +82,9 @@ class Player {
     this.realm = null;            // the enchanted forest we're in (null: the main course)
     this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
     this.lying = false;           // just woken up, still lying down
-    this.magicFeet = false;       // made it out of the enchanted forest: magic holds us up over every hole (for the rest of the race)
+    this.magicFeet = false;
+    this.rotState = new Map();    // the forest's rotten bouncy mushrooms *this* player has bounced on: seconds since (they pop)
+    this.spinning = false;        // a super bounce off a bouncy mushroom: spinning, no steering until we land on solid ground       // made it out of the enchanted forest: magic holds us up over every hole (for the rest of the race)
     this.spores = { red: 0, blue: 0, pink: 0 }; // seconds left of each spore mushroom's effect (forest): faster, higher jumps, floating
     this.poisonMax = TURRET.poison; // how long the poison we have lasts in all (for how it looks)
     this.flood = null;            // a monsoon's flood: { surface } (nothing can hurt us while it's up)
@@ -110,6 +112,18 @@ class Player {
     this.level = level; // remembered so dying can look for a place to come back
     this.updateParticles(dt);
     this.updateFallingPlatforms(dt);
+    for (const [id, t] of this.rotState) {
+      this.rotState.set(id, t + dt);
+      if (t < BOUNCY.rotWobble && t + dt >= BOUNCY.rotWobble) { // a rotten bouncy mushroom we bounced on: it pops
+        const m = level.bouncies.find((q) => q.id === id);
+        if (m) {
+          Sound.play("shroomPop");
+          const cx = level.bouncyX(m, level.time);
+          for (let i = 0; i < 12; i++) this.particles.push({ x: cx + (Math.random() - 0.5) * BOUNCY.capW, y: m.y + 2, vx: (Math.random() - 0.5) * 70, vy: -Math.random() * 60, life: 0.6, size: i % 3 ? 1 : 2, color: ["#a08a98", "#bca6b4", "#6a5466"][i % 3] });
+        }
+      }
+    }
+    if (this.spinning) this.spin += BOUNCY.spin * dt * this.facing;
     this.updateSnow(dt, level);
     this.updateCoconuts(dt, level);
     if (this.dizzy > 0) this.dizzy -= dt;
@@ -267,8 +281,8 @@ class Player {
       this.vx = 0;
     }
 
-    // Running
-    const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    // Running (spinning after a super bounce: no steering at all)
+    const dir = this.spinning ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0);
     if (dir !== 0) {
       const skating = this.skate > 0 && this.onGround && this.onIce;
       let accel = this.onGround ? (this.onIce ? SNOW.iceAccel * (skating ? SNOWBALL.skateAccel : 1) : PHYSICS.groundAccel) : PHYSICS.airAccel;
@@ -317,6 +331,8 @@ class Player {
     this.standingOn = null;
     this.moveY(this.vy * dt, level);
     if (this.vy >= 0) this.landOnPlatforms(level, prevBottom);
+    if (!this.onGround && fallSpeed > 0) this.bounceOnShrooms(level, prevBottom, fallSpeed);
+    if (this.onGround && this.spinning) { this.spinning = false; this.spin = 0; } // back on solid ground: steering again
     this.onIce = this.onGround && !this.standingOn && level.isIce(Math.floor((this.x + HITBOX_W / 2) / TILE));
     // A monsoon's flood: off the logs and into the water, and the current takes you
     if (this.flood && !(this.onGround && this.standingOn && this.standingOn.kind === "flood") && this.y + HITBOX_H > this.flood.surface + 3) {
@@ -690,6 +706,34 @@ class Player {
           return;
         }
       }
+    }
+  }
+
+  // Coming down on one of the forest's bouncy mushrooms: it bounces us back up, faster the faster we landed.
+  // Jump pressed just as we land (the jump buffer): a super bounce, and we spin with no steering till solid ground.
+  bounceOnShrooms(level, prevBottom, fallSpeed) {
+    const bottom = this.y + HITBOX_H, B = BOUNCY;
+    for (const m of level.bouncies) {
+      const cx = level.bouncyX(m, level.time);
+      if (this.x + HITBOX_W <= cx - B.capW / 2 || this.x >= cx + B.capW / 2) continue;
+      if (!(prevBottom <= m.y + 1 && bottom >= m.y)) continue;
+      if (m.rotten && this.rotState.has(m.id) && this.rotState.get(m.id) >= B.rotWobble) continue; // (popped: it's gone)
+      let v = Math.min(B.maxBounce, Math.max(B.bounce, fallSpeed * B.keep));
+      const sup = this.jumpBuffer > 0;
+      if (sup) {
+        v *= B.superBounce;
+        this.spinning = true;
+        if (Math.abs(this.vx) < 40) this.vx = this.facing * PHYSICS.runSpeed; // (flung on the way you're facing)
+        this.jumpBuffer = 0;
+      }
+      this.y = m.y - HITBOX_H;
+      this.vy = -v;
+      this.noCut = 0.3; // (a bounce isn't cut short by letting go of jump)
+      m.bouncedAt = level.time;
+      if (m.rotten && !this.rotState.has(m.id)) { this.rotState.set(m.id, 0); Sound.play("shroomCreak"); }
+      Sound.play(sup ? "superBoing" : "boing");
+      if (sup) this.showHit("SUPER BOUNCE!", "#ffb050");
+      return;
     }
   }
 
@@ -1077,6 +1121,7 @@ class Player {
     this.spores = { red: 0, blue: 0, pink: 0 };
     this.inFlood = false;
     this.spin = 0;
+    this.spinning = false;
     this.dashHold = 0;
     this.dashTime = 0;
     this.windTime = 0;
@@ -1118,6 +1163,8 @@ class Player {
     this.jumpBuffer = 0;
     this.blink = 0.6;
     this.fallState.clear(); // crumbled platforms come back
+    this.rotState.clear();  // ...and rotten bouncy mushrooms
+    this.spinning = false;
     this.icicleState.clear(); // ...and so do icicles
     this.coconutState.clear(); // ...and coconuts
     this.dizzy = 0;
