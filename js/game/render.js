@@ -62,6 +62,8 @@ const Renderer = (() => {
   // ---- One player's half of the screen ----
 
   function drawView(world, player, other, camX) {
+    const d = player.dream;
+    fireflyPull = d && d.kind === "fireflies" && !d.moved ? { x: player.x + HITBOX_W / 2 - camX, y: player.y + HITBOX_H / 2, u: Math.min(1, d.t / SLEEP_SHROOM.fireflies) } : null;
     // Each biome's scenery, faded together near a border
     const mix = biomeMix(world.level, camX);
     const snow = mix.snow || 0;
@@ -289,21 +291,12 @@ const Renderer = (() => {
       }
       b.drawImage(L.near, x0, 0);
     }
-    // fireflies drifting about, blinking on and off
-    for (let k = 0; k < 16; k++) {
-      const x = ((hash(k, 41) * VIEW_W * 2 - camX * 0.5 + Math.sin(time * 0.6 + k * 1.3) * 12) % VIEW_W + VIEW_W) % VIEW_W;
-      const y = 14 + hash(k, 42) * 72 + Math.sin(time * 0.9 + k * 2.1) * 6;
-      const on = Math.sin(time * 2.2 + k * 1.7);
+    // fireflies drifting about, blinking on and off (the ones flying off to join a swarm are drawn with it)
+    for (let k = 0; k < BACK_FIREFLIES; k++) {
+      if (fireflyPull && fireflyPullOf(k) > 0) continue;
+      const { x, y, on } = backFirefly(k, camX, time);
       if (on < -0.3) continue;
-      const bright = 0.4 + 0.6 * Math.max(0, on);
-      drawGlowAt("firefly", 1, x, y, bright);
-      b.globalAlpha = bright * 0.8;
-      b.fillStyle = "#f4ff6a";
-      b.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
-      b.fillRect(Math.round(x), Math.round(y) - 1, 1, 3);
-      b.globalAlpha = 1;
-      b.fillStyle = "#ffffe0";
-      b.fillRect(Math.round(x), Math.round(y), 1, 1);
+      drawFirefly(x, y, 0.4 + 0.6 * Math.max(0, on));
     }
   }
 
@@ -346,6 +339,13 @@ const Renderer = (() => {
     const cx = p.x + HITBOX_W / 2 - camX, cy = p.y + HITBOX_H / 2;
     if (d.kind === "fireflies" && !d.moved) {
       const u = Math.min(1, d.t / SLEEP_SHROOM.fireflies);
+      // the forest's own fireflies leave the background and fly in to join the swarm
+      if (fireflyPull) for (let k = 0; k < BACK_FIREFLIES; k++) {
+        const e = fireflyPullOf(k);
+        if (e <= 0) continue;
+        const from = backFirefly(k, camX, time), a = k * 2.399 + time * 3, r = 14 - 8 * u;
+        drawFirefly(from.x + (cx + Math.cos(a) * r - from.x) * e, from.y + (cy + Math.sin(a) * r * 0.85 - from.y) * e, 0.6 + 0.4 * e);
+      }
       if (u > 0.4) drawGlowAt("firefly", 2, cx, cy, (u - 0.4) * 1.4); // (all glowing together into one ball of light)
       for (let k = 0; k < 40; k++) {
         const a = k * 2.399 + time * (2 + (k % 3)), r = (24 - 17 * u) * (0.45 + 0.55 * ((k * 0.618) % 1)) + (k % 5 === 0 ? 3 * (1 - u) : 0);
@@ -418,6 +418,35 @@ const Renderer = (() => {
       }
     });
     b.globalAlpha = 1;
+  }
+
+  const BACK_FIREFLIES = 16;
+  let fireflyPull = null; // (on your way out of the forest: where the swarm is, and how far along: the background's fireflies join it)
+
+  // Where one of the forest's background fireflies is (on the screen), and how much it's glowing (-1..1)
+  function backFirefly(k, camX, time) {
+    return {
+      x: ((hash(k, 41) * VIEW_W * 2 - camX * 0.5 + Math.sin(time * 0.6 + k * 1.3) * 12) % VIEW_W + VIEW_W) % VIEW_W,
+      y: 14 + hash(k, 42) * 72 + Math.sin(time * 0.9 + k * 2.1) * 6,
+      on: Math.sin(time * 2.2 + k * 1.7),
+    };
+  }
+
+  // How far a background firefly has flown towards the swarm (0..1): each sets off at its own moment
+  function fireflyPullOf(k) {
+    const s = clamp(fireflyPull.u * 1.7 - hash(k, 43) * 0.7, 0, 1);
+    return s * s * (3 - 2 * s);
+  }
+
+  function drawFirefly(x, y, bright) {
+    drawGlowAt("firefly", 1, x, y, bright);
+    b.globalAlpha = bright * 0.8;
+    b.fillStyle = "#f4ff6a";
+    b.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
+    b.fillRect(Math.round(x), Math.round(y) - 1, 1, 3);
+    b.globalAlpha = 1;
+    b.fillStyle = "#ffffe0";
+    b.fillRect(Math.round(x), Math.round(y), 1, 1);
   }
 
   // Glowing grass tufts and tiny glowing mushrooms along the forest floor
