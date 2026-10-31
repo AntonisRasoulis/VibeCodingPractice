@@ -463,7 +463,7 @@ const FOREST = {
 const MAGIC_FEET = {
   near: 48,          // a bridge fades in over a pit or river once you're this close to it (pixels)
   fadeIn: 0.3,       // seconds it takes to fade in (it holds you up straight away)
-  stay: 4,           // once you've left it, it stays this long (for whoever's behind you)...
+  stay: 2,           // once you've left it, it stays this long (for whoever's behind you)...
   fade: 1,           // ...then flickers and fades away over this long (never while someone's standing on it)
   maxTiles: 60,      // the longest a bridge gets (tiles)
   reach: 16,         // its magic shows in a little stretch under whoever's on it: this far each side of them (pixels)
