@@ -152,13 +152,14 @@ const Game = (() => {
     updateDreams(dt);
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
-    for (const f of forests()) onCourse(f, () => { updateLooseSaws(dt); updateSpores(); levelSounds(); });
+    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); levelSounds(); });
     checkFire();
   }
 
   function mainCourse(dt, inputs) {
     world.players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
     updateSleepShrooms();
+    updateBridges(dt);
     updateMonsoon(dt);
     const flooded = world.monsoon !== null; // (while it's flooded, every danger waits)
     updateDrones(dt);
@@ -1445,6 +1446,12 @@ const Game = (() => {
         p.dream = null;
         p.held = false;
         p.lying = false;
+        if (d.kind === "fireflies") { // made it through the forest: its gift, for the rest of the race
+          p.magicFeet = true;
+          p.showHit("MAGIC FEET!", "#e2a6ff");
+          p.sparkle("#e2a6ff");
+          Sound.play("magicFeet");
+        }
       }
     }
   }
@@ -1486,6 +1493,37 @@ const Game = (() => {
     for (const m of [p.fallState, p.icicleState, p.coconutState, p.trapState, p.tumbleStarted, p.snowballStarted]) m.clear();
     p.tumbleweeds = [];
     p.snowballs = [];
+  }
+
+  // ---- The enchanted forest's gift: magic feet ----
+
+  // Anyone with magic feet gets a glowing bridge over every pit and river (a run of columns with no ground)
+  // as they come near it, level with the bank on their side. (Quicksand, sinkholes and broken thin ice make
+  // their own, right under you, when they go off: Player.magicCatch.) A bridge stays a while after they've
+  // left it, for whoever's behind them, then flickers and fades away, but never from under someone's feet.
+  function updateBridges(dt) {
+    const { level, players } = world, M = MAGIC_FEET;
+    const magic = players.filter((p) => p.magicFeet && !p.dead && !p.caught && !p.held);
+    for (const p of magic) {
+      for (let c = Math.max(0, Math.floor((p.x - M.near) / TILE)); c <= Math.floor((p.x + HITBOX_W + M.near) / TILE); c++) {
+        const hole = level.holeAt(c);
+        if (!hole) continue;
+        const [c0, c1] = hole;
+        const left = level.groundTop((c0 - 1) * TILE), right = level.groundTop(c1 * TILE);
+        const fromLeft = p.x + HITBOX_W / 2 < (c0 + c1) * TILE / 2;
+        const br = level.addBridge(c0 * TILE, c1 * TILE, (fromLeft ? left ?? right : right ?? left) ?? p.y + HITBOX_H);
+        if (!br.chimed) { br.chimed = true; Sound.play("magicBridge"); }
+        c = c1;
+      }
+    }
+    for (const br of level.platforms) {
+      if (br.kind !== "bridge") continue;
+      br.t += dt;
+      if (magic.some((p) => p.x + HITBOX_W > br.x - M.near && p.x < br.x + br.w + 16)) br.idle = 0;
+      else if (players.some((p) => p.standingOn === br && !p.dead && !p.caught)) br.idle = Math.min(br.idle + dt, M.stay); // (someone's on it: it waits for them)
+      else br.idle += dt;
+    }
+    level.platforms = level.platforms.filter((br) => br.kind !== "bridge" || br.idle < M.stay + M.fade);
   }
 
   // ---- The enchanted forest's spore mushrooms ----

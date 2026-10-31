@@ -232,6 +232,8 @@ const Sound = (() => {
     bonk: () => { tone({ f: 700, to: 260, dur: 0.14, type: "square", vol: 0.13 }); tone({ f: 1400, to: 900, dur: 0.5, type: "sine", vol: 0.06, at: 0.08, vibrato: 30 }); },
     monsoon: () => { noise({ filter: "lowpass", f: 3000, to: 1200, dur: 2.2, vol: 0.35, attack: 0.4 }); noise({ filter: "lowpass", f: 120, dur: 1.4, vol: 0.6, attack: 0.05, at: 0.2 }); }, // a downpour, and thunder
     fallAsleep: () => { notes([784, 659, 523, 392], { gap: 0.18, dur: 0.3, type: "sine", vol: 0.12 }); noise({ filter: "bandpass", f: 1200, to: 400, q: 1, dur: 0.8, vol: 0.12 }); },
+    magicBridge: () => { notes([1047, 1319, 1568], { gap: 0.05, dur: 0.22, type: "sine", vol: 0.06 }); noise({ filter: "highpass", f: 5000, dur: 0.35, vol: 0.03 }); },
+    magicFeet: () => { notes([659, 784, 988, 1319, 1568], { gap: 0.08, dur: 0.25, type: "triangle", vol: 0.09 }); noise({ filter: "highpass", f: 4500, dur: 0.8, vol: 0.04 }); },
     wakeUp: () => notes([523, 659, 784, 1047], { gap: 0.09, dur: 0.18, type: "triangle", vol: 0.1 }),
     fireflies: () => { for (let k = 0; k < 8; k++) tone({ f: 1800 + k * 220, dur: 0.12, type: "sine", vol: 0.04, at: k * 0.12 }); noise({ filter: "highpass", f: 4000, dur: 1.2, vol: 0.05 }); },
     spore: () => { noise({ filter: "bandpass", f: 2500, to: 5000, q: 2, dur: 0.25, vol: 0.12 }); notes([880, 1320, 1760], { gap: 0.05, dur: 0.08, type: "sine", vol: 0.08 }); },

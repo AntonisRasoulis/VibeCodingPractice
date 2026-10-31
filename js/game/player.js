@@ -82,6 +82,7 @@ class Player {
     this.realm = null;            // the enchanted forest we're in (null: the main course)
     this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
     this.lying = false;           // just woken up, still lying down
+    this.magicFeet = false;       // made it out of the enchanted forest: magic holds us up over every hole (for the rest of the race)
     this.spores = { red: 0, blue: 0, pink: 0 }; // seconds left of each spore mushroom's effect (forest): faster, higher jumps, floating
     this.poisonMax = TURRET.poison; // how long the poison we have lasts in all (for how it looks)
     this.flood = null;            // a monsoon's flood: { surface } (nothing can hurt us while it's up)
@@ -331,6 +332,8 @@ class Player {
     if (this.flood) return; // (nothing can hurt you while it's flooded)
     // Stepped into quicksand
     if (this.onGround && !this.standingOn && level.isQuick(Math.floor((this.x + HITBOX_W / 2) / TILE))) {
+      // magic feet: the sand starts to suck us in, but a bridge of magic holds us up
+      if (this.magicFeet) return this.magicCatch(level, ...level.quickRun(Math.floor((this.x + HITBOX_W / 2) / TILE)).map((c) => c * TILE), this.y + HITBOX_H, "quick");
       this.inQuick = true;
       this.sink = 1;
       this.struggle = 0;
@@ -843,6 +846,8 @@ class Player {
           level.collapseSinkhole(s);
           Sound.play("sinkCollapse");
           this.showHit("CAVE-IN!", "#ffb347");
+          // magic feet: it caves in under us all the same, but a bridge of magic holds us up over the gap
+          if (this.magicFeet) return this.magicCatch(level, (s.col - SINK.gap) * TILE, (s.col + SINK.gap + 1) * TILE, s.gy, "sink");
         }
         continue;
       }
@@ -850,6 +855,11 @@ class Player {
       if (s.state === "idle") {
         s.state = "open";
         s.openedAt = level.time;
+      }
+      if (this.magicFeet) { // it spins open under us all the same, but a bridge of magic holds us up over it
+        Sound.play("sinkOpen");
+        const half = SINK.funnel[s.size][0] + 2;
+        return this.magicCatch(level, s.x - half, s.x + half, s.gy, "sink");
       }
       this.inSink = s;
       this.sinkT = 0;
@@ -905,6 +915,7 @@ class Player {
   // Into the icy water: frozen solid in a block of ice. Everyone frozen in the same pond is
   // stuck in the same ice: the first to break out cracks it, and the others shatter with it.
   freezeIn(pond) {
+    if (this.magicFeet) return this.magicCatch(this.level, pond.x0, pond.x1, pond.gy, "pond"); // (the ice broke all the same: magic holds us up over the water)
     this.inPond = pond;
     this.pondHits = 0;
     pond.frozen.push(this);
@@ -952,6 +963,24 @@ class Player {
       }
     }
     this.checkHazards(level);
+  }
+
+  // Magic feet: something went off under us (quicksand, a sinkhole, the thin ice), but a bridge of magic
+  // fades in right under our feet and holds us up. From x0 to x1, its top at y.
+  magicCatch(level, x0, x1, y, kind) {
+    const bridge = level.addBridge(x0, x1, y);
+    this.y = y - HITBOX_H;
+    this.vy = Math.min(this.vy, 0);
+    this.onGround = true;
+    this.standingOn = bridge;
+    if (!bridge.chimed) { // (only the first time: we might walk on and off it)
+      bridge.chimed = true;
+      if (kind === "quick") Sound.play("sandSink");
+      Sound.play("magicBridge");
+      for (let i = 0; i < 8; i++) {
+        this.particles.push({ x: this.x + HITBOX_W / 2 + (Math.random() - 0.5) * 14, y: y - Math.random() * 2, vx: (Math.random() - 0.5) * 30, vy: -10 - Math.random() * 25, life: 0.5, size: 1, color: i % 3 ? "#e2a6ff" : kind === "quick" || kind === "sink" ? "#e3b673" : "#e8f8ff" });
+      }
+    }
   }
 
   // Out of a bear trap: the jaws spring apart and we hop out of it

@@ -877,6 +877,41 @@ class Level {
     return this.ponds.find((p) => x >= p.x0 && x < p.x1) || null;
   }
 
+  // ---- The enchanted forest's gift: magic bridges ----
+
+  // A glowing bridge from x0 to x1 with its top at y (it's a platform anyone can stand on), or the one
+  // that's already there. It goes first among the platforms, so you'd stand on it rather than on a river
+  // log at the same height (that would carry you off and sink under you).
+  addBridge(x0, x1, y) {
+    const have = this.platforms.find((p) => p.kind === "bridge" && p.x < x1 && p.x + p.w > x0);
+    if (have) {
+      have.idle = 0;
+      return have;
+    }
+    const bridge = { id: this.nextId++, kind: "bridge", x: x0, y, w: x1 - x0, dx: 0, t: 0, idle: 0 };
+    this.platforms.unshift(bridge);
+    return bridge;
+  }
+
+  // The hole column c is in (a run of columns with no ground: a pit, a river, a caved-in sinkhole),
+  // as [first column, column after the last], or null if there's ground there
+  holeAt(c) {
+    if (c < 0 || c >= this.cols.length || this.groundTop(c * TILE) !== null) return null;
+    let c0 = c, c1 = c + 1;
+    const max = MAGIC_FEET.maxTiles;
+    while (c0 > 0 && this.groundTop((c0 - 1) * TILE) === null && c1 - c0 < max) c0--;
+    while (c1 < this.cols.length && this.groundTop(c1 * TILE) === null && c1 - c0 < max) c1++;
+    return [c0, c1];
+  }
+
+  // The run of quicksand column c is part of, as [first column, column after the last]
+  quickRun(c) {
+    let c0 = c, c1 = c + 1;
+    while (this.isQuick(c0 - 1)) c0--;
+    while (this.isQuick(c1)) c1++;
+    return [c0, c1];
+  }
+
   trySink(c) {
     let size = this.bigSize(c);
     if (size === 2 && !this.sinkFits(c, 2)) size = this.rand(0, 1); // too risky here for a deadly one

@@ -456,6 +456,18 @@ const FOREST = {
   stackWeight: 3,        // how often a stack comes, as a section (a single shooter is 5)
 };
 
+// The enchanted forest's gift: whoever makes it out has magic feet for the rest of the race. Magic holds
+// them up over every hole: a glowing bridge fades in across a pit or a river as they come near it (and
+// anyone, the other player too, can use it while it's there). Quicksand, sinkholes and thin ice still go
+// off under them (the sand swirls, the sinkhole spins open, the ice breaks), but a bridge catches them.
+const MAGIC_FEET = {
+  near: 48,          // a bridge fades in over a pit or river once you're this close to it (pixels)
+  fadeIn: 0.3,       // seconds it takes to fade in (it holds you up straight away)
+  stay: 4,           // once you've left it, it stays this long (for whoever's behind you)...
+  fade: 1,           // ...then flickers and fades away over this long (never while someone's standing on it)
+  maxTiles: 60,      // the longest a bridge gets (tiles)
+};
+
 // The forest's spore mushrooms: spores drift down from under the cap all the time, and running
 // under one you'll most likely catch one on your head (about 9 times in 10). Each color does something different (they stack).
 const SPORES = {
