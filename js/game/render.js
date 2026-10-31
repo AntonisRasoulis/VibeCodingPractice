@@ -1569,20 +1569,41 @@ const Renderer = (() => {
   }
 
   // Someone held up over a hole by a magic bridge: no bridge to see, just the same magic that keeps the
-  // forest's spike shooters afloat (a faint pink glow, sparkles drifting down), right under their feet
+  // forest's spike shooters afloat (a faint pink glow, sparkles drifting down) in a little stretch under
+  // them, strongest right under their feet and fading out to either side
   function drawBridgeMagic(p, camX, time, ghost) {
     const br = p.standingOn;
     if (!br || br.kind !== "bridge" || p.dead || p.caught) return;
     const fade = b.globalAlpha;
-    b.globalAlpha = fade * bridgeAlpha(br) * (ghost ? 0.6 : 1);
-    const x = Math.round(p.x - camX), y = Math.round(br.y);
-    drawGlowAt("pink", 1, x + HITBOX_W / 2, y + 3, 0.35);
-    const strength = b.globalAlpha;
-    for (let k = 0; k < 5; k++) {
-      const t = (time * 1.2 + k / 5) % 1;
+    const strength = fade * bridgeAlpha(br) * (ghost ? 0.6 : 1);
+    const mid = p.x + HITBOX_W / 2, y = Math.round(br.y), R = MAGIC_FEET.reach;
+    const from = Math.max(br.x, mid - R), to = Math.min(br.x + br.w, mid + R); // (never past the bridge's ends)
+    const near = (wx) => 1 - ((wx - mid) / R) ** 2; // 1 right under you, 0 at the ends
+    b.globalAlpha = strength;
+    for (const dx of [-R * 0.6, 0, R * 0.6]) if (mid + dx > from && mid + dx < to) drawGlowAt("pink", 1, mid + dx - camX, y + 3, 0.3 * near(mid + dx));
+    // a faint shimmer where you stand, and a haze hanging under it
+    for (let wx = Math.ceil(from); wx < to; wx++) {
+      const k = near(wx), sx = Math.round(wx - camX);
+      if (k <= 0) continue;
+      const flick = hash(wx, Math.floor(time * 8));
+      b.fillStyle = flick > 0.8 ? "#ffffff" : "#ff7ae0";
+      b.globalAlpha = strength * k * (flick > 0.25 ? 0.9 : 0.4);
+      b.fillRect(sx, y, 1, 1);
+      for (let d = 1; d < 5; d++) {
+        if (hash(wx * 3 + d, Math.floor(time * 5)) > k * (0.55 - d * 0.1)) continue;
+        b.fillStyle = "#e08aff";
+        b.globalAlpha = strength * k * 0.6;
+        b.fillRect(sx, y + d, 1, 1);
+      }
+    }
+    // sparkles drifting down from it
+    for (let k = 0; k < 9; k++) {
+      const t = (time * 1.1 + k / 9) % 1;
+      const wx = mid - R + hash(Math.floor(time * 1.1 + k / 9), k) * 2 * R;
+      if (wx < from || wx >= to) continue;
       b.fillStyle = k % 2 ? "#ff9af0" : "#d9a3ff";
-      b.globalAlpha = strength * (1 - t);
-      b.fillRect(x - 2 + Math.floor(hash(Math.floor(time * 1.2 + k / 5), k) * (HITBOX_W + 4)), y + 1 + Math.round(t * 7), 1, 1);
+      b.globalAlpha = strength * (1 - t) * Math.max(0.3, near(wx));
+      b.fillRect(Math.round(wx - camX), y + 1 + Math.round(t * 8), 1, 1);
     }
     b.globalAlpha = fade;
   }
