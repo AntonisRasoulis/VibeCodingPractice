@@ -82,6 +82,7 @@ const Renderer = (() => {
     for (const d of world.decoys) drawEyes(d.kind, d.ex, d.ey, camX, decoyOpacity(d), d.t > d.blink && d.t < d.blink + 0.12 ? "shut" : "open");
     for (const j of world.jaguars) drawJaguarBack(j, world.level, camX, world.time); // eyes in a bush, leaping out
     drawTurrets(world.level, camX, world.time); // (before the ground, so it hides the part still underground)
+    drawAliveTrees(world.level, camX, world.time); // (behind the ground, like the trees in the background)
     drawTiles(world.level, camX, world.time);
     drawTurretDust(world.level, camX, world.time);
     drawSawTracks(world.level, camX);
@@ -138,6 +139,7 @@ const Renderer = (() => {
     drawRiverFronts(world.level, camX, world.time); // ...and anyone in a river is up to their neck
     for (const p of [player, other]) if (p && !p.hiddenIn) drawBridgeMagic(p, camX, world.time, p === other); // held up over a hole by magic
     for (const r of world.roots) drawRoots(r, camX, world.time); // (in front of whoever they've got hold of)
+    drawTreeStrikes(world.level, camX, world.time);
     drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
@@ -1775,6 +1777,53 @@ const Renderer = (() => {
       if (squash) { px(cx - w / 2 - 2, capY + 1, 1, 1, P.hi); px(cx + w / 2 + 1, capY + 1, 1, 1, P.hi); } // a springy twang
     }
     b.globalAlpha = 1;
+  }
+
+  // ---- The enchanted forest's alive trees ----
+
+  // Just like a tree in the background (a twisting trunk, crooked branches, a lumpy canopy), but standing on
+  // the course: it sways a little, and now and then a branch twitches
+  function drawAliveTrees(level, camX, time) {
+    const px = (c, x, y, w = 1, h = 1) => { b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    for (const tr of level.trees) {
+      const tx = Math.round(tr.x - camX) - 2, gy = tr.gy;
+      if (tx < -40 || tx > VIEW_W + 40) continue;
+      const sway = Math.sin(time * 1.3 + tr.seed) * 2, twitch = Math.sin(time * 7 + tr.seed * 3) > 0.7 ? -2 : 0;
+      for (let y = 28; y < gy; y++) { const k = (gy - y) / (gy - 28); px("#2c1640", tx + Math.round(Math.sin(y * 0.12 + tr.seed) * 3 + sway * k), y, 4, 1); }
+      for (const [dx, len] of [[-3, 6], [5, 7]]) for (let k = 0; k < len; k++) px("#2c1640", tx + dx + Math.sign(dx) * k, gy - 1 + (k > 3 ? 1 : 0)); // roots spreading at its foot
+      for (const [by, dir] of [[48, -1], [60, 1]]) for (let k = 0; k < 10; k++) px("#2c1640", tx + 2 + sway * 0.7 + dir * (3 + k), by - Math.round(k * 0.6) + (dir > 0 ? Math.round(twitch * k / 10) : 0), 2, 1);
+      for (let k = 0; k < 70; k++) {
+        const a = hash(tr.seed, k) * Math.PI * 2, r = hash(k, tr.seed) * 18;
+        px(k % 6 ? "#4a2470" : "#6a3a9a", Math.round(tx + 2 + sway + Math.cos(a) * r * 1.5), Math.round(28 + Math.sin(a) * r * 0.75), 3, 3);
+      }
+    }
+  }
+
+  // Where an alive tree strikes: glowing cracks splitting the ground, then its root (or, the first time, root
+  // fingers closing over you), and whoever it's grabbed being pulled down under the ground
+  function drawTreeStrikes(level, camX, time) {
+    const px = (c, x, y, a = 1, w = 1, h = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
+    const A = ALIVE_TREE;
+    for (const tr of level.trees) {
+      if (tr.state === "idle") continue;
+      const x = tr.sx - camX, gy = tr.sgy;
+      if (x < -30 || x > VIEW_W + 30) continue;
+      const u = tr.state === "crack" ? Math.min(1, tr.t / tr.w) : 1, R = Math.round((tr.grab ? 16 : 12) * u);
+      px("#c080ff", x - R - 2, gy - 3, 0.18 * u, 2 * R + 5, 4); // a faint glow seeping up
+      for (let k = -R; k <= R; k++) { const d = Math.abs(k) % 4; px("#d9a0ff", x + k, gy + (d === 1 ? 1 : d === 3 ? 2 : 0)); if (d === 2) px("#f4e0ff", x + k, gy - 1); }
+      if (tr.state === "crack" && Math.floor(time * 20) % 2) { px("#5a3a7e", x - 3, gy - 3); px("#5a3a7e", x + 2, gy - 4); px("#5a3a7e", x + 6, gy - 2); } // bits of earth jumping
+      b.globalAlpha = 1;
+      if (tr.state !== "strike") continue;
+      const t = tr.t, up = t < A.rise ? t / A.rise : t < A.rise + A.hold + (tr.grab ? A.pull : 0) ? 1 : Math.max(0, 1 - (t - A.rise - A.hold - (tr.grab ? A.pull : 0)) / A.sink);
+      if (up <= 0) continue;
+      if (!tr.grab) drawRootList([[x - 1, gy, x + 1, gy - A.tall * up, 4, x, gy - A.tall * up / 2]]);
+      else {
+        // root fingers bursting up round you and curling in over your head, like a closing hand
+        const list = [[-8, -2, -12], [-4, 0, -14], [5, 1, -14], [9, 3, -11]].map(([dx, tipx, tipy]) => [x + dx, gy + 1, x + tipx * up + dx * (1 - up), gy + tipy * up, 3, x + dx * 1.4, gy - 13 * up]);
+        drawRootList(list);
+        if (tr.victim || t < A.rise + A.hold + A.pull) { px("#241038", x - 10, gy + 1, 1, 21, 12); px("#8a3ad0", x - 10, gy, 1, 21, 1); } // the ground they're being pulled into
+      }
+    }
   }
 
   // ---- The enchanted forest's Mushroom Lobbers ----

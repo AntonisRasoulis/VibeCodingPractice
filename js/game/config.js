@@ -501,7 +501,7 @@ const ROOTS = {
 // left and right; some are rotten and pop after one bounce (each player has their own, like the crumbling
 // platforms, and they come back when you respawn).
 const BOUNCY = {
-  weight: 20,          // how often a gap of them comes, as a forest section (about 2-3 per forest)
+  weight: 28,          // how often a gap of them comes, as a forest section (about 2-3 per forest)
   count: [2, 4],       // mushrooms in a gap
   spacing: [36, 46],   // pixels from one cap's middle to the next (an ordinary bounce carries you about 50)
   heights: [10, 26],   // how far above the banks their caps are (pixels)
@@ -528,7 +528,7 @@ const BOUNCY = {
 // Red kills you; green poisons you (your screen goes wild) and kills you a few seconds later; pink floats you
 // away up off the top of the screen; blue wakes you up, back on the main course with no gifts.
 const LOBBER = {
-  weight: 30,          // how often one comes, as a forest section (about 2-3 per forest)
+  weight: 40,          // how often one comes, as a forest section (about 2-3 per forest)
   range: 260,          // it lobs at the nearest runner within this far of it (pixels)
   every: 1,            // seconds between lobs
   squash: 0.2,         // seconds it stays squashed down as it spits
@@ -542,6 +542,26 @@ const LOBBER = {
   float: 110,          // pink: you float up this fast (pixels a second)...
   floatMax: 2.5,       // ...and once you're off the top of the screen (or after this long, stuck under something) you die
   hit: 2,              // a lob's hit box: this far each way from its middle (pixels)
+};
+
+// The enchanted forest's alive trees: they look just like the trees in the background (only swaying a little,
+// a branch twitching now and then). Come close and the ground cracks where you'll be, and a sharp root shoots
+// up there, higher than any jump: stop short (like baiting a flytrap), then run past while it pulls its root
+// back in. Each tree's first attack is a grab instead: wider and quicker, and it pulls you down under the
+// ground, and you wake up back on the main course (like a blue Lobber mushroom).
+const ALIVE_TREE = {
+  weight: 40,          // how often one comes, as a forest section (about 2-3 per forest)
+  sense: 70,           // it strikes at the nearest runner this close to it (pixels, either side)
+  windup: 0.4,         // the ground cracks this long before the root comes up (aimed where you'll be by then)...
+  grabWindup: 0.32,    // ...a little quicker for its first attack, the grab
+  reach: 4,            // the root hits this far each side of it (pixels)...
+  grabReach: 14,       // ...the grab's fingers, much further
+  tall: 42,            // how high the root reaches (higher than any jump)
+  rise: 0.08,          // seconds it takes to shoot up...
+  hold: 0.35,          // ...stays up...
+  sink: 0.4,           // ...and takes to pull back in
+  rest: 1.2,           // after that, seconds before it can strike again: time to run past
+  pull: 0.6,           // a grab: seconds to pull you under
 };
 
 // The forest's spore mushrooms: spores drift down from under the cap all the time, and running

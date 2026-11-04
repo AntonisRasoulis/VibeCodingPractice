@@ -103,6 +103,7 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.trees = [];      // forest: alive trees { id, x (its trunk), gy, seed, state: idle | crack | strike, t, cool, used (its first attack, the grab, is done), sx (where it strikes), grab, w, victim }
     this.lobbers = [];    // forest: Mushroom Lobbers { id, x (its middle), gy (the ground under it), dir (the way it leans), t (time to its next lob), squash (time since it last lobbed), seed }
     this.lobShots = [];   // ...and the little mushrooms they've lobbed, in the air { x, y, vx, vy, kind }
     this.bouncies = [];   // forest: bouncy mushrooms over gaps { id, x0 (its cap's middle), y (the cap's top), amp, period, phase (swaying), rotten, seed, bouncedAt }
@@ -310,6 +311,7 @@ class Level {
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => s.float ? this.floatThreat(s, x, y) : Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
+    if (this.trees.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < ALIVE_TREE.sense + 8)) return true; // (no coming back where an alive tree strikes)
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
     if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.capW / 2 + SLEEP_SHROOM.drift * SLEEP_SHROOM.stem / SLEEP_SHROOM.fall + HITBOX_W)) return true; // (no waiting where its spores fall)
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
@@ -692,6 +694,7 @@ class Level {
     if (this.biome === "forest") weights.sporeShroom = SPORES.weight;
     if (this.biome === "forest" && this.col > 40) weights.bouncy = BOUNCY.weight;
     if (this.biome === "forest" && this.col > 40) weights.lobber = LOBBER.weight;
+    if (this.biome === "forest" && this.col > 40) weights.aliveTree = ALIVE_TREE.weight;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -1252,6 +1255,14 @@ const SECTIONS = {
     }
     this.empty(Math.ceil((x + this.rand(B.edge[0], B.edge[1]) - x0) / TILE));
     this.flat(4, false); // a landing you can stop on
+  },
+
+  // The forest's: an alive tree, on open, flat ground (room to stop short of its root, and to run past)
+  aliveTree() {
+    this.iceBias = false;
+    this.flat(12, false);
+    this.trees.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, seed: this.rng() * 100, state: "idle", t: 0, cool: 0, used: false });
+    this.flat(14, false);
   },
 
   // The forest's: a Mushroom Lobber on open, flat ground (it lobs little mushrooms at whoever comes near)

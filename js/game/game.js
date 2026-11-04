@@ -156,7 +156,7 @@ const Game = (() => {
     updateRootWall(dt);
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
-    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); updateLobbers(dt); levelSounds(); });
+    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); updateLobbers(dt); updateAliveTrees(dt); levelSounds(); });
     checkFire();
   }
 
@@ -180,6 +180,7 @@ const Game = (() => {
       updateLooseSaws(dt);
       updateSpores();
       updateLobbers(dt); // (a race that's all enchanted forest has them on the main course)
+      updateAliveTrees(dt);
     }
     updateMonkeys(dt);
     updateWarps(dt);
@@ -1623,6 +1624,50 @@ const Game = (() => {
       Sound.play("rootGrab");
     }
     if (world.rootWall && (world.rootWall.t += dt) > ROOTS.wallTime + 0.6) world.rootWall = null;
+  }
+
+  // ---- The enchanted forest's alive trees ----
+
+  // An alive tree strikes at the nearest runner who comes close: the ground cracks where they'll be, then a root
+  // shoots up there (or, its first time, root fingers that grab them and pull them under: they wake up on the
+  // main course). Then it pulls its root back in and rests a moment before it can strike again.
+  function updateAliveTrees(dt) {
+    const { level, players } = world, A = ALIVE_TREE;
+    const free = (p) => !p.dead && !p.caught && !p.held && !p.dream;
+    for (const tr of level.trees) {
+      tr.t += dt;
+      if (tr.state === "idle") {
+        if (tr.cool > 0) { tr.cool -= dt; continue; }
+        const target = players.filter((p) => free(p) && Math.abs(p.x + HITBOX_W / 2 - tr.x) < A.sense)
+          .sort((p, q) => Math.abs(p.x - tr.x) - Math.abs(q.x - tr.x))[0];
+        if (!target) continue;
+        const grab = !tr.used, w = grab ? A.grabWindup : A.windup;
+        let sx = target.x + HITBOX_W / 2 + target.vx * w; // where they'll be
+        if (level.groundTop(sx) === null) sx = target.x + HITBOX_W / 2; // (never out over a hole)
+        const gy = level.groundTop(sx);
+        if (gy === null) continue;
+        Object.assign(tr, { state: "crack", t: 0, sx, sgy: gy, grab, w, victim: null });
+        Sound.play("treeCrack");
+      } else if (tr.state === "crack") {
+        if (tr.t >= tr.w) { tr.state = "strike"; tr.t = 0; tr.used = true; Sound.play(tr.grab ? "treeGrab" : "treeStrike"); }
+      } else if (tr.state === "strike") {
+        const reach = tr.grab ? A.grabReach : A.reach, up = Math.min(1, tr.t / A.rise) * A.tall;
+        if (!tr.victim && tr.t < A.rise + A.hold) {
+          const v = players.find((p) => free(p) && p.x + HITBOX_W > tr.sx - reach && p.x < tr.sx + reach && p.y + HITBOX_H > tr.sgy - up && p.y < tr.sgy);
+          if (v && tr.grab) { // grabbed: held fast, and pulled down under the ground
+            tr.victim = v;
+            Object.assign(v, { held: true, vx: 0, vy: 0, x: tr.sx - HITBOX_W / 2, y: tr.sgy - HITBOX_H, onGround: true, standingOn: null });
+            v.showHit("GRABBED!", "#c080ff");
+          } else if (v) { v.showHit("SKEWERED!", "#c080ff"); v.die(); }
+        }
+        const v = tr.victim;
+        if (v && !v.dream) {
+          v.y = Math.min(tr.sgy + 2, v.y + (HITBOX_H + 2) / A.pull * dt);
+          if (tr.t > A.pull) { v.dream = { kind: "woken", t: 0 }; tr.victim = null; Sound.play("lobBonk"); } // under: and you wake up
+        }
+        if (tr.t >= A.rise + A.hold + A.sink + (tr.grab ? A.pull : 0) && !tr.victim) { tr.state = "idle"; tr.cool = A.rest; }
+      }
+    }
   }
 
   // ---- The enchanted forest's Mushroom Lobbers ----

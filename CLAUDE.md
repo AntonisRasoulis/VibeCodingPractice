@@ -109,7 +109,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   landing for a spinning super bounce; some sway, rotten ones pop after one bounce, per player); **Mushroom Lobbers**
   (`LOBBER`, lilac puffballs that lean at the nearest runner and lob a little mushroom once a second: red kills,
   green kills after 3 s of poison screen, pink floats you off the top, blue wakes you up with no gifts:
-  `updateLobbers`, `lobHit`, dream kind `woken`); **spore mushrooms** (curvy S stems; red =
+  `updateLobbers`, `lobHit`, dream kind `woken`); **alive trees** (`ALIVE_TREE`, look like background trees but
+  sway; the ground cracks where you'll be, then a root that kills; each tree's first attack is a grab that pulls
+  you under and wakes you up: `updateAliveTrees`, `drawAliveTrees`, `drawTreeStrikes`); **spore mushrooms** (curvy S stems; red =
   faster, blue = higher jumps, green = poison screen, 10 s; pink = float up for 5 s; they stack). At the
   end, fireflies (the background's too) swarm you into a ball of light and you wake on the main course
   at the same distance. No orbs in the forest; you can't use powers there (you keep them).
