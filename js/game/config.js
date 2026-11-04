@@ -532,8 +532,8 @@ const LOBBER = {
   range: 260,          // it lobs at the nearest runner within this far of it (pixels)
   every: 1,            // seconds between lobs
   squash: 0.2,         // seconds it stays squashed down as it spits
-  speed: 230,          // its lobs cross the ground about this fast (pixels a second; running is 96)...
-  flight: [0.55, 1.2], // ...taking between these many seconds in the air
+  speed: 200,          // its lobs cross the ground about this fast (pixels a second; running is 96)...
+  flight: [0.95, 1.15], // ...taking between these many seconds in the air: high lobs, 60-85 pixels up, near or far
   gravity: 520,        // how hard they fall
   behind: 26,          // a lob "just behind you" lands this far behind (pixels)
   aims: { at: 1, ahead: 1, behind: 1 }, // how likely each aim is: where you are, where you'll be, just behind you
