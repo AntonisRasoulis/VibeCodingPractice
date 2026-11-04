@@ -155,7 +155,7 @@ const Game = (() => {
     updateRootWall(dt);
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
-    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); levelSounds(); });
+    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); updateLobbers(dt); levelSounds(); });
     checkFire();
   }
 
@@ -1621,6 +1621,69 @@ const Game = (() => {
       Sound.play("rootGrab");
     }
     if (world.rootWall && (world.rootWall.t += dt) > ROOTS.wallTime + 0.6) world.rootWall = null;
+  }
+
+  // ---- The enchanted forest's Mushroom Lobbers ----
+
+  const LOB_LOOK = { red: ["SPLAT!", "#ff5a6a"], green: ["POISONED!", "#7aff6a"], pink: ["FLOATING AWAY!", "#ff7ae0"], blue: ["WOKEN UP!", "#7ab8ff"] };
+
+  // Each Lobber leans toward the nearest runner in range and, once a second, squashes down and lobs a little
+  // mushroom up and over at them (where they are, where they'll be, or just behind them). The lobs fly in an
+  // arc and hit whoever they touch on the way, or pop on the ground.
+  function updateLobbers(dt) {
+    const { level, players } = world, L = LOBBER;
+    const free = (p) => !p.dead && !p.caught && !p.held && !p.dream;
+    for (const lb of level.lobbers) {
+      lb.squash += dt;
+      const target = players.filter((p) => free(p) && Math.abs(p.x + HITBOX_W / 2 - lb.x) < L.range)
+        .sort((p, q) => Math.abs(p.x - lb.x) - Math.abs(q.x - lb.x))[0];
+      if (!target) { lb.t = 0; continue; }
+      const mid = target.x + HITBOX_W / 2;
+      lb.dir = mid < lb.x ? -1 : 1;
+      if ((lb.t += dt) < L.every) continue;
+      lb.t = 0;
+      lb.squash = 0;
+      // out of the pore on its upper front, squashed down: a lob that lands on the spot it picked
+      const sx = lb.x + lb.dir * 6, sy = lb.gy - 12;
+      const T = Math.min(L.flight[1], Math.max(L.flight[0], Math.abs(mid - sx) / L.speed));
+      const aim = pickWeighted(L.aims), moving = Math.sign(target.vx) || target.facing;
+      const tx = aim === "ahead" ? mid + target.vx * T : aim === "behind" ? mid - moving * L.behind : mid;
+      const ty = (level.groundTop(tx) ?? target.y + HITBOX_H) - 2;
+      level.lobShots.push({ x: sx, y: sy, vx: (tx - sx) / T, vy: (ty - sy) / T - 0.5 * L.gravity * T, kind: pickWeighted(L.kinds) });
+      Sound.play("lobSpit");
+    }
+    for (const s of level.lobShots) {
+      s.vy += L.gravity * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      const hit = players.find((p) => free(p) && overlaps(p.x, p.y, HITBOX_W, HITBOX_H, s.x - L.hit, s.y - L.hit, L.hit * 2, L.hit * 2));
+      if (hit) { lobHit(hit, s.kind); s.gone = true; continue; }
+      const g = level.groundTop(s.x);
+      if ((g !== null && s.y >= g - 1) || s.y > VIEW_H + 8 || level.isSolid(Math.floor(s.x / TILE), Math.floor(s.y / TILE))) {
+        s.gone = true; // plop: it bursts on the ground, harmless
+        Sound.play("lobPlop");
+        for (let i = 0; i < 6; i++) world.sawBits.push({ x: s.x, y: Math.min(s.y, (g ?? s.y) - 1), vx: (Math.random() - 0.5) * 60, vy: -30 - Math.random() * 50, t: 0.4, c: LOB_LOOK[s.kind][1], level });
+      }
+    }
+    level.lobShots = level.lobShots.filter((s) => !s.gone);
+  }
+
+  // A lobbed mushroom lands on someone: red kills, green poisons (and kills when it's done), pink floats you away
+  // up off the top of the screen, blue wakes you up (back on the main course, with no gifts)
+  function lobHit(p, kind) {
+    p.showHit(...LOB_LOOK[kind]);
+    p.sparkle(LOB_LOOK[kind][1]);
+    if (kind === "red") return p.die();
+    if (kind === "green") { // (another green one doesn't start the countdown over)
+      if (!p.poisonLethal) { p.poison = LOBBER.poison; p.poisonMax = LOBBER.poison; p.poisonLethal = true; }
+      Sound.play("poisoned");
+      return;
+    }
+    if (kind === "pink") { p.floatAway = 0.001; Sound.play("spore"); return; }
+    p.dream = { kind: "woken", t: 0 }; // blue: the screen goes dark and you wake up on the main course
+    p.held = true;
+    p.vx = p.vy = 0;
+    Sound.play("lobBonk");
   }
 
   // ---- The enchanted forest's spore mushrooms ----

@@ -1111,6 +1111,54 @@ function makeForestLayers() {
 
 // ---- The forest's spore mushrooms ----
 
+// The forest's Mushroom Lobber: a lumpy lilac puffball on a short fibrous stem, with a purple pore on its upper
+// front (it lobs out of that). Resting, and squashed down flat as it spits. Facing right (drawn flipped to face left).
+// o outline, B/b highlights, a flesh, c shade, d deep folds, w warts, R the pore's rim, p its mouth, s/t stem, r roots
+const LOBBER_REST_ROWS = [
+  "..........ooo.....",
+  "....ooooooRRRo....",
+  "..ooBbbBoRppRo....",
+  ".oBbbaabbaRRbBo...",
+  ".oBbaawaaaaaabco..",
+  ".obaaaaaaawaaaco..",
+  "oBaawaaaaaaaaaaco.",
+  "obaaaaaaawaaaaaco.",
+  "oaaaaawaaaaaaaaco.",
+  "oaaaaaaaaaaaaaaco.",
+  ".oaawaaaaawaaacco.",
+  ".ocaaaaaaaaaaccco.",
+  "..ocdcaacdccacco..",
+  "...oodcdddcddoo...",
+  ".....odsstdo......",
+  ".....osstto.......",
+  "......ossto.......",
+  ".....ostsso.......",
+  "....oossttoo......",
+  "..rro.ossto.orr...",
+  ".r...rr...rr...r..",
+];
+const LOBBER_FIRE_ROWS = [
+  "..............oooo..",
+  ".....oooooooooRRRRo.",
+  "...ooBbbbbbBBoRpppRo",
+  "..oBbbaawaaabbbRppRo",
+  ".obaaawaaaaaaawaRRco",
+  "oBaaaaaaaaaawaaaaaco",
+  "oaaawaaaaaaaaaaaaaco",
+  "oaaaaaaaawaaaaaaacco",
+  ".ocaaaaaaaaaaaaaacco",
+  "..ocdcaacdccacdcco..",
+  "...oodcdddcddddoo...",
+  ".....oodssttdoo.....",
+  "....oosssttttoo.....",
+  "..rroosssttttoorr...",
+  ".r...rr.....rr...r..",
+];
+const LOBBER_PALETTE = { o: "#2a1440", B: "#e8d0f8", b: "#d0b0ec", a: "#b48ad0", c: "#8e64b0", d: "#6a4690", w: "#f0e0ff", R: "#c080ff", p: "#2a0a44", s: "#d8c8e8", t: "#9a86b4", r: "#7a6a98" };
+// ...and the little mushrooms it lobs (like the forest's decorations), cap first
+const LOB_SHOT_ROWS = [".ccc.", "cchcc", "ccccc", "..s..", "..s.."];
+const LOB_SHOT_COLORS = { red: ["#ff4a5a", "#ffb0b8"], green: ["#5aee4a", "#d0ffb8"], pink: ["#ff6ad5", "#ffc0ee"], blue: ["#4a8aff", "#b8d4ff"] };
+
 const SPORE_COLORS = {
   sleep: { cap: "#7a2ec0", capHi: "#c070f0", capDk: "#4a1c72", spot: "#e0b0ff", spore: "#d9a3ff" }, // (the sleep mushroom)
   red: { cap: "#e8344a", capHi: "#ff7a8a", capDk: "#a01a30", spot: "#ffe0e6", spore: "#ff6a7a" },
@@ -1602,7 +1650,9 @@ function buildSprites() {
     forestThorns: [0, 1, 2].map(makeForestThorn),
     sleepShroom: makeSporeShroom("sleep", 1, SLEEP_SHROOM), // (like the spore mushrooms, a bit bigger, purple)
     sporeShrooms: Object.fromEntries(SPORES.kinds.map((k) => [k, [makeSporeShroom(k, -1), makeSporeShroom(k, 1)]])), // [leaning left, leaning right]
-    glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
+    lobber: { rest: spriteFromRows(LOBBER_REST_ROWS, LOBBER_PALETTE), fire: spriteFromRows(LOBBER_FIRE_ROWS, LOBBER_PALETTE) },
+    lobShots: Object.fromEntries(Object.entries(LOB_SHOT_COLORS).map(([k, [c, h]]) => [k, spriteFromRows(LOB_SHOT_ROWS, { c, h, s: "#f0e6f4" })])),
+    glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"], ["lilac", "#c080ff"], ["red", "#ff4a5a"], ["green", "#5aee4a"], ["blue", "#4a8aff"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow
     arrows: makeArrows(), // its arrows: [flying left, flying right]

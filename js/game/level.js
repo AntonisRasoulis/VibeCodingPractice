@@ -102,6 +102,8 @@ class Level {
     this.sinkholes = [];  // desert sinkholes: { id, x (middle), col, size, gy, state: idle | open, openedAt }
     this.pending = [];    // sinkholes and thin ice a section wants: put in once the ground round them is built and checked
     this.ponds = [];      // snow: thin ice over water: { id, x0, x1 (pixels), gy, state: ice | water, frozen: players stuck in it }
+    this.lobbers = [];    // forest: Mushroom Lobbers { id, x (its middle), gy (the ground under it), dir (the way it leans), t (time to its next lob), squash (time since it last lobbed), seed }
+    this.lobShots = [];   // ...and the little mushrooms they've lobbed, in the air { x, y, vx, vy, kind }
     this.bouncies = [];   // forest: bouncy mushrooms over gaps { id, x0 (its cap's middle), y (the cap's top), amp, period, phase (swaying), rotten, seed, bouncedAt }
     this.sporeShrooms = []; // forest: big spore mushrooms { id, x (its foot), gy, kind, seed, lean (-1 left, 1 right) }
     this.flytraps = [];   // jungle: giant flytraps { id, x (middle), gy, big, state: open | windup | chew | chewNothing | opening, t, victim }
@@ -688,6 +690,7 @@ class Level {
     if (this.biome === "forest" && this.col > 60) weights.shooterStack = FOREST.stackWeight;
     if (this.biome === "forest") weights.sporeShroom = SPORES.weight;
     if (this.biome === "forest" && this.col > 40) weights.bouncy = BOUNCY.weight;
+    if (this.biome === "forest" && this.col > 40) weights.lobber = LOBBER.weight;
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends
@@ -1248,6 +1251,14 @@ const SECTIONS = {
     }
     this.empty(Math.ceil((x + this.rand(B.edge[0], B.edge[1]) - x0) / TILE));
     this.flat(4, false); // a landing you can stop on
+  },
+
+  // The forest's: a Mushroom Lobber on open, flat ground (it lobs little mushrooms at whoever comes near)
+  lobber() {
+    this.iceBias = false;
+    this.flat(10, false);
+    this.lobbers.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, dir: -1, t: 0, squash: 9, seed: this.rng() });
+    this.flat(12, false);
   },
 
   // The forest's: a stack of floating shooters, each drifting its own way

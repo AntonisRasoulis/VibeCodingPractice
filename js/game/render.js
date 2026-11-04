@@ -46,7 +46,7 @@ const Renderer = (() => {
       drawView(view, p, other && other.realm === p.realm && !other.dream ? other : null, camX);
       drawDream(p, camX, world.time);
       b.restore();
-      if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time, p.poisonMax);
+      if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time, p.poisonMax, p.poisonLethal);
     }
     const height = world.players.length === 1 ? VIEW_H : BUFFER_H; // 1 player: just the one view
     if (world.players.length > 1) {
@@ -103,6 +103,7 @@ const Renderer = (() => {
     drawRivers(world.level, camX, world.time);
     drawFlytraps(world.level, camX, world.time);
     drawSporeShrooms(world.level, camX);
+    drawLobbers(world.level, camX, world.time);
     drawSleepShrooms(world.level, camX, world.time);
     drawGroundFires(world.level, camX, world.time);
     drawBushes(world.level, camX, true); // bushes torn open by a trap: behind the runners
@@ -142,6 +143,7 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSnowIce(p, camX, world.time, p === other);
     drawSpores(world.level, camX, world.time); // (in front of the runners, so you see them land on you)
+    drawLobShots(world.level, camX);
     drawSleepClouds(world.level, camX, world.time);
     for (const p of [player, other]) if (p && !p.dead && !p.caught && !p.hiddenIn) drawSporeAura(p, camX, world.time, p === other);
     for (const sb of world.thrownSnowballs) b.drawImage(sprites.thrownSnowball, Math.round(sb.x - camX) - 2, Math.round(sb.y) - 2);
@@ -1422,8 +1424,9 @@ const Renderer = (() => {
 
   // Poisoned: your half of the screen goes green and wobbly, then swims, doubles up and changes
   // color, worse and worse... then clears in the last second
-  function drawPoison(y0, left, time, max) {
-    const s = Math.min(1, (max - left) / (max - 1)) * Math.min(1, left);
+  function drawPoison(y0, left, time, max, lethal) {
+    // (a Lobber's poison doesn't wear off: it just gets worse until it kills you)
+    const s = lethal ? Math.min(1, 0.45 + (max - left) / max) : Math.min(1, (max - left) / (max - 1)) * Math.min(1, left);
     if (s <= 0) return;
     const pg = poisonCopy.getContext("2d");
     pg.clearRect(0, 0, VIEW_W, VIEW_H);
@@ -1432,7 +1435,7 @@ const Renderer = (() => {
     b.beginPath();
     b.rect(0, y0, VIEW_W, VIEW_H);
     b.clip();
-    const amp = 0.5 + s * 3.5; // each row slides a little sideways: the world swims
+    const amp = (0.5 + s * 3.5) * (lethal ? 1.8 : 1); // each row slides a little sideways: the world swims
     for (let y = 0; y < VIEW_H; y++) b.drawImage(poisonCopy, 0, y, VIEW_W, 1, Math.round(Math.sin(y * 0.22 + time * 5) * amp), y0 + y, VIEW_W, 1);
     if (s > 0.35) { // double vision
       b.globalAlpha = (s - 0.35) * 0.7;
@@ -1781,6 +1784,44 @@ const Renderer = (() => {
       if (squash) { px(cx - w / 2 - 2, capY + 1, 1, 1, P.hi); px(cx + w / 2 + 1, capY + 1, 1, 1, P.hi); } // a springy twang
     }
     b.globalAlpha = 1;
+  }
+
+  // ---- The enchanted forest's Mushroom Lobbers ----
+
+  // Leaning toward whoever it's after, squashed down flat for a moment each time it spits, a soft glow round
+  // its purple pore and a little spore dust drifting up out of it
+  function drawLobbers(level, camX, time) {
+    for (const lb of level.lobbers) {
+      const firing = lb.squash < LOBBER.squash, img = firing ? sprites.lobber.fire : sprites.lobber.rest;
+      const x = Math.round(lb.x - camX - img.width / 2), y = lb.gy - img.height;
+      if (x > VIEW_W + 10 || x + img.width < -10) continue;
+      const poreX = lb.x - camX + lb.dir * (firing ? 6 : 2), poreY = y + 2.5;
+      drawGlowAt("lilac", firing ? 1 : 0, poreX, poreY, firing ? 0.7 : 0.45);
+      if (lb.dir > 0) b.drawImage(img, x, y);
+      else { b.save(); b.translate(x + img.width, y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); }
+      for (let k = 0; k < 3; k++) { // spore dust, up and out of the pore
+        const u = (time * 0.6 + k / 3 + lb.seed) % 1;
+        b.globalAlpha = 0.7 * (1 - u);
+        b.fillStyle = "#e8d0f8";
+        b.fillRect(Math.round(poreX + lb.dir * (1 + u * 6 + k)), Math.round(poreY - 2 - u * 8), 1, 1);
+      }
+      b.globalAlpha = 1;
+    }
+  }
+
+  // The little mushrooms in the air, turned to follow their arc (cap first: tipping up as they climb, over the
+  // top, then nose down as they drop)
+  function drawLobShots(level, camX) {
+    for (const s of level.lobShots) {
+      const x = s.x - camX;
+      if (x < -8 || x > VIEW_W + 8) continue;
+      drawGlowAt(s.kind, 0, x, s.y, 0.6);
+      b.save();
+      b.translate(Math.round(x), Math.round(s.y));
+      b.rotate(Math.atan2(s.vy, s.vx) + Math.PI / 2);
+      b.drawImage(sprites.lobShots[s.kind], -2, -2);
+      b.restore();
+    }
   }
 
   function drawPlatforms(level, player, camX, time) {
@@ -3221,7 +3262,7 @@ const Renderer = (() => {
       }
       // Spore mushroom effects, with the seconds left on each
       const effects = [["red", "FAST"], ["blue", "HIGH JUMP"], ["pink", "FLOAT"]].filter(([k]) => p.spores[k] > 0);
-      if (p.poison > 0 && p.poisonMax === SPORES.time) effects.push(["green", "POISON"]);
+      if (p.poison > 0 && (p.poisonMax === SPORES.time || p.poisonLethal)) effects.push(["green", "POISON"]); // (a spore's, or a Lobber's deadly one)
       if (p.rootGuard) effects.unshift(["roots", "ROOTS"]);       // (alone: the roots guarding you from the fire, till they're used)
       if (p.magicFeet) effects.unshift(["magic", "MAGIC FEET"]); // (the enchanted forest's gift: for good, so no countdown)
       let ex = 12;

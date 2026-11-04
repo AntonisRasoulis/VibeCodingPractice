@@ -522,6 +522,28 @@ const BOUNCY = {
   squash: 0.25,        // seconds a cap squashes and springs back after a bounce
 };
 
+// The enchanted forest's Mushroom Lobbers: a lumpy lilac puffball on a short stem, with a purple pore on its
+// upper front. It always leans toward the nearest runner within range and squashes down to lob a little
+// glowing mushroom at them, up and over in an arc: where they are, where they'll be, or just behind them.
+// Red kills you; green poisons you (your screen goes wild) and kills you a few seconds later; pink floats you
+// away up off the top of the screen; blue wakes you up, back on the main course with no gifts.
+const LOBBER = {
+  weight: 30,          // how often one comes, as a forest section (about 2-3 per forest)
+  range: 260,          // it lobs at the nearest runner within this far of it (pixels)
+  every: 1,            // seconds between lobs
+  squash: 0.2,         // seconds it stays squashed down as it spits
+  speed: 230,          // its lobs cross the ground about this fast (pixels a second; running is 96)...
+  flight: [0.55, 1.2], // ...taking between these many seconds in the air
+  gravity: 520,        // how hard they fall
+  behind: 26,          // a lob "just behind you" lands this far behind (pixels)
+  aims: { at: 1, ahead: 1, behind: 1 }, // how likely each aim is: where you are, where you'll be, just behind you
+  kinds: { red: 3, green: 3, pink: 3, blue: 1 }, // how likely each mushroom is (blue is rare)
+  poison: 3,           // green: seconds until the poison kills you
+  float: 110,          // pink: you float up this fast (pixels a second)...
+  floatMax: 2.5,       // ...and once you're off the top of the screen (or after this long, stuck under something) you die
+  hit: 2,              // a lob's hit box: this far each way from its middle (pixels)
+};
+
 // The forest's spore mushrooms: spores drift down from under the cap all the time, and running
 // under one you'll most likely catch one on your head (about 9 times in 10). Each color does something different (they stack).
 const SPORES = {

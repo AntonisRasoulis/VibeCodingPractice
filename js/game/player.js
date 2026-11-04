@@ -83,7 +83,9 @@ class Player {
     this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
     this.lying = false;           // just woken up, still lying down
     this.magicFeet = false;
-    this.rootGuard = false;       // alone: the forest's roots are watching over us, and burst up when the fire gets close
+    this.rootGuard = false;
+    this.poisonLethal = false;    // a Lobber's green mushroom: when the poison runs out, we die
+    this.floatAway = 0;           // a Lobber's pink mushroom: floating up and away (seconds so far); off the top of the screen, we die       // alone: the forest's roots are watching over us, and burst up when the fire gets close
     this.rotState = new Map();    // the forest's rotten bouncy mushrooms *this* player has bounced on: seconds since (they pop)
     this.spinning = false;        // a super bounce off a bouncy mushroom: spinning, no steering until we land on solid ground       // made it out of the enchanted forest: magic holds us up over every hole (for the rest of the race)
     this.spores = { red: 0, blue: 0, pink: 0 }; // seconds left of each spore mushroom's effect (forest): faster, higher jumps, floating
@@ -146,6 +148,7 @@ class Player {
       return;
     }
 
+    if (this.poisonLethal && this.poison <= 0 && !this.dead) return this.die(); // (a Lobber's green mushroom: it's run its course)
     if (this.dead) {
       this.deadTimer -= dt;
       if (this.deadTimer <= 0) this.respawn();
@@ -317,8 +320,12 @@ class Player {
     // Ride moving platforms
     if (this.standingOn && this.vy >= 0) this.moveX(this.standingOn.dx, level);
 
-    // Gravity and movement (a pink spore: no gravity, you drift slowly up instead)
-    if (this.spores.pink > 0) {
+    // Gravity and movement (a pink spore: no gravity, you drift slowly up instead; a Lobber's pink mushroom: fast, and away)
+    if (this.floatAway) {
+      this.vy = -LOBBER.float;
+      this.onGround = false;
+      this.standingOn = null;
+    } else if (this.spores.pink > 0) {
       this.vy = this.y > 2 ? -SPORES.floatRise : 0;
       this.onGround = false;
       this.standingOn = null;
@@ -333,6 +340,7 @@ class Player {
     this.moveY(this.vy * dt, level);
     if (this.vy >= 0) this.landOnPlatforms(level, prevBottom);
     if (!this.onGround && fallSpeed > 0) this.bounceOnShrooms(level, prevBottom, fallSpeed);
+    if (this.floatAway && (this.y + HITBOX_H < -2 || (this.floatAway += dt) > LOBBER.floatMax)) return this.die(); // floated away
     if (this.onGround && this.spinning) { this.spinning = false; this.spin = 0; } // back on solid ground: steering again
     this.onIce = this.onGround && !this.standingOn && level.isIce(Math.floor((this.x + HITBOX_W / 2) / TILE));
     // A monsoon's flood: off the logs and into the water, and the current takes you
@@ -1123,6 +1131,8 @@ class Player {
     this.inFlood = false;
     this.spin = 0;
     this.spinning = false;
+    this.floatAway = 0;
+    if (this.poisonLethal) { this.poisonLethal = false; this.poison = 0; } // (a Lobber's poison: it's done its worst)
     this.dashHold = 0;
     this.dashTime = 0;
     this.windTime = 0;
