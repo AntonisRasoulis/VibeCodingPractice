@@ -1737,7 +1737,7 @@ const Renderer = (() => {
     for (const m of level.bouncies) {
       const cx0 = level.bouncyX(m, level.time) - camX;
       if (cx0 < -40 || cx0 > VIEW_W + 40) continue;
-      const rot = m.rotten && player.rotState.get(m.id), popped = rot !== undefined && rot >= BOUNCY.rotWobble;
+      const rot = m.rotten ? player.rotState.get(m.id) : undefined, popped = rot !== undefined && rot >= BOUNCY.rotWobble; // (rot: seconds since this player bounced on a rotten one)
       const P = m.rotten ? { ...L0, ...L0.rot } : L0;
       const since = time - m.bouncedAt;
       const squash = !popped && since < BOUNCY.squash ? Math.round(2 * Math.sin(Math.PI * since / BOUNCY.squash)) : 0; // squashing down and springing back
@@ -1754,7 +1754,8 @@ const Renderer = (() => {
       for (let yy = popped ? top + 3 : top; yy < VIEW_H + 4; yy++) {
         const d = (yy - top) / len, k = 1 - d;
         const curl = Math.sin(d * Math.PI * 2 * Math.max(1.2, len / 26) + seed) * (2 + d * 2.5);
-        const sx = Math.round(cx - 1 + curl - Math.sin(seed) * 2 * d + (level.bouncyX(m, level.time) - m.x0) * -(1 - k * k) + wob * k);
+        // (worked out from its exact position and rounded once, so a swaying stem doesn't flicker; its foot stays put)
+        const sx = Math.round(m.x0 - camX + (level.bouncyX(m, level.time) - m.x0) * k * k + shake - 1 + curl - Math.sin(seed) * 2 * d + wob * k);
         const tw = Math.floor((yy + seed * 10) / 3) % 3;
         px(sx, yy, 3, 1, L0.stem[1]);
         px(sx + tw, yy, 1, 1, L0.stem[0]);

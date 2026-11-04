@@ -1232,11 +1232,15 @@ const SECTIONS = {
     for (let i = 0; i < n; i++) {
       let dist = i === 0 ? this.rand(B.edge[0], B.edge[1]) : this.rand(B.spacing[0], B.spacing[1]);
       let h = this.rand(B.heights[0], B.heights[1]);
-      const sway = i > 0 && !prev.rotten && this.rng() < B.swayChance; // (never right after a rotten one: you couldn't bounce on the spot waiting for it)
+      // (never right after a rotten one, or another swaying one: you wait on the one before, bouncing on the spot)
+      const sway = i > 0 && !prev.rotten && !prev.amp && this.rng() < B.swayChance;
       const amp = sway ? this.rand(B.swayAmp[0], B.swayAmp[1]) : 0;
       const v = i === 0 ? PHYSICS.jumpSpeed : B.bounce, room = 10;
-      while (h > B.heights[0] && dist + amp + prev.amp > reach(v, h - prev.h) - room) h -= 2;
-      dist = Math.min(dist, Math.floor(reach(v, h - prev.h) - room - amp - prev.amp));
+      // a swaying one (or the one after it) only has to come in reach as it swings your way, for a good part of its swing
+      const give = (amp + prev.amp) * B.swayReach;
+      while (h > B.heights[0] && dist - give > reach(v, h - prev.h) - room) h -= 2;
+      dist = Math.min(dist, Math.floor(reach(v, h - prev.h) - room + give));
+      dist = Math.max(dist, B.capW + 2 + amp + prev.amp); // (and never so close that two caps bump into each other mid-swing)
       x += dist;
       const m = { id: this.nextId++, x0: x, y: gy - h, amp, period: this.rand(B.swayPeriod[0] * 10, B.swayPeriod[1] * 10) / 10, phase: this.rng(), rotten: this.rng() < B.rotChance, seed: this.rng() * 100, bouncedAt: -9 };
       this.bouncies.push(m);
