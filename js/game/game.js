@@ -1631,6 +1631,13 @@ const Game = (() => {
   // An alive tree strikes at the nearest runner who comes close: the ground cracks where they'll be, then a root
   // shoots up there (or, its first time, root fingers that grab them and pull them under: they wake up on the
   // main course). Then it pulls its root back in and rests a moment before it can strike again.
+  // How close a runner has to come for a tree to strike: just close enough that running straight in at full
+  // speed, they reach its trunk as the root comes up (stop short, or back off, and it misses)
+  function treeSense(grab) {
+    const A = ALIVE_TREE;
+    return PHYSICS.runSpeed * (grab ? A.grabWindup : A.windup) + (grab ? A.grabReach : A.reach) + HITBOX_W / 2 - 4;
+  }
+
   function updateAliveTrees(dt) {
     const { level, players } = world, A = ALIVE_TREE;
     const free = (p) => !p.dead && !p.caught && !p.held && !p.dream;
@@ -1638,34 +1645,36 @@ const Game = (() => {
       tr.t += dt;
       if (tr.state === "idle") {
         if (tr.cool > 0) { tr.cool -= dt; continue; }
-        const target = players.filter((p) => free(p) && Math.abs(p.x + HITBOX_W / 2 - tr.x) < A.sense)
-          .sort((p, q) => Math.abs(p.x - tr.x) - Math.abs(q.x - tr.x))[0];
-        if (!target) continue;
-        const grab = !tr.used, w = grab ? A.grabWindup : A.windup;
-        let sx = target.x + HITBOX_W / 2 + target.vx * w; // where they'll be
-        if (level.groundTop(sx) === null) sx = target.x + HITBOX_W / 2; // (never out over a hole)
-        const gy = level.groundTop(sx);
-        if (gy === null) continue;
-        Object.assign(tr, { state: "crack", t: 0, sx, sgy: gy, grab, w, victim: null });
+        const grab = !tr.used;
+        if (!players.some((p) => free(p) && Math.abs(p.x + HITBOX_W / 2 - tr.x) < treeSense(grab) && p.y + HITBOX_H > tr.gy - 60)) continue;
+        Object.assign(tr, { state: "crack", t: 0, sx: tr.x, sgy: tr.gy, grab, w: grab ? A.grabWindup : A.windup, victim: null, caughtAt: null }); // (always right at its trunk)
         Sound.play("treeCrack");
       } else if (tr.state === "crack") {
         if (tr.t >= tr.w) { tr.state = "strike"; tr.t = 0; tr.used = true; Sound.play(tr.grab ? "treeGrab" : "treeStrike"); }
       } else if (tr.state === "strike") {
         const reach = tr.grab ? A.grabReach : A.reach, up = Math.min(1, tr.t / A.rise) * A.tall;
-        if (!tr.victim && tr.t < A.rise + A.hold) {
+        if (!tr.victim && tr.caughtAt === null && tr.t < A.rise + A.hold) {
           const v = players.find((p) => free(p) && p.x + HITBOX_W > tr.sx - reach && p.x < tr.sx + reach && p.y + HITBOX_H > tr.sgy - up && p.y < tr.sgy);
-          if (v && tr.grab) { // grabbed: held fast, and pulled down under the ground
+          if (v && tr.grab) { // caught: flung up, coiled round, then yanked down into the dirt
             tr.victim = v;
-            Object.assign(v, { held: true, vx: 0, vy: 0, x: tr.sx - HITBOX_W / 2, y: tr.sgy - HITBOX_H, onGround: true, standingOn: null });
+            tr.caughtAt = tr.t;
+            Object.assign(v, { held: true, vx: 0, vy: 0, x: tr.sx - HITBOX_W / 2, onGround: false, standingOn: null });
             v.showHit("GRABBED!", "#c080ff");
           } else if (v) { v.showHit("SKEWERED!", "#c080ff"); v.die(); }
         }
         const v = tr.victim;
         if (v && !v.dream) {
-          v.y = Math.min(tr.sgy + 2, v.y + (HITBOX_H + 2) / A.pull * dt);
-          if (tr.t > A.pull) { v.dream = { kind: "woken", t: 0 }; tr.victim = null; Sound.play("lobBonk"); } // under: and you wake up
+          const u = tr.t - tr.caughtAt, top = tr.sgy - HITBOX_H - A.fling, ground = tr.sgy - HITBOX_H;
+          if (u < A.flingTime) { const k = u / A.flingTime; v.y = ground + (top - ground) * (1 - (1 - k) * (1 - k)); }  // flung up
+          else if (u < A.flingTime + A.wrapTime) v.y = top + Math.sin(u * 60) * 0.8;                                         // coiled, struggling
+          else if (u < A.flingTime + A.wrapTime + A.yankTime) {                                                               // yanked down, hard
+            const k = (u - A.flingTime - A.wrapTime) / A.yankTime;
+            v.y = top + (tr.sgy + 4 - top) * k * k;
+            if (!tr.yanked) { tr.yanked = true; Sound.play("treeStrike"); }
+          } else { v.y = tr.sgy + 4; v.dream = { kind: "woken", t: 0 }; tr.victim = null; tr.yanked = false; Sound.play("lobBonk"); } // under: and you wake up
         }
-        if (tr.t >= A.rise + A.hold + A.sink + (tr.grab ? A.pull : 0) && !tr.victim) { tr.state = "idle"; tr.cool = A.rest; }
+        const grabTime = tr.caughtAt !== null ? tr.caughtAt + A.flingTime + A.wrapTime + A.yankTime : 0;
+        if (!tr.victim && tr.t >= Math.max(A.rise + A.hold, grabTime) + A.sink) { tr.state = "idle"; tr.cool = A.rest; }
       }
     }
   }

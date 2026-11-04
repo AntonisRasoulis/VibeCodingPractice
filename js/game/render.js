@@ -1814,15 +1814,26 @@ const Renderer = (() => {
       if (tr.state === "crack" && Math.floor(time * 20) % 2) { px("#5a3a7e", x - 3, gy - 3); px("#5a3a7e", x + 2, gy - 4); px("#5a3a7e", x + 6, gy - 2); } // bits of earth jumping
       b.globalAlpha = 1;
       if (tr.state !== "strike") continue;
-      const t = tr.t, up = t < A.rise ? t / A.rise : t < A.rise + A.hold + (tr.grab ? A.pull : 0) ? 1 : Math.max(0, 1 - (t - A.rise - A.hold - (tr.grab ? A.pull : 0)) / A.sink);
+      const t = tr.t, A2 = A, caught = tr.caughtAt !== null;
+      const grabEnd = caught ? tr.caughtAt + A2.flingTime + A2.wrapTime + A2.yankTime : 0;
+      const holdEnd = Math.max(A2.rise + A2.hold, grabEnd);
+      const up = t < A2.rise ? t / A2.rise : t < holdEnd ? 1 : Math.max(0, 1 - (t - holdEnd) / A2.sink);
       if (up <= 0) continue;
-      if (!tr.grab) drawRootList([[x - 1, gy, x + 1, gy - A.tall * up, 4, x, gy - A.tall * up / 2]]);
-      else {
-        // root fingers bursting up round you and curling in over your head, like a closing hand
-        const list = [[-8, -2, -12], [-4, 0, -14], [5, 1, -14], [9, 3, -11]].map(([dx, tipx, tipy]) => [x + dx, gy + 1, x + tipx * up + dx * (1 - up), gy + tipy * up, 3, x + dx * 1.4, gy - 13 * up]);
-        drawRootList(list);
-        if (tr.victim || t < A.rise + A.hold + A.pull) { px("#241038", x - 10, gy + 1, 1, 21, 12); px("#8a3ad0", x - 10, gy, 1, 21, 1); } // the ground they're being pulled into
-      }
+      const v = tr.victim;
+      if (tr.grab && v) {
+        // one thick root up from the trunk, holding them up in the air and coiled tight round them
+        const vx = Math.round(v.x - camX), vy = v.y, wob = Math.sin(time * 50) * 1;
+        drawRootList([[x - 2, gy + 2, x - 1 + wob, vy + HITBOX_H + 1, 6, x - 7, (gy + vy) / 2]]);
+        const band = (xa, ya, xb, yb) => { for (let xx = xa; xx <= xb; xx++) { const yy = Math.round(ya + (yb - ya) * (xx - xa) / Math.max(1, xb - xa)); px("#776b82", xx, yy); px("#2f2934", xx, yy + 1); px("#1d1922", xx, yy + 2); } };
+        band(vx - 2, vy + 9, vx + 7, vy + 6); band(vx - 2, vy + 5, vx + 7, vy + 2);
+        px("#2f2934", vx - 3, vy + 3, 1, 1, 9); px("#2f2934", vx + 8, vy + 1, 1, 1, 9); // round the back
+        drawRootList([[vx + 8, vy + 2, vx + 3, vy - 4, 2, vx + 10, vy - 3]]);               // its tip, over the head
+        b.globalAlpha = 1;
+      } else if (tr.grab) {
+        drawRootList([[x - 2, gy + 2, x, gy - A2.tall * up, 6, x - 6, gy - A2.tall * up / 2]]); // (a thick one: missed)
+      } else drawRootList([[x - 1, gy, x + 1, gy - A2.tall * up, 4, x, gy - A2.tall * up / 2]]);
+      // the dirt they're yanked down into (in front of them)
+      if (tr.grab && (v ? v.y > gy - HITBOX_H : caught && t < grabEnd + 0.8)) { px("#241038", x - 12, gy + 1, 1, 25, 14); px("#8a3ad0", x - 12, gy, 1, 25, 1); b.globalAlpha = 1; }
     }
   }
 
