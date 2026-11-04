@@ -244,7 +244,7 @@ const MISSILE = {
 const BIOMES = ["prairie", "snow", "desert", "jungle"];
 // Hidden biomes: never in the normal rotation (you'll only get there through a magic portal)
 const SECRET_BIOMES = ["forest"];
-const BIOME_NAMES = { forest: "enchanted forest" }; // (the rest are shown as they are)
+const BIOME_NAMES = { forest: "enchanted forest", snow: "taiga" }; // what players see (the rest are shown as they are)
 const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
 
 const SNOW = {

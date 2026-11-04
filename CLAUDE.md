@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 92 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 93 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -87,7 +87,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 - **Shared obstacles:** steps, spike groups, pits, floating / moving / crumbling platforms, blue-to-orange
   portals, swinging maces, diagonal spike shooters, saw blades (in a ground slot, on a pole, in a pit).
 - **Biomes** (off by default, turned on with the Biomes button; the arrow picks which): **prairie**
-  (missiles, bear traps, bushes to hide in), **snow** (ice, icicles, rolling snowballs, thin ice over
+  (missiles, bear traps, bushes to hide in), **taiga** (`snow` in the code: ice, icicles, rolling snowballs, thin ice over
   ponds, bears), **desert** (cactuses, quicksand, tumbleweeds, sinkholes, vultures), **jungle** (bamboo
   and thorn bushes, rivers with drifting logs, palms dropping coconuts, flytraps, jaguars and panthers,
   ancient turrets shooting arrows: plain, poison, sleep and blunt). Biome dangers start at 400 m
