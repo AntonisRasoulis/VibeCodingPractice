@@ -1580,16 +1580,23 @@ const Renderer = (() => {
     return fadeIn * (1 - u) * (Math.floor(br.idle * 14) % 2 ? 0.45 : 1);
   }
 
-  // Someone held up over a hole by a magic bridge: no bridge to see, just the same magic that keeps the
+  // Someone held up over a hole by a magic bridge (or floating up: a pink spore, a Lobber's pink mushroom): no bridge to see, just the same magic that keeps the
   // forest's spike shooters afloat (a faint pink glow, sparkles drifting down) in a little stretch under
   // them, strongest right under their feet and fading out to either side
   function drawBridgeMagic(p, camX, time, ghost) {
-    const br = p.standingOn;
-    if (!br || br.kind !== "bridge" || p.dead || p.caught) return;
-    const fade = b.globalAlpha;
-    const strength = fade * bridgeAlpha(br) * (ghost ? 0.6 : 1);
-    const mid = p.x + HITBOX_W / 2, y = Math.round(br.y), R = MAGIC_FEET.reach;
-    const from = Math.max(br.x, mid - R), to = Math.min(br.x + br.w, mid + R); // (never past the bridge's ends)
+    if (p.dead || p.caught) return;
+    const br = p.standingOn, mid = p.x + HITBOX_W / 2, R = MAGIC_FEET.reach;
+    if (br && br.kind === "bridge") {
+      drawFootMagic(mid, Math.round(br.y), Math.max(br.x, mid - R), Math.min(br.x + br.w, mid + R), b.globalAlpha * bridgeAlpha(br) * (ghost ? 0.6 : 1), camX, time); // (never past the bridge's ends)
+    } else if (p.floatAway || p.spores.pink > 0) {
+      // floating (a pink spore, or a Lobber's pink mushroom): the same magic under your feet, carrying you up
+      drawFootMagic(mid, Math.round(p.y + HITBOX_H), mid - R, mid + R, b.globalAlpha * (ghost ? 0.6 : 1), camX, time);
+    }
+  }
+
+  // The magic itself: centred on mid, at height y, from..to (world x)
+  function drawFootMagic(mid, y, from, to, strength, camX, time) {
+    const fade = b.globalAlpha, R = MAGIC_FEET.reach;
     const near = (wx) => 1 - ((wx - mid) / R) ** 2; // 1 right under you, 0 at the ends
     b.globalAlpha = strength;
     for (const dx of [-R * 0.6, 0, R * 0.6]) if (mid + dx > from && mid + dx < to) drawGlowAt("pink", 1, mid + dx - camX, y + 3, 0.3 * near(mid + dx));
