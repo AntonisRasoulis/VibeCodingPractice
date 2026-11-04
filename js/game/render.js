@@ -1833,6 +1833,8 @@ const Renderer = (() => {
         px("#2f2934", vx - 3, vy + 3, 1, 1, 9); px("#2f2934", vx + 8, vy + 1, 1, 1, 9); // round the back
         drawRootList([[vx + 8, vy + 2, vx + 3, vy - 4, 2, vx + 10, vy - 3]]);               // its tip, over the head
         b.globalAlpha = 1;
+      } else if (tr.grab && caught) {
+        // (it went down into the dirt with them: nothing left sticking up)
       } else if (tr.grab) {
         drawRootList([[x - 2, gy + 2, x, gy - A2.tall * up, 6, x - 6, gy - A2.tall * up / 2]]); // (a thick one: missed)
       } else drawRootList([[x - 1, gy, x + 1, gy - A2.tall * up, 4, x, gy - A2.tall * up / 2]]);
