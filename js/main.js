@@ -16,11 +16,20 @@ let lastMode = 2;
 let biomes = false; // snow, desert and jungle biomes: off until you turn them on (remembered by the browser)
 try { biomes = localStorage.getItem("fire-run-biomes") === "1"; } catch (e) { /* storage blocked */ }
 let biomeList = BIOMES.slice(); // ...and which ones you get with them on (picked with the arrow next to the button)
+// (read further down, once the secret biomes are known: at least one of all of them has to be on)
 try {
   const saved = JSON.parse(localStorage.getItem("fire-run-biome-list"));
   const known = Array.isArray(saved) ? saved.filter((b) => BIOMES.includes(b)) : [];
-  if (known.length) biomeList = known;
+  if (Array.isArray(saved)) biomeList = known; // (it can be empty now, if a secret biome is on)
 } catch (e) { /* storage blocked, or nothing saved */ }
+// The secret biomes (reached in special ways, like the enchanted forest through a sleep mushroom): which are on.
+// Turn every regular biome off and the race is in the secret ones instead.
+let secretList = SECRET_BIOMES.slice();
+try {
+  const saved = JSON.parse(localStorage.getItem("fire-run-secret-list"));
+  if (Array.isArray(saved)) secretList = saved.filter((b) => SECRET_BIOMES.includes(b));
+} catch (e) { /* storage blocked, or nothing saved */ }
+if (!biomeList.length && !secretList.length) biomeList = BIOMES.slice();
 let wild = false; // Wild mode (the hard one): off until you pick it (remembered by the browser)
 try { wild = localStorage.getItem("fire-run-mode") === "wild"; } catch (e) { /* storage blocked */ }
 // best distance in 1-player mode, one for each mode (remembered by the browser)
@@ -99,7 +108,7 @@ function startGame(players) {
   startButton.blur();
   soloButton.blur();
   canvas.scrollIntoView({ behavior: "smooth", block: "center" });
-  Game.start(players, { biomes, biomeList, wild });
+  Game.start(players, { biomes, biomeList, secretList, wild });
 }
 
 startButton.addEventListener("click", () => startGame(2));
@@ -112,10 +121,11 @@ function showBiomes() {
   biomesButton.setAttribute("aria-pressed", String(biomes));
   biomeArrow.hidden = !biomes; // the arrow to pick which biomes is only there with them on
   if (!biomes) openBiomePanel(false);
+  const total = biomeList.length + secretList.length;
   for (const chip of biomePanel.querySelectorAll(".biome-choice")) {
-    const on = biomeList.includes(chip.dataset.biome);
+    const on = (chip.dataset.secret ? secretList : biomeList).includes(chip.dataset.biome);
     chip.setAttribute("aria-pressed", String(on));
-    chip.title = on && biomeList.length === 1 ? "At least one biome has to be on" : "";
+    if (!chip.dataset.secret) chip.title = on && total === 1 ? "At least one biome has to be on" : "";
   }
 }
 function openBiomePanel(open) {
@@ -131,12 +141,18 @@ biomeArrow.addEventListener("click", () => openBiomePanel(biomePanel.hidden));
 biomePanel.addEventListener("click", (e) => {
   const chip = e.target.closest(".biome-choice");
   if (!chip) return;
-  const biome = chip.dataset.biome;
-  if (biomeList.includes(biome)) {
-    if (biomeList.length === 1) return; // always at least one
-    biomeList = biomeList.filter((b) => b !== biome);
-  } else biomeList = BIOMES.filter((b) => b === biome || biomeList.includes(b));
-  try { localStorage.setItem("fire-run-biome-list", JSON.stringify(biomeList)); } catch (e) { /* storage blocked */ }
+  const biome = chip.dataset.biome, secret = !!chip.dataset.secret;
+  const list = secret ? secretList : biomeList, all = secret ? SECRET_BIOMES : BIOMES;
+  let next;
+  if (list.includes(biome)) {
+    if (biomeList.length + secretList.length === 1) return; // always at least one (a secret one counts)
+    next = list.filter((b) => b !== biome);
+  } else next = all.filter((b) => b === biome || list.includes(b));
+  if (secret) secretList = next; else biomeList = next;
+  try {
+    localStorage.setItem("fire-run-biome-list", JSON.stringify(biomeList));
+    localStorage.setItem("fire-run-secret-list", JSON.stringify(secretList));
+  } catch (e) { /* storage blocked */ }
   showBiomes();
 });
 // click anywhere else (or press Escape) to close it

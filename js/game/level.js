@@ -79,6 +79,7 @@ class Level {
     this.signs = [];          // wooden signs where a new biome starts
     this.sleepShrooms = [];   // giant sleep mushrooms (the way into the enchanted forest): { id, x (its foot), gy, seed, forest }
     this.realmEnd = options.realmEnd; // (an enchanted forest you're sent to: where it ends, pixels)
+    this.sleepShroomsOn = options.sleepShrooms !== false; // (the enchanted forest turned off in the biome picker: no sleep mushrooms)
     this.realmExit = undefined;       // ...and where its calm ground at the end starts, once it's built (the fireflies come there)
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
@@ -1036,7 +1037,7 @@ class Level {
   // Each biome's special danger. Snow: two bears, at random spots in the biome (at least 70 m apart).
   addBiomeEvents(length) {
     // somewhere in it, a giant sleep mushroom (not in the forest itself)
-    if (this.realmEnd === undefined && this.biome !== "forest") this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
+    if (this.realmEnd === undefined && this.biome !== "forest" && this.sleepShroomsOn) this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
     if (this.biome === "prairie") {
       // Missiles: usually 2 (MISSILE.perBiome), spread out across the biome
       const n = Number(this.pickWeighted(MISSILE.perBiome));

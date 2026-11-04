@@ -27,9 +27,10 @@ const Game = (() => {
   let solo = false;     // 1-player mode: one runner, one big view, WASD or the arrow keys
   let biomeList = ["prairie"]; // the biomes this race goes through (biomes off: just the prairie)
   let wild = false;     // Wild mode: the hard one
+  let sleepShrooms = true; // are there sleep mushrooms (the way into the enchanted forest) on the main course?
 
   function newWorld(startBiome = "prairie") {
-    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes: biomeList.length > 1, biomeList, wild });
+    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes: biomeList.length > 1, biomeList, wild, sleepShrooms });
     level.ensure(VIEW_W * 2);
     const startX = 4 * TILE;
     const startY = level.groundRow * TILE - HITBOX_H;
@@ -178,6 +179,7 @@ const Game = (() => {
       updateArrows(dt);
       updateLooseSaws(dt);
       updateSpores();
+      updateLobbers(dt); // (a race that's all enchanted forest has them on the main course)
     }
     updateMonkeys(dt);
     updateWarps(dt);
@@ -2773,7 +2775,10 @@ const Game = (() => {
     start(players = 2, options = {}) {
       solo = players === 1;
       const picked = (options.biomeList || BIOMES).filter((b) => BIOMES.includes(b));
-      biomeList = options.biomes === true && picked.length ? picked : ["prairie"];
+      const secret = (options.secretList || SECRET_BIOMES).filter((b) => SECRET_BIOMES.includes(b));
+      // biomes off: the prairie. Every regular biome turned off: the race is in the secret biomes instead
+      biomeList = options.biomes !== true ? ["prairie"] : picked.length ? picked : secret.length ? secret : ["prairie"];
+      sleepShrooms = options.biomes !== true || secret.includes("forest"); // (the forest turned off: no way into it)
       wild = options.wild === true;
       canvas.height = (solo ? VIEW_H : VIEW_H * 2 + DIVIDER) * SCALE;
       canvas.style.aspectRatio = `auto ${canvas.width} / ${canvas.height}`;

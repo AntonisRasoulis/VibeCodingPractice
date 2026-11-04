@@ -370,6 +370,16 @@ kbd {
 .biome-choice.snow { --chip: #bfe6ff; }
 .biome-choice.desert { --chip: #ffcc66; }
 .biome-choice.jungle { --chip: #3fbf6a; }
+.biome-choice.forest { --chip: #c080ff; }
+
+/* the secret biomes get their own row, under a little heading */
+.biome-group-label {
+  flex-basis: 100%;
+  margin-top: 4px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 
 .button.wild {
   border-color: #ff6b3d;
