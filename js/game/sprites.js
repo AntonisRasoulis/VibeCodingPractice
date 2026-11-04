@@ -1085,7 +1085,8 @@ function makeForestLayers() {
   for (const tx of [40, 190, 330]) {
     // a twisting trunk, a couple of crooked branches, and a lumpy canopy
     for (let y = 28; y < VIEW_H; y++) px(g, "#2c1640", tx + Math.round(Math.sin(y * 0.12 + tx) * 3), y, 4, 1);
-    for (const [by, dir] of [[48, -1], [60, 1]]) for (let k = 0; k < 10; k++) px(g, "#2c1640", tx + 2 + dir * (3 + k), by - Math.round(k * 0.6), 2, 1);
+    // (each branch grows out of the trunk where it actually is at that height: the trunk winds)
+    for (const [by, dir] of [[48, -1], [60, 1]]) { const bx = tx + Math.round(Math.sin(by * 0.12 + tx) * 3) + (dir > 0 ? 3 : 0); for (let k = 0; k < 10; k++) px(g, "#2c1640", bx + dir * k, by - Math.round(k * 0.6), 2, 1); }
     for (let k = 0; k < 70; k++) {
       const a = hash(tx, k) * Math.PI * 2, r = hash(k, tx) * 18;
       px(g, k % 6 ? "#4a2470" : "#6a3a9a", Math.round(tx + 2 + Math.cos(a) * r * 1.5), Math.round(28 + Math.sin(a) * r * 0.75), 3, 3);

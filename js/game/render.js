@@ -1791,7 +1791,11 @@ const Renderer = (() => {
       const sway = Math.sin(time * 1.3 + tr.seed) * 2, twitch = Math.sin(time * 7 + tr.seed * 3) > 0.7 ? -2 : 0;
       for (let y = 28; y < gy; y++) { const k = (gy - y) / (gy - 28); px("#2c1640", tx + Math.round(Math.sin(y * 0.12 + tr.seed) * 3 + sway * k), y, 4, 1); }
       for (const [dx, len] of [[-3, 6], [5, 7]]) for (let k = 0; k < len; k++) px("#2c1640", tx + dx + Math.sign(dx) * k, gy - 1 + (k > 3 ? 1 : 0)); // roots spreading at its foot
-      for (const [by, dir] of [[48, -1], [60, 1]]) for (let k = 0; k < 10; k++) px("#2c1640", tx + 2 + sway * 0.7 + dir * (3 + k), by - Math.round(k * 0.6) + (dir > 0 ? Math.round(twitch * k / 10) : 0), 2, 1);
+      // (each branch grows out of the trunk where it actually is at that height, swaying with it)
+      for (const [by, dir] of [[48, -1], [60, 1]]) {
+        const bx = tx + Math.round(Math.sin(by * 0.12 + tr.seed) * 3 + sway * (gy - by) / (gy - 28)) + (dir > 0 ? 3 : 0);
+        for (let k = 0; k < 10; k++) px("#2c1640", bx + dir * k, by - Math.round(k * 0.6) + (dir > 0 ? Math.round(twitch * k / 10) : 0), 2, 1);
+      }
       for (let k = 0; k < 70; k++) {
         const a = hash(tr.seed, k) * Math.PI * 2, r = hash(k, tr.seed) * 18;
         px(k % 6 ? "#4a2470" : "#6a3a9a", Math.round(tx + 2 + sway + Math.cos(a) * r * 1.5), Math.round(28 + Math.sin(a) * r * 0.75), 3, 3);
