@@ -156,7 +156,7 @@ const Game = (() => {
     updateRootWall(dt);
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
-    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateSpores(); updateLobbers(dt); updateAliveTrees(dt); levelSounds(); });
+    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateLooseMaces(dt); updateSpores(); updateLobbers(dt); updateAliveTrees(dt); levelSounds(); });
     checkFire();
   }
 
@@ -178,6 +178,7 @@ const Game = (() => {
       updateTurrets(dt);
       updateArrows(dt);
       updateLooseSaws(dt);
+      updateLooseMaces(dt);
       updateSpores();
       updateLobbers(dt); // (a race that's all enchanted forest has them on the main course)
       updateAliveTrees(dt);
@@ -253,7 +254,7 @@ const Game = (() => {
       s.lastVolley = volley;
     }
     for (const m of level.maces) {
-      if (!near(m.x)) continue;
+      if (!near(m.x) || m.loose) continue;
       const half = Math.floor(2 * (level.time / m.period + m.phase)); // changes as it swings through the bottom
       if (m.lastHalf !== undefined && half !== m.lastHalf) Sound.play("maceSwoosh");
       m.lastHalf = half;
@@ -1833,6 +1834,68 @@ const Game = (() => {
       }
       const far = runners.every((p) => Math.abs(p.x - L.x) > VIEW_W);
       if (L.y > VIEW_H + s.r + 4 || Math.abs(L.x - L.from) > FOREST.sawRollFor || (far && runners.length)) { s.gone = true; s.loose = null; }
+    }
+  }
+
+  // ---- The enchanted forest's maces that break loose ----
+
+  // Some of the forest's maces (FOREST.maceBreaks) snap off their vines: once someone comes near, the vine
+  // glows and cracks for a moment, then the ball is flung at where they are, in an arc that falls with
+  // gravity. Of the throws that would hit them, it picks the one most in line with its swing, so it looks
+  // like the swing threw it. Where it lands, it lies there: a spiked ball to jump over. Shared: whoever's nearest.
+  function updateLooseMaces(dt) {
+    const { level, players } = world, F = FOREST;
+    const runners = players.filter((p) => !p.caught && !p.dead && !p.held && !p.dream);
+    for (const m of level.maces) {
+      if (!m.breaks || m.gone) continue;
+      if (!m.loose) {
+        if (m.breakAt === undefined) {
+          if (runners.some((p) => Math.abs(p.x + HITBOX_W / 2 - m.x) < F.maceSense)) { m.breakAt = world.time + F.maceWarn; Sound.play("sawCreak"); }
+          continue;
+        }
+        const now = level.macePoints(m, level.time);
+        if (Math.random() < dt * 20) { // bits of vine and magic flicking off where it's cracking
+          const k = now.links[Math.floor(now.links.length * 0.45)] || now.ball, t = 0.4 + Math.random() * 0.2;
+          world.wisps.push({ level: world.level, x: k.x, y: k.y, vx: (Math.random() - 0.5) * 30, vy: -10 - Math.random() * 20, t, max: t, pink: Math.random() < 0.4, ph: Math.random() * 6, faint: true });
+        }
+        if (world.time < m.breakAt || !runners.length) continue;
+        const ball = now.ball, prev = level.macePoints(m, level.time - 0.01).ball;
+        const sx = (ball.x - prev.x) / 0.01, sy = (ball.y - prev.y) / 0.01; // which way the swing is carrying it
+        const target = runners.reduce((a, q) => (Math.abs(q.x - ball.x) < Math.abs(a.x - ball.x) ? q : a));
+        const tx = target.x + HITBOX_W / 2, ty = target.y + HITBOX_H / 2;
+        const late = world.time > m.breakAt + F.maceWait;
+        if (!late && (Math.sign(sx) !== Math.sign(tx - ball.x) || Math.abs(sx) < 40)) continue; // (wait for it to swing their way)
+        let best = null;
+        for (let T = F.maceFlight[0]; T <= F.maceFlight[1] + 1e-6; T += 0.05) {
+          const vx = (tx - ball.x) / T, vy = (ty - ball.y) / T - 0.5 * F.maceGravity * T;
+          const fit = (vx * sx + vy * sy) / (Math.hypot(vx, vy) * Math.hypot(sx, sy) || 1);
+          if (!best || fit > best.fit) best = { vx, vy, fit };
+        }
+        m.loose = { x: ball.x, y: ball.y, vx: best.vx, vy: best.vy, spin: now.spin, turn: Math.sign(best.vx) * 9, landed: false };
+        sawBurst({ r: 4 }, ball.x, ball.y, 14, ["#2f6a2f", "#4f8a3f", "#7ac25a", "#c080ff", "#ffd0f4"], 120); // the vine snapping
+        Sound.play("sawBreak");
+        continue;
+      }
+      const L = m.loose;
+      if (L.landed) continue;
+      if (Math.random() < dt * 30) { // a trail of the magic that flung it
+        const t = 0.4 + Math.random() * 0.3;
+        world.wisps.push({ level: world.level, x: L.x, y: L.y, vx: -L.vx * 0.1, vy: -L.vy * 0.1 - 10, t, max: t, pink: Math.random() < 0.4, ph: Math.random() * 6, faint: true });
+      }
+      L.vy += F.maceGravity * dt;
+      L.x += L.vx * dt;
+      L.y += L.vy * dt;
+      L.spin += L.turn * dt;
+      const g = level.groundTop(L.x);
+      if (g !== null && L.y + MACE_RADIUS > g + 4 && L.y - L.vy * dt + MACE_RADIUS > g + 4) { L.x -= L.vx * dt; L.vx *= -0.3; continue; } // (into the side of a step: it knocks back off it)
+      if (g !== null && L.y + MACE_RADIUS >= g && L.y - L.vy * dt + MACE_RADIUS <= g + 4 && L.vy > 0) {
+        // thuds down and stays there, half sunk in the moss
+        L.y = g - MACE_RADIUS + 1;
+        L.landed = true;
+        sawBurst({ r: 6 }, L.x, g, 16, ["#3c2148", "#2a1634", "#a24cf0", "#ff9af0"], 140);
+        world.quakes.push({ level: world.level, x: L.x, t: 0.3 });
+        Sound.play("sawSlam");
+      } else if (L.y > VIEW_H + 20) m.gone = true; // (down a pit)
     }
   }
 

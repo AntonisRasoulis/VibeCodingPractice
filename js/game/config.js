@@ -450,6 +450,15 @@ const FOREST = {
   sawJolt: { slot: 170, rail: 120, pit: 230 }, // how hard it jerks up as it breaks (pixels a second, upwards)
   sawClear: 96,          // it only breaks once it would land on ground with at least this far to roll (never straight into a pit)
   sawRollFor: 1400,      // pixels it rolls before it's gone, if no pit stops it first
+  sawWeight: 20,         // how often a saw comes, as a forest section (about 1 per forest; 5 on the main course)
+  maceWeight: 20,        // how often a mace comes, as a forest section (about 1 per forest; 4 on the main course)
+  maceBreaks: 0.2,       // share of its maces whose vine snaps (the same as the saws)...
+  maceSense: 150,        // ...once someone is this close (pixels, either way)...
+  maceWarn: 0.6,         // ...after its vine glows and cracks for this long (seconds)...
+  maceFlight: [0.55, 0.95], // ...and it's flung at where they are, landing this long later (seconds: it picks
+                         // the time whose throw lines up best with its swing, so it looks like the swing threw it)
+  maceGravity: 420,      // how fast it falls (pixels a second, each second)
+  maceWait: 1.5,         // if its swing never lines up, it snaps anyway after this long (seconds)
   floatAmp: [2, 10],     // tiles each way a floating shooter drifts
   floatSpeed: 36,        // its top speed (pixels a second)
   stack: [2, 3],         // shooters in a stack

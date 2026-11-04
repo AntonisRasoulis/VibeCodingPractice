@@ -221,6 +221,10 @@ class Level {
   // link further down the chain lags slightly behind the one above it, so the
   // chain bends like a whip instead of swinging as a stiff stick.
   macePoints(m, time) {
+    if (m.loose) { // (a forest mace whose vine snapped: the ball moves itself, and a stub of vine still swings)
+      const rest = this.macePoints({ ...m, loose: null, length: m.length * 0.45 }, time);
+      return { links: rest.links, ball: { x: m.loose.x, y: m.loose.y }, spin: m.loose.spin, speed: 0, stub: true };
+    }
     const links = [];
     const steps = Math.max(4, Math.round(m.length / 5));
     const seg = m.length / steps;
@@ -304,6 +308,7 @@ class Level {
   // a shooter's spikes, or icicles that would drop on them.
   threatened(x, y, ignoreTraps = false) {
     if (this.maces.some((m) => Math.abs(m.x - (x + HITBOX_W / 2)) < this.maceReach(m) + HITBOX_W / 2)) return true;
+    if (this.maces.some((m) => m.loose && !m.gone && Math.abs(m.loose.x - (x + HITBOX_W / 2)) < MACE_RADIUS + HITBOX_W + 4)) return true; // (one lying on the ground)
     if (this.saws.some((s) => x + HITBOX_W > Math.min(s.x0, s.x1) - s.r - 10 && x < Math.max(s.x0, s.x1) + s.r + 10)) return true;
     if (!ignoreTraps && this.traps.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < TRAP.sizes[t.size] + HITBOX_W)) return true;
     if (!ignoreTraps && this.ponds.some((p) => x + HITBOX_W > p.x0 - 2 && x < p.x1 + 2)) return true;
@@ -690,7 +695,7 @@ class Level {
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
-    if (this.biome === "forest" && this.col > 60) weights.shooterStack = FOREST.stackWeight;
+    if (this.biome === "forest" && this.col > 60) Object.assign(weights, { shooterStack: FOREST.stackWeight, saw: FOREST.sawWeight, mace: FOREST.maceWeight }); // (more of them: the forest's own dangers would drown them out)
     if (this.biome === "forest") weights.sporeShroom = SPORES.weight;
     if (this.biome === "forest" && this.col > 40) weights.bouncy = BOUNCY.weight;
     if (this.biome === "forest" && this.col > 40) weights.lobber = LOBBER.weight;
@@ -1354,6 +1359,7 @@ const SECTIONS = {
         period: (1.9 + this.rng() * 1.3 - d * 0.1) * this.pace, // each mace swings at its own speed
         phase: this.rng(),
         spin: (this.rng() < 0.5 ? -1 : 1) * (3 + this.rng() * 4),
+        breaks: this.biome === "forest" && this.rng() < FOREST.maceBreaks, // (its vine will snap and fling it at you)
       });
       this.flat(i + 1 < count ? 18 : 12); // room to stop safely between two maces (even if the next section starts with one)
     }

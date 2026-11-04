@@ -820,7 +820,7 @@ class Player {
     // Swinging maces: hit if the ball touches the body
     const cx = this.x + HITBOX_W / 2;
     for (const m of level.maces) {
-      if (Math.abs(m.x - cx) > m.length + 10) continue;
+      if (m.loose ? Math.abs(m.loose.x - cx) > 20 : Math.abs(m.x - cx) > m.length + 10) continue;
       const ball = level.macePoints(m, level.time).ball;
       const nearX = clamp(ball.x, this.x, this.x + HITBOX_W);
       const nearY = clamp(ball.y, this.y, this.y + HITBOX_H);

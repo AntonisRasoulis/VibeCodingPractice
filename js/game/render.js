@@ -3096,8 +3096,8 @@ const Renderer = (() => {
 
   function drawMaces(level, camX, time) {
     for (const m of level.maces) {
-      const sx = m.x - camX;
-      if (sx < -m.length - 10 || sx > VIEW_W + m.length + 10) continue;
+      const sx = m.x - camX, lx = m.loose ? m.loose.x - camX : sx; // (a loose one can be well away from its branch)
+      if (Math.max(sx, lx) < -m.length - 10 || Math.min(sx, lx) > VIEW_W + m.length + 10) continue;
       const now = level.macePoints(m, time);
       const forest = forestAt(level, m.x);
       const look = forest ? MACE_LOOK.forest : MACE_LOOK.steel;
@@ -3120,10 +3120,15 @@ const Renderer = (() => {
         b.fillRect(Math.round(sx) - 1, m.y - 4, 2, 1);
       }
 
-      // Chain: alternating light and dark links (a vine, with a leaf now and then, in the forest)
-      now.links.slice(0, -1).forEach((p, i) => {
-        b.fillStyle = forest ? (i % 2 ? "#2f6a2f" : "#4f8a3f") : i % 2 ? "#5c616b" : "#9aa0aa";
+      // Chain: alternating light and dark links (a vine, with a leaf now and then, in the forest).
+      // A forest vine about to snap glows and flickers, a crack of light where it'll break; once it has,
+      // only a stub of it is left swinging.
+      const snapping = m.breakAt !== undefined && !m.loose, flick = Math.floor(time * 16) % 2, crack = Math.floor(now.links.length * 0.45);
+      (now.stub ? now.links : now.links.slice(0, -1)).forEach((p, i) => {
+        const glow = snapping && (i === crack || i === crack - 1 ? true : flick === i % 2);
+        b.fillStyle = glow ? (i === crack ? "#ffd0f4" : "#c080ff") : forest ? (i % 2 ? "#2f6a2f" : "#4f8a3f") : i % 2 ? "#5c616b" : "#9aa0aa";
         b.fillRect(Math.round(p.x - camX) - 1, Math.round(p.y) - 1, 2, 2);
+        if (snapping && i === crack) drawGlowAt("lilac", 0, p.x - camX, p.y, 0.6 + 0.3 * flick);
         if (forest && i % 4 === 2) {
           b.fillStyle = "#7ac25a";
           b.fillRect(Math.round(p.x - camX) + 1, Math.round(p.y) - 2, 2, 1);
@@ -3139,7 +3144,7 @@ const Renderer = (() => {
         }
         b.globalAlpha = 1;
       }
-      if (forest) drawGlowAt("thorn", 1, now.ball.x - camX, now.ball.y, 0.5);
+      if (forest) { const down = m.loose && m.loose.landed; drawGlowAt("thorn", down ? 2 : 1, now.ball.x - camX, now.ball.y, down ? 0.75 : 0.5); } // (brighter lying on the dark moss)
       drawMaceBall(now.ball.x - camX, now.ball.y, now.spin, look);
     }
   }
