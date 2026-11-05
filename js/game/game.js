@@ -1441,6 +1441,15 @@ const Game = (() => {
       const d = p.dream;
       d.t += dt;
       if (p.caught) { p.dream = null; continue; } // (the fire got you while you slept)
+      // Nodding off (or bonked awake) mid-jump: you drop to the ground first, instead of hanging in the air
+      if (!d.moved && d.kind !== "fireflies") {
+        const g = (p.realm || world.level).groundTop(p.x + HITBOX_W / 2);
+        if (g !== null && p.y + HITBOX_H < g) {
+          p.vy = Math.max(0, p.vy) + PHYSICS.gravity * dt;
+          p.y = Math.min(g - HITBOX_H, p.y + p.vy * dt);
+          if (p.y + HITBOX_H >= g) { p.vy = 0; p.onGround = true; }
+        }
+      }
       const out = d.kind === "fireflies" ? S.fireflies : 0; // (the fireflies first, then the same fade as falling asleep)
       if (!d.moved && d.t >= out + S.sleep) {
         d.moved = true;
