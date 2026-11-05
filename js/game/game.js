@@ -1840,7 +1840,7 @@ const Game = (() => {
   // ---- The enchanted forest's maces that break loose ----
 
   // Some of the forest's maces (FOREST.maceBreaks) snap off their vines: once someone comes near, the vine
-  // glows and cracks for a moment, then the ball is flung at where they are, in an arc that falls with
+  // glows and cracks for a moment, then the ball is flung at where they are (or, half the time, where they'll be when it lands), in an arc that falls with
   // gravity. Of the throws that would hit them, it picks the one most in line with its swing, so it looks
   // like the swing threw it. Where it lands, it lies there: a spiked ball to jump over. Shared: whoever's nearest.
   function updateLooseMaces(dt) {
@@ -1865,13 +1865,14 @@ const Game = (() => {
         const tx = target.x + HITBOX_W / 2, ty = target.y + HITBOX_H / 2;
         const late = world.time > m.breakAt + F.maceWait;
         if (!late && (Math.sign(sx) !== Math.sign(tx - ball.x) || Math.abs(sx) < 40)) continue; // (wait for it to swing their way)
+        const lead = Math.random() < F.maceAhead && Math.abs(target.vx) > 20 ? target.vx : 0; // (half the time it leads you: where you'll be when it lands)
         let best = null;
         for (let T = F.maceFlight[0]; T <= F.maceFlight[1] + 1e-6; T += 0.05) {
-          const vx = (tx - ball.x) / T, vy = (ty - ball.y) / T - 0.5 * F.maceGravity * T;
+          const vx = (tx + lead * T - ball.x) / T, vy = (ty - ball.y) / T - 0.5 * F.maceGravity * T;
           const fit = (vx * sx + vy * sy) / (Math.hypot(vx, vy) * Math.hypot(sx, sy) || 1);
           if (!best || fit > best.fit) best = { vx, vy, fit };
         }
-        m.loose = { x: ball.x, y: ball.y, vx: best.vx, vy: best.vy, spin: now.spin, turn: Math.sign(best.vx) * 9, landed: false };
+        m.loose = { x: ball.x, y: ball.y, vx: best.vx, vy: best.vy, spin: now.spin, turn: Math.sign(best.vx) * 9, landed: false, lead: lead !== 0 };
         sawBurst({ r: 4 }, ball.x, ball.y, 14, ["#2f6a2f", "#4f8a3f", "#7ac25a", "#c080ff", "#ffd0f4"], 120); // the vine snapping
         Sound.play("sawBreak");
         continue;

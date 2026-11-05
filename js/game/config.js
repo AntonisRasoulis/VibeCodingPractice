@@ -457,6 +457,7 @@ const FOREST = {
   maceWarn: 0.6,         // ...after its vine glows and cracks for this long (seconds)...
   maceFlight: [0.55, 0.95], // ...and it's flung at where they are, landing this long later (seconds: it picks
                          // the time whose throw lines up best with its swing, so it looks like the swing threw it)
+  maceAhead: 0.5,        // chance it's thrown at where you're going to be (your speed times its flight) instead of where you are
   maceGravity: 420,      // how fast it falls (pixels a second, each second)
   maceWait: 1.5,         // if its swing never lines up, it snaps anyway after this long (seconds)
   floatAmp: [2, 10],     // tiles each way a floating shooter drifts
