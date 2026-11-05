@@ -695,11 +695,11 @@ class Level {
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
-    if (this.biome === "forest" && this.col > 60) Object.assign(weights, { shooterStack: FOREST.stackWeight, saw: FOREST.sawWeight, mace: FOREST.maceWeight }); // (more of them: the forest's own dangers would drown them out)
-    if (this.biome === "forest") weights.sporeShroom = SPORES.weight;
-    if (this.biome === "forest" && this.col > 40) weights.bouncy = BOUNCY.weight;
-    if (this.biome === "forest" && this.col > 40) weights.lobber = LOBBER.weight;
-    if (this.biome === "forest" && this.col > 40) weights.aliveTree = ALIVE_TREE.weight;
+    if (this.biome === "forest") { // (its own mix, so its own dangers and the usual ones all get their turn)
+      Object.assign(weights, FOREST.mix);
+      if (this.col <= 60) for (const k of ["shooter", "shooterStack", "saw"]) delete weights[k];
+      if (this.col <= 40) for (const k of ["bouncy", "lobber", "aliveTree"]) delete weights[k];
+    }
 
     let type = this.pickWeighted(weights);
     // Snow: make sure this biome gets its thin ice before it ends

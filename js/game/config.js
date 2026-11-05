@@ -442,6 +442,14 @@ const SLEEP_SHROOM = {
 
 // The enchanted forest's twists on the usual obstacles
 const FOREST = {
+  // How often each kind of section comes in the forest (it replaces the main course's mix there). Balanced so
+  // everything has its turn: about 1.2 each of its own dangers per forest, a little less of the usual ones,
+  // but no forest is promised anything (measured over 500 forests: see the README)
+  mix: {
+    aliveTree: 12, lobber: 12, bouncy: 13, sporeShroom: 12, // its own dangers
+    saw: 8, mace: 8, shooter: 5, shooterStack: 4,           // the usual dangers, forest style
+    falling: 7, gap: 4, spikes: 4, floating: 3, moving: 3, step: 3, portal: 2, flat: 1,
+  },
   sawBreaks: 0.2,        // share of its saws that break loose...
   sawDelay: [0.8, 3],    // ...a while (seconds) after someone first comes near
   sawWarn: 0.6,          // seconds it shakes and creaks first
@@ -450,8 +458,6 @@ const FOREST = {
   sawJolt: { slot: 170, rail: 120, pit: 230 }, // how hard it jerks up as it breaks (pixels a second, upwards)
   sawClear: 96,          // it only breaks once it would land on ground with at least this far to roll (never straight into a pit)
   sawRollFor: 1400,      // pixels it rolls before it's gone, if no pit stops it first
-  sawWeight: 20,         // how often a saw comes, as a forest section (about 1 per forest; 5 on the main course)
-  maceWeight: 20,        // how often a mace comes, as a forest section (about 1 per forest; 4 on the main course)
   maceBreaks: 0.2,       // share of its maces whose vine snaps (the same as the saws)...
   maceSense: 150,        // ...once someone is this close (pixels, either way)...
   maceWarn: 0.6,         // ...after its vine glows and cracks for this long (seconds)...
@@ -463,10 +469,9 @@ const FOREST = {
   floatAmp: [2, 10],     // tiles each way a floating shooter drifts
   floatSpeed: 36,        // its top speed (pixels a second)
   stack: [2, 3],         // shooters in a stack
-  stackWeight: 3,        // how often a stack comes, as a section (a single shooter is 5)
-  branchHold: 0.7,       // its rotten branches (the crumbling platforms) don't fall: stand on one this long in all
+  branchHold: 0.35,      // its rotten branches (the crumbling platforms) don't fall: stand on one this long in all
                          // (stepping off doesn't reset it) and it snaps in two, and you drop straight down
-  branchCreak: 0.3,      // ...it starts creaking and shaking this long before it snaps (cracks spread all the while)
+  branchCreak: 0.15,     // ...it starts creaking and shaking this long before it snaps (cracks spread all the while)
 };
 
 // The enchanted forest's gift: whoever makes it out has magic feet for the rest of the race. Magic holds
@@ -511,7 +516,6 @@ const ROOTS = {
 // left and right; some are rotten and pop after one bounce (each player has their own, like the crumbling
 // platforms, and they come back when you respawn).
 const BOUNCY = {
-  weight: 28,          // how often a gap of them comes, as a forest section (about 2-3 per forest)
   count: [2, 4],       // mushrooms in a gap
   spacing: [36, 46],   // pixels from one cap's middle to the next (an ordinary bounce carries you about 50)
   heights: [10, 26],   // how far above the banks their caps are (pixels)
@@ -538,7 +542,6 @@ const BOUNCY = {
 // Red kills you; green poisons you (your screen goes wild) and kills you a few seconds later; pink floats you
 // away up off the top of the screen; blue wakes you up, back on the main course with no gifts.
 const LOBBER = {
-  weight: 40,          // how often one comes, as a forest section (about 2-3 per forest)
   range: 260,          // it lobs at the nearest runner within this far of it (pixels)
   every: 1,            // seconds between lobs
   squash: 0.2,         // seconds it stays squashed down as it spits
@@ -560,7 +563,6 @@ const LOBBER = {
 // back in. Each tree's first attack is a grab instead: wider and quicker, and it pulls you down under the
 // ground, and you wake up back on the main course (like a blue Lobber mushroom).
 const ALIVE_TREE = {
-  weight: 40,          // how often one comes, as a forest section (about 2-3 per forest)
   windup: 0.4,         // the ground at its trunk cracks this long before the root comes up there...
   grabWindup: 0.32,    // ...a little quicker for its first attack, the grab
   // (it notices you from just far enough that running straight in, you reach its trunk as the root comes up)
@@ -580,7 +582,6 @@ const ALIVE_TREE = {
 // The forest's spore mushrooms: spores drift down from under the cap all the time, and running
 // under one you'll most likely catch one on your head (about 9 times in 10). Each color does something different (they stack).
 const SPORES = {
-  weight: 12,          // how often one comes, as a section (about 4 per forest)
   kinds: ["red", "blue", "green", "pink"],
   time: 10,            // seconds red, blue and green last...
   floatTime: 5,        // ...and pink
