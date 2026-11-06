@@ -1803,19 +1803,47 @@ const Renderer = (() => {
     }
   }
 
-  // Where an alive tree strikes: glowing cracks splitting the ground, then its root (or, the first time, root
-  // fingers closing over you), and whoever it's grabbed being pulled down under the ground
+  // Where an alive tree strikes: the ground at its trunk bulges up, cracking, pebbles hopping on it, until the
+  // root's tip pokes through and it bursts out (or, the first time, the grabbing root); whoever it's grabbed is
+  // pulled down under the ground; then the root shakes as it sinks back in, earth crumbling off it, a puff of
+  // dust, and the hole closes up over a moment (ALIVE_TREE.close), loose earth on it fading away
   function drawTreeStrikes(level, camX, time) {
     const px = (c, x, y, a = 1, w = 1, h = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
-    const A = ALIVE_TREE;
+    const A = ALIVE_TREE, ease = (k) => 1 - (1 - k) * (1 - k);
+    const bit = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }; // (a fixed pattern of loose earth)
+    const SOIL = "#2a1634", SOIL2 = "#3c2148", DARK = "#14081c", CRUMB = "#5a3a7e";
     for (const tr of level.trees) {
-      if (tr.state === "idle") continue;
-      const x = tr.sx - camX, gy = tr.sgy;
+      const closing = tr.state === "idle" && tr.close !== undefined && tr.close < A.close;
+      if (tr.state === "idle" && !closing) continue;
+      const x = Math.round(tr.sx - camX), gy = tr.sgy;
       if (x < -30 || x > VIEW_W + 30) continue;
-      const u = tr.state === "crack" ? Math.min(1, tr.t / tr.w) : 1, R = Math.round((tr.grab ? 16 : 12) * u);
-      px("#c080ff", x - R - 2, gy - 3, 0.18 * u, 2 * R + 5, 4); // a faint glow seeping up
-      for (let k = -R; k <= R; k++) { const d = Math.abs(k) % 4; px("#d9a0ff", x + k, gy + (d === 1 ? 1 : d === 3 ? 2 : 0)); if (d === 2) px("#f4e0ff", x + k, gy - 1); }
-      if (tr.state === "crack" && Math.floor(time * 20) % 2) { px("#5a3a7e", x - 3, gy - 3); px("#5a3a7e", x + 2, gy - 4); px("#5a3a7e", x + 6, gy - 2); } // bits of earth jumping
+      if (tr.state === "crack") {
+        // a mound of earth rising and spreading, shaking at the end, cracks splitting it, the root's tip through the top
+        const k = Math.min(1, tr.t / tr.w), lift = Math.round(1 + 3 * k), W = (tr.grab ? 10 : 7) + Math.round(3 * k);
+        const shake = k > 0.6 ? (Math.floor(time * 40) % 2 ? 1 : -1) : 0;
+        for (let dx = -W; dx <= W; dx++) {
+          const l = Math.round(lift * (1 - (dx / (W + 1)) ** 2));
+          if (l <= 0) continue;
+          const X = x + dx + shake;
+          px(SOIL, X, gy - l, 1, 1, l + 2); px("#a24cf0", X, gy - l, 1, 1, 2); px("#7a2ec0", X, gy - l + 2);
+          if (bit(dx) > 0.85) px("#e2a6ff", X, gy - l);
+        }
+        if (k > 0.35) for (const [cx, n] of [[-3, 3], [2, 4], [5, 2]]) for (let i = 0; i < Math.round(n * k); i++) px(DARK, x + cx + shake + (i % 2), gy - lift + 1 + i);
+        if (k > 0.85) { px(ROOT.dark, x + shake, gy - lift - 1); px(ROOT.edge, x + shake, gy - lift - 2); } // the tip, pushing through
+        for (let i = 0; i < 3; i++) px(i % 2 ? CRUMB : SOIL2, x - 6 + i * 6, gy - lift - 1 - Math.abs(Math.sin(time * 18 + i * 2)) * 3 * k); // pebbles hopping
+        b.globalAlpha = 1;
+        continue;
+      }
+      // the ragged hole it burst out of (closing up again once it's back in)
+      const shut = closing ? ease(tr.close / A.close) : 0, R = Math.round((tr.grab ? 8 : 6) * (1 - shut));
+      for (let dx = -R; dx <= R; dx++) px(DARK, x + dx, gy, 1, 1, Math.round((1 - Math.abs(dx) / (R + 1)) * 4));
+      if (closing) {
+        const k = tr.close / A.close;
+        for (let dx = -8; dx <= 8; dx++) if (bit(dx + 3) > 0.45) px(bit(dx) > 0.5 ? CRUMB : SOIL2, x + dx, gy - (bit(dx * 7) > 0.6 && k < 0.6 ? 1 : 0), 1 - k * 0.8); // loose earth, smoothing out
+        if (k < 0.5) for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI, t = 0.5 + k; px("#c8a8e8", x + Math.cos(a) * (3 + 8 * t), gy - 1 - Math.sin(a) * (2 + 4 * t), 0.5 * (1 - t)); } // the dust settling
+        b.globalAlpha = 1;
+        continue;
+      }
       b.globalAlpha = 1;
       if (tr.state !== "strike") continue;
       const t = tr.t, A2 = A, caught = tr.caughtAt !== null;
@@ -1837,7 +1865,16 @@ const Renderer = (() => {
         // (it went down into the dirt with them: nothing left sticking up)
       } else if (tr.grab) {
         drawRootList([[x - 2, gy + 2, x, gy - A2.tall * up, 6, x - 6, gy - A2.tall * up / 2]]); // (a thick one: missed)
-      } else drawRootList([[x - 1, gy, x + 1, gy - A2.tall * up, 4, x, gy - A2.tall * up / 2]]);
+      } else {
+        const sinking = t >= holdEnd, wob = sinking ? Math.round(Math.sin(time * 60)) : 0, h = A2.tall * (sinking ? ease(up) : up);
+        drawRootList([[x - 1 + wob, gy + 2, x + 1 + wob, gy - h, 4, x + wob, gy - h / 2]]);
+      }
+      if (t >= holdEnd && !(tr.grab && caught)) { // sinking back in: earth crumbling off it into the hole, a puff of dust
+        const k = Math.min(1, (t - holdEnd) / A2.sink), h = A2.tall * ease(up);
+        for (let i = 0; i < 6; i++) { const f = (k * 3 + i / 6) % 1; px(i % 2 ? CRUMB : SOIL2, x + (i % 2 ? 3 : -3) + (i % 3 - 1), Math.min(gy - 1, gy - h * (1 - f) - 2), 1 - f * 0.5); }
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI, f = k * 0.5; px("#c8a8e8", x + Math.cos(a) * (3 + 8 * f), gy - 1 - Math.sin(a) * (2 + 4 * f), 0.5 * (1 - f)); }
+        b.globalAlpha = 1;
+      }
       // the dirt they're yanked down into (in front of them)
       if (tr.grab && (v ? v.y > gy - HITBOX_H : caught && t < grabEnd + 0.8)) { px("#241038", x - 12, gy + 1, 1, 25, 14); px("#8a3ad0", x - 12, gy, 1, 25, 1); b.globalAlpha = 1; }
     }

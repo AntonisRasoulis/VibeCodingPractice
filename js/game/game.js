@@ -1654,6 +1654,7 @@ const Game = (() => {
     for (const tr of level.trees) {
       tr.t += dt;
       if (tr.state === "idle") {
+        if (tr.close !== undefined) tr.close += dt; // (the hole it struck from closing up: drawn by drawTreeStrikes)
         if (tr.cool > 0) { tr.cool -= dt; continue; }
         const grab = !tr.used;
         if (!players.some((p) => free(p) && Math.abs(p.x + HITBOX_W / 2 - tr.x) < treeSense(grab) && p.y + HITBOX_H > tr.gy - 60)) continue;
@@ -1684,7 +1685,7 @@ const Game = (() => {
           } else { v.y = tr.sgy + 4; v.dream = { kind: "woken", t: 0 }; tr.victim = null; tr.yanked = false; Sound.play("lobBonk"); } // under: and you wake up
         }
         const grabTime = tr.caughtAt !== null ? tr.caughtAt + A.flingTime + A.wrapTime + A.yankTime : 0;
-        if (!tr.victim && tr.t >= Math.max(A.rise + A.hold, grabTime) + A.sink) { tr.state = "idle"; tr.cool = A.rest; }
+        if (!tr.victim && tr.t >= Math.max(A.rise + A.hold, grabTime) + A.sink) { tr.state = "idle"; tr.cool = A.rest; tr.close = 0; }
       }
     }
   }
