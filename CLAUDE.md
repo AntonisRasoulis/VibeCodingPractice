@@ -215,5 +215,18 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       running under it doesn't take you in.
     - The button is **flush with the ground**: you press it just by running over it, so to *not* press it you
       have to **jump over it**.
+  - **Running out of time:** the ruins collapse ("TIME'S UP!") and you're back on the main course at the
+    distance you'd reached, with no gift. *How* you come back is still to be talked about (not dropping in
+    from the top of the screen).
+  - **How tight 60 s is:** fair but tense. Sized so that a runner who never has to stop or turn back can die
+    **3 times and still make it, but not 4** (measure what a death really costs: the 1 s respawn plus the
+    ground lost, and size the goal's distance from that).
+  - **Timer and goal:** a big countdown at the top of your view, in the ruins' colors (teal / aurora, not
+    red), turning red only when you're running out of time; the goal is a glowing rune gate, and a bar shows
+    how far it is.
+  - **The old obstacles there:** restyled in stone and teal magic (like the forest's dark purple wood).
+  - **Still to talk about:** its own dangers (offered: rune pillars firing beams, magic flames that flare up,
+    floating rocks that drop, rune tiles that burst, a guardian statue, gravity runes), how you come back
+    when time runs out, and 2 players (each their own 60 s from going in?).
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
