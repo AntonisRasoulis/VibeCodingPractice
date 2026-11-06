@@ -450,6 +450,9 @@ const FOREST = {
     saw: 8, mace: 8, shooter: 5, shooterStack: 4,           // the usual dangers, forest style
     falling: 7, gap: 4, spikes: 4, floating: 3, moving: 3, step: 3, portal: 2, flat: 1,
   },
+  gap: 1,                // flat tiles between its sections: 0 to this (the main course has 1-3)
+  treeRoom: [6, 7],      // flat tiles before and after an alive tree (it notices you 5 tiles out)
+  lobberRoom: [3, 4],    // ...and a Mushroom Lobber
   sawBreaks: 0.2,        // share of its saws that break loose...
   sawDelay: [0.8, 3],    // ...a while (seconds) after someone first comes near
   sawWarn: 0.6,          // seconds it shakes and creaks first
@@ -469,9 +472,9 @@ const FOREST = {
   floatAmp: [2, 10],     // tiles each way a floating shooter drifts
   floatSpeed: 36,        // its top speed (pixels a second)
   stack: [2, 3],         // shooters in a stack
-  branchHold: 0.35,      // its rotten branches (the crumbling platforms) don't fall: stand on one this long in all
+  branchHold: 0.175,      // its rotten branches (the crumbling platforms) don't fall: stand on one this long in all
                          // (stepping off doesn't reset it) and it snaps in two, and you drop straight down
-  branchCreak: 0.15,     // ...it starts creaking and shaking this long before it snaps (cracks spread all the while)
+  branchCreak: 0.075,    // ...it starts creaking and shaking this long before it snaps (cracks spread all the while)
 };
 
 // The enchanted forest's gift: whoever makes it out has magic feet for the rest of the race. Magic holds

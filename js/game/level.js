@@ -316,7 +316,7 @@ class Level {
     if (!ignoreTraps && this.sinkholes.some((s) => Math.abs(s.x - (x + HITBOX_W / 2)) < (s.size === 2 ? (SINK.gap + 1) * TILE : Math.max(SINK.catch[s.size], SINK.funnel[s.size][0])) + HITBOX_W)) return true;
     if (this.shooters.some((s) => s.float ? this.floatThreat(s, x, y) : Math.abs(s.x - x) < SHOOTER.range && this.shooterHits(s, x, y))) return true;
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
-    if (this.trees.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < ALIVE_TREE.sense + 8)) return true; // (no coming back where an alive tree strikes)
+    if (this.trees.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < ALIVE_TREE.grabReach + HITBOX_W + 8)) return true; // (no coming back where an alive tree strikes)
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
     if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.capW / 2 + SLEEP_SHROOM.drift * SLEEP_SHROOM.stem / SLEEP_SHROOM.fall + HITBOX_W)) return true; // (no waiting where its spores fall)
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
@@ -708,7 +708,7 @@ class Level {
       if (have < this.pondTarget && this.biomeEnd - this.col < (this.pondTarget - have) * 40 + 30) type = "thinIce";
     }
     SECTIONS[type].call(this, this.difficulty());
-    this.flat(this.rand(1, 3), false); // breathing room between sections (never icy)
+    this.flat(this.biome === "forest" ? this.rand(0, FOREST.gap) : this.rand(1, 3), false); // breathing room between sections (never icy; less in the forest: it crowds in on you)
     this.scatter();
   }
 
@@ -1225,9 +1225,9 @@ const SECTIONS = {
 
   // The forest's: a big mushroom dropping spores (red: faster, blue: jump higher, green: poison, pink: float)
   sporeShroom() {
-    this.flat(4);
+    this.flat(3);
     this.sporeShrooms.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, kind: this.pickFrom(SPORES.kinds), seed: this.rng(), lean: this.rng() < 0.5 ? -1 : 1 });
-    this.flat(6);
+    this.flat(4);
   },
 
   // The forest's: a wide gap with 2-4 bouncy mushrooms growing up out of it on long twisting stems. Each is
@@ -1265,17 +1265,17 @@ const SECTIONS = {
   // The forest's: an alive tree, on open, flat ground (room to stop short of its root, and to run past)
   aliveTree() {
     this.iceBias = false;
-    this.flat(12, false);
+    this.flat(FOREST.treeRoom[0], false); // (room to stop short of its root once the ground cracks: you notice it 5 tiles out)
     this.trees.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, seed: this.rng() * 100, state: "idle", t: 0, cool: 0, used: false });
-    this.flat(14, false);
+    this.flat(FOREST.treeRoom[1], false);
   },
 
   // The forest's: a Mushroom Lobber on open, flat ground (it lobs little mushrooms at whoever comes near)
   lobber() {
     this.iceBias = false;
-    this.flat(10, false);
+    this.flat(FOREST.lobberRoom[0], false); // (it's harmless to touch: its lobs are what you dodge, from anywhere near)
     this.lobbers.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, dir: -1, t: 0, squash: 9, seed: this.rng() });
-    this.flat(12, false);
+    this.flat(FOREST.lobberRoom[1], false);
   },
 
   // The forest's: a stack of floating shooters, each drifting its own way
