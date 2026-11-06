@@ -184,6 +184,17 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 - Maybe a forest animal / chaser (a shadow wolf or an owl were offered).
 - The floating shooters' stumps and thorns are small and dark: could be made easier to see.
 - An **arcane ruins** biome (aurora sky, stone ruins with glowing runes, teal magic flames) was mocked
-  up and liked; saved for a later "secret" biome reached the same way as the forest.
+  up and liked: the next secret world (not built yet; open questions were asked about the way in, what
+  happens when time runs out, the timer / goal, its dangers, the old obstacles there, 2 players). What the
+  owner has decided so far:
+  - **A race against the clock:** you have **60 seconds to reach a set point** in the ruins. Fail and you
+    die and come back on the main course ("back at the top somehow": details to settle). Make it and you
+    win its gift (like the forest's).
+  - **The gift: the aurora's preservation.** Aurora lights circle round you for the rest of the race.
+    They **block any attack** once, keeping you alive, then disappear and **come back after 5 seconds**.
+    Each time they're back you can also **use them** with the action button: they disappear (recharging,
+    the same 5 s) and give a **big, close-range circular push** that shoves away anything alive (the
+    special creatures: bears, jaguars, ...) and the other player too. So: a shield and an attack that
+    never run out, but share one recharge.
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
