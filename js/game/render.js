@@ -1837,6 +1837,28 @@ const Renderer = (() => {
       // the ragged hole it burst out of (closing up again once it's back in)
       const shut = closing ? ease(tr.close / A.close) : 0, R = Math.round((tr.grab ? 8 : 6) * (1 - shut));
       for (let dx = -R; dx <= R; dx++) px(DARK, x + dx, gy, 1, 1, Math.round((1 - Math.abs(dx) / (R + 1)) * 4));
+      // the mound bursting: its two halves slumping outwards and flattening, and clods of earth flung out that
+      // land round the hole and lie there until it closes (fading with it)
+      const st = tr.state === "strike" ? tr.t : 9, W = tr.grab ? 13 : 10;
+      if (st < A.burst) {
+        const f = st / A.burst, lift = Math.round(4 * (1 - f));
+        for (let dx = -W; dx <= W; dx++) {
+          if (Math.abs(dx) <= R) continue;
+          const l = Math.round(lift * (1 - (dx / (W + 1)) ** 2));
+          if (l <= 0) continue;
+          const X = x + dx + Math.sign(dx) * Math.round(3 * f);
+          px(SOIL, X, gy - l, 1, 1, l + 2); px("#a24cf0", X, gy - l, 1, 1, 2);
+        }
+      }
+      const fade = closing ? 1 - tr.close / A.close : 1;
+      for (let i = 0; i < 10; i++) {
+        const vx = (bit(i + 1) - 0.5) * 2 * (40 + 50 * bit(i + 21)), vy = -(70 + 80 * bit(i + 41)), g = 520;
+        const land = (-vy + Math.sqrt(vy * vy + 2 * g * 3)) / g, tt = Math.min(st, land); // (it comes back down just below where it left: on the ground)
+        const cx = x + vx * tt, cy = gy - 4 + vy * tt + 0.5 * g * tt * tt;
+        if (Math.abs(cx - x) <= R && st >= land) continue; // (fell back in)
+        const c = i % 3 === 0 ? "#a24cf0" : i % 3 === 1 ? CRUMB : SOIL2, big = i % 4 === 0;
+        px(c, cx, Math.min(cy, gy - (big ? 2 : 1)), fade, big ? 2 : 1, big ? 2 : 1);
+      }
       if (closing) {
         const k = tr.close / A.close;
         for (let dx = -8; dx <= 8; dx++) if (bit(dx + 3) > 0.45) px(bit(dx) > 0.5 ? CRUMB : SOIL2, x + dx, gy - (bit(dx * 7) > 0.6 && k < 0.6 ? 1 : 0), 1 - k * 0.8); // loose earth, smoothing out

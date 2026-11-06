@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since.
-const GAME_VERSION = "6.16";
+const GAME_VERSION = "6.17";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -581,7 +581,8 @@ const ALIVE_TREE = {
   hold: 0.35,          // ...stays up...
   sink: 0.4,           // ...and takes to pull back in
   rest: 1.2,           // after that, seconds before it can strike again: time to run past
-  close: 0.6,          // seconds the hole it struck from takes to close up (just for show)
+  burst: 0.15,         // seconds the mound takes to burst apart as the root comes out (just for show)...
+  close: 0.6,          // ...and the hole it struck from to close up again
   fling: 30,           // a grab: it flings you this high (pixels)...
   flingTime: 0.16,     // ...this fast...
   wrapTime: 0.2,       // ...coils round you up there this long...
