@@ -201,5 +201,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     - The other player is just **pushed back a bit** (no stun).
     - **Alone**, the push also **shoves the fire back a little**.
     - It **stacks** with the forest's gifts (magic feet, the roots): one player can have all of them.
+  - **The way in: a portal** on the main course, in the ruins' style: its frame is rocks stacked tightly in a
+    circle (none can drop out), the portal itself blue with some green. It starts **turned off**. Right below it
+    is a **button**: run over it and the portal turns on, and aurora lights burst violently out of it, **grabbing
+    anyone nearby** and pulling them in. That grab only happens that first time: after that, anyone can
+    **jump into the portal** if they want to. **Press the button a second time and the portal breaks apart**
+    (no more way in).
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
