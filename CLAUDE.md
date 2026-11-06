@@ -195,6 +195,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     Each time they're back you can also **use them** with the action button: they disappear (recharging,
     the same 5 s) and give a **big, close-range circular push** that shoves away anything alive (the
     special creatures: bears, jaguars, ...) and the other player too. So: a shield and an attack that
-    never run out, but share one recharge.
+    never run out, but share one recharge. Settled details:
+    - The shield blocks **everything that would kill you except the fire and falling into a pit**.
+    - The push is on **S / Down when you're holding no power** (holding one, S / Down uses the power).
+    - The other player is just **pushed back a bit** (no stun).
+    - **Alone**, the push also **shoves the fire back a little**.
+    - It **stacks** with the forest's gifts (magic feet, the roots): one player can have all of them.
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
