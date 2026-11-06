@@ -1805,8 +1805,8 @@ const Renderer = (() => {
 
   // Where an alive tree strikes: the ground at its trunk bulges up, cracking, pebbles hopping on it, until the
   // root's tip pokes through and it bursts out (or, the first time, the grabbing root); whoever it's grabbed is
-  // pulled down under the ground; then the root shakes as it sinks back in, earth crumbling off it, a puff of
-  // dust, and the hole closes up over a moment (ALIVE_TREE.close), loose earth on it fading away
+  // pulled down under the ground; then the root shakes as it sinks back in, earth crumbling off it into the
+  // hole, and the loose earth is pushed back in and the hole fills over a moment (ALIVE_TREE.close)
   function drawTreeStrikes(level, camX, time) {
     const px = (c, x, y, a = 1, w = 1, h = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); };
     const A = ALIVE_TREE, ease = (k) => 1 - (1 - k) * (1 - k);
@@ -1834,13 +1834,14 @@ const Renderer = (() => {
         b.globalAlpha = 1;
         continue;
       }
-      // the ragged hole it burst out of (closing up again once it's back in)
-      const shut = closing ? ease(tr.close / A.close) : 0, R = Math.round((tr.grab ? 8 : 6) * (1 - shut));
+      // The ragged hole it burst out of. Once the root's back in, the earth round it is pushed back in: the clods
+      // and the slumped mound slide into the hole and drop in, the hole fills in from its edges, and the grass
+      // grows back over the turned earth a pixel at a time (ALIVE_TREE.close). Nothing just fades away.
+      const k = closing ? tr.close / A.close : 0, clamp01 = (v) => Math.max(0, Math.min(1, v)), easeIn = (v) => v * v;
+      const R0 = tr.grab ? 8 : 6, R = Math.round(R0 * (1 - ease(clamp01((k - 0.35) / 0.4))));
       for (let dx = -R; dx <= R; dx++) px(DARK, x + dx, gy, 1, 1, Math.round((1 - Math.abs(dx) / (R + 1)) * 4));
-      // the mound bursting: its two halves slumping outwards and flattening, and clods of earth flung out that
-      // land round the hole and lie there until it closes (fading with it)
       const st = tr.state === "strike" ? tr.t : 9, W = tr.grab ? 13 : 10;
-      if (st < A.burst) {
+      if (st < A.burst) { // the mound bursting: its two halves slumping outwards and flattening
         const f = st / A.burst, lift = Math.round(4 * (1 - f));
         for (let dx = -W; dx <= W; dx++) {
           if (Math.abs(dx) <= R) continue;
@@ -1849,20 +1850,30 @@ const Renderer = (() => {
           const X = x + dx + Math.sign(dx) * Math.round(3 * f);
           px(SOIL, X, gy - l, 1, 1, l + 2); px("#a24cf0", X, gy - l, 1, 1, 2);
         }
+      } else { // ...left lying as a low ridge of loose earth either side of the hole, pushed back in as it closes
+        const push = easeIn(clamp01(k / 0.45));
+        for (let dx = R0 + 1; dx <= R0 + 5; dx++) for (const side of [-1, 1]) {
+          if (bit(dx * side + 50) < 0.3) continue;
+          const d = R0 + (dx - R0) * (1 - push);
+          if (closing && d <= R + 0.5) continue; // (dropped in)
+          px(bit(dx * side) > 0.5 ? CRUMB : SOIL2, x + side * d, gy - 1);
+        }
       }
-      const fade = closing ? 1 - tr.close / A.close : 1;
+      // clods of earth flung out as it burst, landing round the hole; as it closes they slide back and drop in
       for (let i = 0; i < 10; i++) {
         const vx = (bit(i + 1) - 0.5) * 2 * (40 + 50 * bit(i + 21)), vy = -(70 + 80 * bit(i + 41)), g = 520;
         const land = (-vy + Math.sqrt(vy * vy + 2 * g * 3)) / g, tt = Math.min(st, land); // (it comes back down just below where it left: on the ground)
-        const cx = x + vx * tt, cy = gy - 4 + vy * tt + 0.5 * g * tt * tt;
-        if (Math.abs(cx - x) <= R && st >= land) continue; // (fell back in)
-        const c = i % 3 === 0 ? "#a24cf0" : i % 3 === 1 ? CRUMB : SOIL2, big = i % 4 === 0;
-        px(c, cx, Math.min(cy, gy - (big ? 2 : 1)), fade, big ? 2 : 1, big ? 2 : 1);
+        const lx = x + vx * tt, cy = gy - 4 + vy * tt + 0.5 * g * tt * tt, big = i % 4 === 0;
+        const p = easeIn(clamp01((k - 0.2 * bit(i + 61)) / 0.3)), cx = lx + (x - lx) * p;
+        if (st >= land && Math.abs(cx - x) <= Math.max(R, 1) - (closing ? 0 : 0.5)) continue; // (in the hole)
+        px(i % 3 === 0 ? "#a24cf0" : i % 3 === 1 ? CRUMB : SOIL2, cx, Math.min(cy, gy - (big ? 2 : 1)), 1, big ? 2 : 1, big ? 2 : 1);
       }
       if (closing) {
-        const k = tr.close / A.close;
-        for (let dx = -8; dx <= 8; dx++) if (bit(dx + 3) > 0.45) px(bit(dx) > 0.5 ? CRUMB : SOIL2, x + dx, gy - (bit(dx * 7) > 0.6 && k < 0.6 ? 1 : 0), 1 - k * 0.8); // loose earth, smoothing out
-        if (k < 0.5) for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI, t = 0.5 + k; px("#c8a8e8", x + Math.cos(a) * (3 + 8 * t), gy - 1 - Math.sin(a) * (2 + 4 * t), 0.5 * (1 - t)); } // the dust settling
+        // the turned earth where the hole was, the grass growing back over it a pixel at a time
+        for (let dx = -R0 - 1; dx <= R0 + 1; dx++) {
+          if (Math.abs(dx) <= R || k > 0.55 + 0.45 * bit(dx + 11)) continue;
+          px(bit(dx + 7) > 0.5 ? CRUMB : SOIL2, x + dx, gy, 1, 1, 2);
+        }
         b.globalAlpha = 1;
         continue;
       }
@@ -1891,10 +1902,9 @@ const Renderer = (() => {
         const sinking = t >= holdEnd, wob = sinking ? Math.round(Math.sin(time * 60)) : 0, h = A2.tall * (sinking ? ease(up) : up);
         drawRootList([[x - 1 + wob, gy + 2, x + 1 + wob, gy - h, 4, x + wob, gy - h / 2]]);
       }
-      if (t >= holdEnd && !(tr.grab && caught)) { // sinking back in: earth crumbling off it into the hole, a puff of dust
+      if (t >= holdEnd && !(tr.grab && caught)) { // sinking back in: earth crumbling off it, falling into the hole
         const k = Math.min(1, (t - holdEnd) / A2.sink), h = A2.tall * ease(up);
-        for (let i = 0; i < 6; i++) { const f = (k * 3 + i / 6) % 1; px(i % 2 ? CRUMB : SOIL2, x + (i % 2 ? 3 : -3) + (i % 3 - 1), Math.min(gy - 1, gy - h * (1 - f) - 2), 1 - f * 0.5); }
-        for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI, f = k * 0.5; px("#c8a8e8", x + Math.cos(a) * (3 + 8 * f), gy - 1 - Math.sin(a) * (2 + 4 * f), 0.5 * (1 - f)); }
+        for (let i = 0; i < 6; i++) { const f = (k * 3 + i / 6) % 1; px(i % 2 ? CRUMB : SOIL2, x + (i % 2 ? 3 : -3) + (i % 3 - 1), Math.min(gy - 1, gy - h * (1 - f) - 2)); }
         b.globalAlpha = 1;
       }
       // the dirt they're yanked down into (in front of them)
