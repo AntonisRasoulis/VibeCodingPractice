@@ -206,6 +206,14 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     is a **button**: run over it and the portal turns on, and aurora lights burst violently out of it, **grabbing
     anyone nearby** and pulling them in. That grab only happens that first time: after that, anyone can
     **jump into the portal** if they want to. **Press the button a second time and the portal breaks apart**
-    (no more way in).
+    (no more way in). Settled details:
+    - **One portal per race**, after 400 m, like the sleep mushroom (a race can have both).
+    - The first grab pulls in **anyone within about 5 tiles (40 px)** of it.
+    - **Anyone's** second press breaks it, the first presser's too (in 2 players: go in, and your opponent may
+      not get to follow).
+    - Afterwards, the portal **floats a little above the ground**: you have to **jump into it** on purpose;
+      running under it doesn't take you in.
+    - The button is **flush with the ground**: you press it just by running over it, so to *not* press it you
+      have to **jump over it**.
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
