@@ -42,6 +42,7 @@ function loadBest() {
 loadBest();
 
 document.getElementById("year").textContent = new Date().getFullYear();
+document.getElementById("game-version").textContent = "v" + GAME_VERSION; // (set in config.js)
 
 const gameCallbacks = {
   onGameOver(winner) {

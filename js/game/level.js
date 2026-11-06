@@ -675,7 +675,7 @@ class Level {
     }
     if (this.sleepAt !== undefined && this.col >= this.sleepAt) {
       this.sleepAt = undefined;
-      if (this.col >= SLEEP_SHROOM.from) return SECTIONS.sleepShroom.call(this);
+      if (this.col >= SLEEP_SHROOM.from) { this.sleepPlaced = true; return SECTIONS.sleepShroom.call(this); } // (one per race: one chance at the forest)
     }
     if (this.col >= this.stretchEnd) {
       this.addBiomeEvents(MISSILE.stretch);
@@ -1044,8 +1044,8 @@ class Level {
 
   // Each biome's special danger. Snow: two bears, at random spots in the biome (at least 70 m apart).
   addBiomeEvents(length) {
-    // somewhere in it, a giant sleep mushroom (not in the forest itself)
-    if (this.realmEnd === undefined && this.biome !== "forest" && this.sleepShroomsOn) this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
+    // somewhere in it, a giant sleep mushroom (not in the forest itself), until the race has its one
+    if (this.realmEnd === undefined && this.biome !== "forest" && this.sleepShroomsOn && !this.sleepPlaced) this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
     if (this.biome === "prairie") {
       // Missiles: usually 2 (MISSILE.perBiome), spread out across the biome
       const n = Number(this.pickWeighted(MISSILE.perBiome));

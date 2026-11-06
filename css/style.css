@@ -36,6 +36,23 @@ a {
   background: var(--surface);
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* The game version, just left of the logo */
+.version {
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+  color: var(--text);
+  opacity: 0.6;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}
+
 .logo {
   font-family: var(--pixel-font);
   font-size: 1rem;

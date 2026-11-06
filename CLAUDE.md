@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 93 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 102 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -98,8 +98,8 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   whoever has fallen off the leader's screen (alone: when the fire is on your screen), out of sight of
   both: portal gun, grapple (2 players only), vine.
 - **The enchanted forest** (a hidden biome, never in the normal rotation): reached by falling asleep
-  under a **sleep mushroom** (purple, spore-mushroom style, on the main course about once per biome from
-  400 m; a slow light rain of spores for 3-10 s, then 10 s rest; its cap glows just before). You wake in
+  under a **sleep mushroom** (purple, spore-mushroom style, exactly one per race, on the main course after
+  400 m: one chance at the forest, `sleepPlaced`; a slow light rain of spores for 3-10 s, then 10 s rest; its cap glows just before). You wake in
   a twilight forest 100-250 tiles long (fireflies, glowing mushrooms, thorn-vine spikes, all obstacles
   restyled in dark purple wood: no brown). The forest is "secretly out to get you": 1 in 5 saws breaks
   loose with a faint magic, bursts out and rolls at you half-buried with a magic trail; spike shooters
@@ -153,7 +153,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   1 player `crop=800:240:50:2` after skipping the first ~3.4 s). Videos and mockups go in the
   scratchpad only, never in the repo. Check them with contact sheets of frames before sending.
 - **Answer questions with numbers** when asked ("how many orbs per biome?" → a measured number).
-- **Shipping every change:** test → bump the `?v=` stamp on all 8 script tags in index.html → bundle
+- **Version:** `GAME_VERSION` in config.js, shown left of the logo (e.g. v6.16). Big updates (a new biome or
+  secret world) bump the first number and reset the second; every other shipped change bumps the second.
+- **Shipping every change:** test → bump `GAME_VERSION` → bump the `?v=` stamp on all 9 tags in index.html → bundle
   (`python3 tools/bundle.py . <scratchpad>/fire-run.html`) → smoke test the bundle
   (`node tools/smoke-test.mjs <absolute path>`) → commit (with the attribution lines the session asks
   for) → push to the branch → republish the artifact to the same URL. Update the README and the
