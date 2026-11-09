@@ -1943,8 +1943,9 @@ const Game = (() => {
 
   // ---- Purple catch-up orbs: portal gun, grapple and vine ----
 
-  // Someone who's fallen off the leader's screen (alone: who has the fire on their screen) gets purple
-  // orbs now and then, out of sight of both of you, ahead of them. The further behind, the more often.
+  // Someone who's fallen off the leader's screen (alone: who has the fire on their screen) gets a purple
+  // orb, out of sight of both of you, ahead of them: the further behind, the sooner. Only one each per race:
+  // one chance to catch up, no second ones (Player.catchupGiven).
   function updateCatchup() {
     const { level, players, fire } = world;
     const runners = players.filter((p) => !p.caught);
@@ -1967,7 +1968,7 @@ const Game = (() => {
         hi = leadScreen - CATCHUP.margin - 8;
       }
     }
-    if (!behind || world.monsoon) { world.nextCatchup = null; return; }
+    if (!behind || world.monsoon || behind.catchupGiven) { world.nextCatchup = null; return; }
     const wait = CATCHUP.every[0] + (CATCHUP.every[1] - CATCHUP.every[0]) * far;
     if (world.nextCatchup === null) world.nextCatchup = world.time + wait;
     if (world.time < world.nextCatchup) return;
@@ -1982,6 +1983,7 @@ const Game = (() => {
       const kinds = { ...CATCHUP.kinds };
       if (world.solo) delete kinds.grapple;
       level.orbs.push({ x: spot.x, y: spot.y + HITBOX_H - 32, w: 8, h: 8, used: false, kind: pickWeighted(kinds), purple: true });
+      behind.catchupGiven = true; // (their one catch-up orb this race)
       return;
     }
   }

@@ -81,6 +81,7 @@ class Player {
     this.skate = 0;               // seconds left on skates (faster on ice)
     this.realm = null;            // the enchanted forest we're in (null: the main course)
     this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
+    this.catchupGiven = false;    // had our one purple catch-up orb this race
     this.lying = false;           // just woken up, still lying down
     this.magicFeet = false;
     this.rootGuard = false;

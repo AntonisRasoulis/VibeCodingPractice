@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since.
-const GAME_VERSION = "6.18";
+const GAME_VERSION = "6.19";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -171,7 +171,7 @@ const ORBS = {
 // Purple catch-up orbs: they appear for a runner who has fallen off the leader's screen (alone: when
 // the fire is on your screen), ahead of them but out of sight of both. Further behind, they come more often.
 const CATCHUP = {
-  every: [9, 3],      // seconds between orbs: just off the screen ... `far` or more behind
+  every: [9, 3],      // seconds behind before your orb comes: just off the screen ... `far` or more behind (one per player per race)
   far: 1200,          // (pixels behind the leader's screen; alone: how close the fire is, see fireNear)
   fireNear: 140,      // alone: the fire within this many pixels of you counts as falling behind
   margin: 24,         // how far outside both screens it has to be

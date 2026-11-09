@@ -96,7 +96,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   monsoon in their biomes). **Light blue** is used with S / Down (wind dash, lightning, mystic hand,
   rescue drone; firehawk, snowball, monkey in their biomes). **Purple** catch-up orbs appear only for
   whoever has fallen off the leader's screen (alone: when the fire is on your screen), out of sight of
-  both: portal gun, grapple (2 players only), vine.
+  both, just one per player per race (`catchupGiven`): portal gun, grapple (2 players only), vine.
 - **The enchanted forest** (a hidden biome, never in the normal rotation): reached by falling asleep
   under a **sleep mushroom** (purple, spore-mushroom style, exactly one per race, on the main course after
   400 m: one chance at the forest, `sleepPlaced`; a slow light rain of spores for 3-10 s, then 10 s rest; its cap glows just before). You wake in
