@@ -235,8 +235,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     built portal on the main course **falls apart** again once you're out (its bricks dropping and crumbling
     away); and when time runs out, the portal the aurora throws you through **builds itself the same way**.
   - **The old obstacles there:** restyled in stone and teal magic (like the forest's dark purple wood).
-  - **Still to talk about:** its own dangers (offered: rune pillars firing beams, magic flames that flare up,
-    floating rocks that drop, rune tiles that burst, a guardian statue, gravity runes) and 2 players (each
-    their own 60 s from going in?).
+  - **2 players:** **one shared clock**, starting when the portal opens: whoever jumps in later has less time
+    (and the collapse is the same for both).
+  - **Its own dangers** (being talked through one at a time; others offered: rune pillars firing beams, magic
+    flames that flare up, floating rocks that drop, rune tiles that burst, a guardian statue, gravity runes):
+    - **Fire turrets** set in the ground, a bunch in a row: the **fire goes left and right, one by one**
+      (details being asked).
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
