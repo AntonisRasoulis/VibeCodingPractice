@@ -241,9 +241,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     flames that flare up, floating rocks that drop, rune tiles that burst, a guardian statue, gravity runes):
     - **Fire turrets** set in the ground, **replacing the spikes** there (like the forest's thorn vines):
       rows of **1-10** turrets, **teal / aurora-green magic fire** (not orange like the wall of fire), and
-      touching it kills ("SCORCHED!"). The **special version**: the fire runs along the row one turret at a
-      time, **left to right, then right to left**, in different **speeds and heights**; on **big rows,
-      several fires** can be running along it at once. A turret's grate glows and puffs sparks as it
+      touching it kills ("SCORCHED!"). Every row works the same way (there's no plain, always-on version):
+      the fire runs along the row one turret at a time, **left to right, then right to left**, at different
+      **speeds and heights**: some flames are **low** (jump over them as they pass), some **tall** (too high to
+      jump: slip through behind them), and some **switch between high and low** as they go, so you have to
+      time it *and* jump. On **big rows, several fires** can be running along it at once. A turret's grate glows and puffs sparks as it
       changes, **just for looks** (not a warning). Fairness still applies (there must always be a way
       through: test it).
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
