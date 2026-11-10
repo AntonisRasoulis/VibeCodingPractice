@@ -226,8 +226,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     **3 times and still make it, but not 4** (measure what a death really costs: the 1 s respawn plus the
     ground lost, and size the goal's distance from that).
   - **Timer and goal:** a big countdown at the top of your view, in the ruins' colors (teal / aurora, not
-    red), turning red only when you're running out of time; the goal is a glowing rune gate, and a bar shows
-    how far it is.
+    red), turning red only when you're running out of time; a bar shows how far the goal is.
+  - **The goal: an exit portal** at the end of the ruins, in the same style as the way in (rocks stacked in a
+    circle, blue with some green). You **jump into it** to escape, and that gives you the gift. Back on the
+    main course, the portal you come out of **builds itself**: grey bricks fly in and lock together in a
+    circle, the portal opening in the middle of it (the same style as the other portals), and out you come.
   - **The old obstacles there:** restyled in stone and teal magic (like the forest's dark purple wood).
   - **Still to talk about:** its own dangers (offered: rune pillars firing beams, magic flames that flare up,
     floating rocks that drop, rune tiles that burst, a guardian statue, gravity runes) and 2 players (each
