@@ -231,6 +231,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     circle, blue with some green). You **jump into it** to escape, and that gives you the gift. Back on the
     main course, the portal you come out of **builds itself**: grey bricks fly in and lock together in a
     circle, the portal opening in the middle of it (the same style as the other portals), and out you come.
+    Settled: the exit portal **floats a little** (jump into it, like the entrance after its first grab); the
+    built portal on the main course **falls apart** again once you're out (its bricks dropping and crumbling
+    away); and when time runs out, the portal the aurora throws you through **builds itself the same way**.
   - **The old obstacles there:** restyled in stone and teal magic (like the forest's dark purple wood).
   - **Still to talk about:** its own dangers (offered: rune pillars firing beams, magic flames that flare up,
     floating rocks that drop, rune tiles that burst, a guardian statue, gravity runes) and 2 players (each
