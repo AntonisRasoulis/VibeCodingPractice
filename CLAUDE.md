@@ -235,6 +235,16 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     built portal on the main course **falls apart** again once you're out (its bricks dropping and crumbling
     away); and when time runs out, the portal the aurora throws you through **builds itself the same way**.
   - **The old obstacles there:** restyled in stone and teal magic (like the forest's dark purple wood).
+  - **The look (mocked up and approved, following the owner's first mockup closely):** a dark navy-to-teal
+    sky with stars and two stepped aurora bands (green over teal); small floating rock chunks with a glowing
+    teal rune; dark background pillar silhouettes (broken, jagged tops) and a broken arch; grey foreground
+    rune pillars (capital on top, three teal glyphs, a few small cracks); ground of grey stone bricks under a
+    mossy grass top, with small teal sparkle crosses; stone slab platforms with glowing teal dashes; teal mist
+    in pits. **Wear and tear:** only short (3-6 px), jagged stone cracks with a lit edge, sometimes forking,
+    a few crumbs of stone at ground edges and pillar feet, faint dust drifting down. **No missing square
+    chunks of rock** (the owner didn't like those). Fire turrets: a stone vent flush with the ground, glowing
+    teal slots; flames teal / aurora-green with a white-hot core, a soft glow, licks breaking off the tip
+    (low about 11 px, tall about 46 px: higher than a jump's 39 px).
   - **2 players:** **one shared clock**, starting when the portal opens: whoever jumps in later has less time
     (and the collapse is the same for both).
   - **Its own dangers** (being talked through one at a time; others offered: rune pillars firing beams, magic
