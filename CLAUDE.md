@@ -275,5 +275,15 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       edge, a glow; sparks and a scorch mark where it hits the ground), held for **0.5 s**, then fading. Beams
       stop only at the ground, walls and the screen's edge: they **go straight through players** (one beam
       can hit both). Fairness: test there's always a safe spot and time to get out of the lines.
+  - **Biome portals inside the ruins:** **1-2 per visit**, each sending you into a **ramped-up stretch of
+    another biome** for a while, then back into the ruins. Settled:
+    - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).
+    - **Which biomes:** only the ones turned on in the picker for that race; if just one biome is picked,
+      any of them (all four regular ones).
+    - **A visit:** a short stretch of about **40-60 tiles** (5-7 s of running); the 60 s clock keeps ticking.
+    - **Ramped up:** that biome's dangers **packed closer together** (more of them), at their normal speed.
+    - **Dying in there:** you respawn inside the stretch as usual (it costs time).
+    - **Look:** the aurora vortex in the rock ring, **tinted with the biome's colours** (green for prairie,
+      icy white for taiga, sandy gold for desert, deep green for jungle) so you can tell where each goes.
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
