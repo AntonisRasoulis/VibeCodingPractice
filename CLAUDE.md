@@ -202,7 +202,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     - **Alone**, the push also **shoves the fire back a little**.
     - It **stacks** with the forest's gifts (magic feet, the roots): one player can have all of them.
   - **The way in: a portal** on the main course, in the ruins' style: its frame is rocks stacked tightly in a
-    circle (none can drop out), the portal itself blue with some green. It starts **turned off**. Right below it
+    circle (none can drop out). **The portal itself (chosen: design A, the aurora vortex):** a deep navy well
+    with four thin teal and green aurora streaks curling in towards a black centre, faint stars deep inside
+    (dark and mysterious, not the bright blue swirl first mocked up). All the ruins' portals use it. It starts **turned off**. Right below it
     is a **button**: run over it and the portal turns on, and aurora lights burst violently out of it, **grabbing
     anyone nearby** and pulling them in. That grab only happens that first time: after that, anyone can
     **jump into the portal** if they want to. **Press the button a second time and the portal breaks apart**
