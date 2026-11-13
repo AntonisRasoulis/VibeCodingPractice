@@ -275,6 +275,14 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       edge, a glow; sparks and a scorch mark where it hits the ground), held for **0.5 s**, then fading. Beams
       stop only at the ground, walls and the screen's edge: they **go straight through players** (one beam
       can hit both). Fairness: test there's always a safe spot and time to get out of the lines.
+  - **The gear laser** (a new ruins danger of its own; mocked up): a tall stone post (heights **vary**: short to
+    tall) with iron bands and a pipe of teal energy, a housing on top, and a **big toothed gear** (rim, spokes,
+    bolts, a rune at the hub) turned by a small drive gear, carrying a **sleek laser emitter** (pale metal,
+    cooling fins, an energy line, a lens ring). It **turns** (about 0.6 s), **clicks into place** (a ratchet
+    catch drops into its teeth) pointing **left, down-left, down-right or right** (45 degree steps, never up;
+    picked at random), **warns 0.4 s** (energy runs up the barrel, the lens glows, a dotted aim line), then
+    **fires an instant laser** to whatever it hits, held **0.5 s**; then turns again. **Faster ones sometimes
+    fake it out**: click into place, hold (no glow) and turn on without firing; slower ones always fire.
   - **Biome portals inside the ruins:** **1-2 per visit**, each sending you into a **ramped-up stretch of
     another biome** for a while, then back into the ruins. Settled:
     - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).
