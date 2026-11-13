@@ -234,9 +234,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     Settled: the exit portal **floats a little** (jump into it, like the entrance after its first grab); the
     built portal on the main course **falls apart** again once you're out (its bricks dropping and crumbling
     away); and when time runs out, the portal the aurora throws you through **builds itself the same way**.
-    **Arriving in the ruins** works the same way too. The built portal (mocked up): grey bricks start **laid
-    out neatly on the ground** in two tidy courses (end to end, 1 px gaps, the top course offset half a brick:
-    never piled on each other), shiver awake in place, hop up tumbling, swirl into a circle and clack into
+    **Arriving in the ruins** works the same way too. The built portal (mocked up): grey bricks start as **an old
+    structure nobody has touched in ages**: the top half of the old ring sticks up out of the ground like a
+    half-buried arch (its end bricks broken off), the rest fallen round it (lying, one leaning on the arch, one
+    on its end, one on an old mossy stone stump, a few sunk so only their tops peek out: never piled up), all
+    overgrown (grass over their edges, a vine draped over the arch, little flowers). They shiver awake in place, hop up tumbling, swirl into a circle and clack into
     place (one latecomer last), then the portal opens; falling apart, they drop back down. The bricks have
     **personality**: each its own size and shade of grey, some mossy on top, some with a little crack, two
     with a small glowing teal rune.
