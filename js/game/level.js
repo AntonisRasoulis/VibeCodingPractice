@@ -657,8 +657,9 @@ class Level {
     const T = time + gl.phase * L, k = Math.floor(T / L), u = T - k * L;
     const dirOf = (kk) => DIRS[Math.floor(hash(kk, gl.id) * DIRS.length)];
     const from = dirOf(k - 1), to = dirOf(k);
-    let delta = ((to - from) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+    let delta = ((to - from) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); // (clockwise)
     if (delta < (G.minTurn * Math.PI) / 180) delta += Math.PI * 2; // (hardly any different: it still turns, all the way round)
+    if (hash(k * 7 + 1, gl.id * 3 + 101) < G.backChance) delta -= Math.PI * 2; // (this time it turns the other way, anticlockwise)
     const fires = !(gl.fast && hash(k, gl.id + 7) < G.fakeChance);
     if (u < turn) { const e = u / turn, ease = e * e * (3 - 2 * e); return { ang: from + delta * ease, phase: "turn", u: e, dir: to, fires }; }
     let v = u - turn;
