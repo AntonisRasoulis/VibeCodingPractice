@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since. (7: the arcane ruins.)
-const GAME_VERSION = "7.5";
+const GAME_VERSION = "7.6";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -493,16 +493,16 @@ const RUINS = {
   ringR: 16,           // the portal ring's radius (pixels)
   gateUp: 33,          // the ruins' clean gateways: how high their ring's middle is above the ground
   hole: 11,            // ...and the swirl's: you go in by touching it
-  time: 60,            // seconds to reach the exit portal
-  length: 545,         // tiles from where you arrive to the exit portal (sized so a clean run can die 3 times, not 4)
-  arrive: 24,          // calm tiles where you arrive
+  time: 20,            // seconds to reach the exit portal (from when the portal opened)
+  length: 90,          // tiles from where you arrive to the exit portal (sized so a clean run can die 3 times, not 4: about 12.5 s clean, 2 s a death)
+  arrive: 12,          // calm tiles where you arrive
   failBack: 80,        // time's up: thrown back out this many pixels behind where you'd got to
   pullTime: 0.8,       // seconds the aurora takes to pull you in (and the screen to fade)
   buildTime: 1.0,      // seconds the bricks take to build the portal you come out of...
   outTime: 0.35,       // ...you coming out of it...
   breakTime: 0.9,      // ...and it falling apart again
-  collapse: [30, 15, 10], // seconds left when the crumbling gets worse (and in the last of these, stones fall)
-  stoneEvery: 0.7,     // last 10 s: a stone falls near each runner about this often (seconds)
+  collapse: [12, 7, 4], // seconds left when the crumbling gets worse (and in the last of these, stones fall and the clock turns red)
+  stoneEvery: 0.7,     // last 4 s: a stone falls near each runner about this often (seconds)
   stoneWarn: 0.6,      // ...its shadow grows on the ground this long first
   stoneFall: 0.35,     // ...then it drops this fast (seconds from the top to the ground)
   mix: { flat: 1, step: 3, spikes: 7, gap: 4, floating: 3, moving: 2, falling: 2, mace: 3, saw: 3, shooter: 5, gearLaser: 5 }, // the ruins' sections (spikes are its fire turrets, shooters its laser eye-stones)

@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 111 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 112 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -128,7 +128,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   close and hold it still for 5 s (`world.rootWall`); alone they're not a power at all (`p.rootGuard`, you keep yours).
 
 - **The arcane ruins** (the second secret world; **a first, playable version is built**, v7.0): a portal on the
-  main course (one per race after 400 m) with a button under it; inside, a 60 s race to an exit portal past fire
+  main course (one per race after 400 m) with a button under it; inside, a 20 s race (v7.6; it was 60 s) to an exit portal past fire
   turrets, laser eye-stones and gear lasers, crumbling as time runs out; escape for the aurora's preservation.
   Code: `RUINS`, `FIRE_ROW`, `EYE`, `GEAR_LASER`, `AURORA` (config); `Level.ruinsGates`, `fireRows`, `gearLasers`,
   `stones`, `exitPortal`, `fireFlames`, `eyeState` / `eyeBeams`, `gearState` / `gearBeam`, `beamHits` (level);
@@ -196,7 +196,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 - The **arcane ruins**: a first version is built (see above). **Still to build:** the biome portals inside it,
   the old obstacles' stone-and-teal restyle (maces and saws are still steel), more of its own dangers (to be
   talked through), teal mist in its pits. The full design the owner settled:
-  - **A race against the clock:** you have **60 seconds to reach a set point** in the ruins. Fail and you
+  - **A race against the clock:** you have **20 seconds to reach a set point** (v7.6: cut from 60 s, which is a long time in this game; 90 tiles after 12 calm ones) in the ruins. Fail and you
     die and come back on the main course ("back at the top somehow": details to settle). Make it and you
     win its gift (like the forest's).
   - **The gift: the aurora's preservation.** Aurora lights circle round you for the rest of the race.
@@ -227,9 +227,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     - The button is **flush with the ground**: you press it just by running over it, so to *not* press it you
       have to **jump over it**.
   - **Running out of time:** the ruins **fall apart while you run**, and the aurora snatches you out at the end.
-    Small cracks from the very start (dust trickling), worse in steps at 30 s, 15 s and 10 s left (pillars
+    Small cracks from the very start (dust trickling), worse in steps at 12 s, 7 s and 4 s left (were 30 / 15 / 10 with the 60 s clock) (pillars
     leaning and toppling in the background, stones dropping, the aurora flickering, the screen shaking at the
-    end): you can see time running out. In the **last 10 s, real stones fall on the course** (a shadow on the
+    end): you can see time running out. In the **last 4 s, real stones fall on the course** (a shadow on the
     ground first, like the floating rocks). At zero it all comes crashing down ("TIME'S UP!"), and at the last
     moment the **aurora grabs you and throws you back through a portal onto the main course, about 10 tiles
     (80 px) behind** the distance you'd reached, with no gift (never dropping in from the top of the screen).
@@ -316,7 +316,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).
     - **Which biomes:** only the ones turned on in the picker for that race; if just one biome is picked,
       any of them (all four regular ones).
-    - **A visit:** a short stretch of about **40-60 tiles** (5-7 s of running); the 60 s clock keeps ticking.
+    - **A visit:** a short stretch of about **40-60 tiles** (5-7 s of running); the clock keeps ticking.
     - **Ramped up:** that biome's dangers **packed closer together** (more of them), at their normal speed.
     - **Dying in there:** you respawn inside the stretch as usual (it costs time).
     - **Look:** the aurora vortex in the rock ring, **tinted with the biome's colours** (green for prairie,
