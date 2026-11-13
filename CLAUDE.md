@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 107 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 110 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -284,8 +284,8 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       edge, a glow; sparks and a scorch mark where it hits the ground), held for **0.5 s**, then fading. Beams
       stop only at the ground, walls and the screen's edge: they **go straight through players** (one beam
       can hit both). Fairness: test there's always a safe spot and time to get out of the lines.
-  - **The gear laser** (a new ruins danger of its own; mocked up): a tall stone post (heights **vary**: 7 sizes, 3 to 9
-    tiles; v7.3 added 8 and 9) with iron bands and a pipe of teal energy, a housing on top, and a **big toothed gear** (rim, spokes,
+  - **The gear laser** (a new ruins danger of its own; mocked up): a tall stone post (heights **vary**: 6 sizes, 5 to 10
+    tiles; v7.4: 3 and 4 were too small) with iron bands and a pipe of teal energy, a housing on top, and a **big toothed gear** (rim, spokes,
     bolts, a rune at the hub) turned by a small drive gear, carrying a **sleek laser emitter** (pale metal,
     cooling fins, an energy line, a lens ring). It **turns** (about 0.6 s), **clicks into place** (a ratchet
     catch drops into its teeth) pointing **always some way down** (v7.2: 40-70 degrees below flat, left or right, in
