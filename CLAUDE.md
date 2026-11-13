@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 116 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 117 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -292,7 +292,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     cooling fins, an energy line, a lens ring). It **turns** (about 0.6 s), **clicks into place** (a ratchet
     catch drops into its teeth) pointing **always some way down** (v7.2: 40-70 degrees below flat, left or right, in
     10 degree steps, i.e. 220-250 / 290-320 on a circle; never straight down its own post; `GEAR_LASER.below`; picked at random), **warns 0.4 s** (energy runs up the barrel, the lens glows, a dotted aim line), then
-    **fires an instant laser** to whatever it hits, held **0.5 s**; then turns again (v7.10: either way, clockwise or anticlockwise, at random). **Faster ones sometimes
+    **fires an instant laser** to whatever it hits, held **0.5 s**; then turns again (v7.11: a fair coin toss picks clockwise or anticlockwise, so it often takes the long way round). **Faster ones sometimes
     fake it out**: click into place, hold (no glow) and turn on without firing; slower ones always fire.
     **Its stem (chosen: the carved rune column):** carved stone sections with dark bands, glowing rune panels,
     a teal energy pipe spiralling up it, a stepped base with iron braces, a little moss and a crack; and a

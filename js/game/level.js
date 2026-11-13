@@ -16,6 +16,8 @@ const T_SHOOTER = 3; // a solid block that fires spikes diagonally
 
 // The four diagonal directions a shooter fires in
 const SHOOTER_DIRS = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+// a fair coin toss for each turn of a gear laser (well mixed, so it really is 50/50): 0..1
+const coin = (k, id) => { let h = Math.imul(k ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(id + 0x632be5ab, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
 // a gear laser's aims, all pointing down: each angle below flat to the right, and mirrored to the left (y points down)
 const GEAR_DIRS = GEAR_LASER.below.map((d) => (d * Math.PI) / 180).flatMap((b) => [b, Math.PI - b]);
 
@@ -657,9 +659,11 @@ class Level {
     const T = time + gl.phase * L, k = Math.floor(T / L), u = T - k * L;
     const dirOf = (kk) => DIRS[Math.floor(hash(kk, gl.id) * DIRS.length)];
     const from = dirOf(k - 1), to = dirOf(k);
+    // a coin toss picks the way it turns (so half the time it goes the long way round); an aim hardly any different
+    // from the last one spins it all the way round, that same way
     let delta = ((to - from) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); // (clockwise)
-    if (delta < (G.minTurn * Math.PI) / 180) delta += Math.PI * 2; // (hardly any different: it still turns, all the way round)
-    if (hash(k * 7 + 1, gl.id * 3 + 101) < G.backChance) delta -= Math.PI * 2; // (this time it turns the other way, anticlockwise)
+    if (coin(k, gl.id) < G.backChance) delta -= Math.PI * 2; // (anticlockwise)
+    if (Math.abs(delta) < (G.minTurn * Math.PI) / 180) delta += Math.sign(delta || 1) * Math.PI * 2;
     const fires = !(gl.fast && hash(k, gl.id + 7) < G.fakeChance);
     if (u < turn) { const e = u / turn, ease = e * e * (3 - 2 * e); return { ang: from + delta * ease, phase: "turn", u: e, dir: to, fires }; }
     let v = u - turn;
