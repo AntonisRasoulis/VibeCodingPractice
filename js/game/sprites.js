@@ -381,6 +381,20 @@ function makeSnowball(r) {
 function makeSign(biome) {
   const c = makeCanvas(20, 22);
   const g = c.getContext("2d");
+  if (biome === "forest") { // (the secret biomes, met at a sign in a race that's all secret biomes) dark purple wood, a glowing mushroom
+    px(g, "#3a2448", 9, 10, 2, 12);
+    px(g, "#5e3a78", 0, 0, 20, 11); px(g, "#7a4e98", 0, 0, 20, 1); px(g, "#3a2448", 0, 10, 20, 1); px(g, "#3a2448", 19, 0, 1, 11);
+    px(g, "#e2a6ff", 7, 3, 6, 2); px(g, "#f4d4ff", 8, 2, 4, 1); px(g, "#ffffff", 9, 3); px(g, "#d8c8e8", 9, 5, 2, 3);
+    for (const [x, y] of [[4, 6], [15, 3], [14, 8]]) px(g, "#fff27a", x, y);
+    return c;
+  }
+  if (biome === "ruins") { // a stone slab on a stone post, a glowing teal rune
+    px(g, "#3a4444", 8, 10, 4, 12); px(g, "#6a7676", 9, 10, 2, 12);
+    px(g, "#3a4444", 0, 0, 20, 11); px(g, "#7a8686", 1, 1, 18, 9); px(g, "#a8b4b4", 1, 1, 18, 1); px(g, "#56626a", 1, 9, 18, 1);
+    px(g, "#7af0d8", 7, 3, 6, 1); px(g, "#7af0d8", 9, 3, 1, 5); px(g, "#7af0d8", 11, 4, 1, 3); px(g, "#d8fff0", 9, 3);
+    px(g, "#4c5656", 3, 2, 1, 2); px(g, "#4c5656", 4, 4); px(g, "#5a9a44", 1, 1, 3, 1); px(g, "#5a9a44", 16, 1, 2, 1);
+    return c;
+  }
   px(g, "#7a4a2e", 9, 10, 2, 12);
   px(g, "#c28b5a", 0, 0, 20, 11);
   px(g, "#8f563b", 0, 10, 20, 1);
@@ -1710,7 +1724,7 @@ function buildSprites() {
     iceSpikes: ICE_SPIKE_SHARDS.map(makeIceSpike),
     icicles: Object.fromEntries([10, 11, 12, 13].map((len) => [len, makeIcicle(len)])),
     snowballs: [2, 3, 4, 5, 6, 7, 8, 9].map(makeSnowball),
-    signs: Object.fromEntries(BIOMES.map((biome) => [biome, makeSign(biome)])),
+    signs: Object.fromEntries(BIOMES.concat(SECRET_BIOMES).map((biome) => [biome, makeSign(biome)])),
     pines: [12, 14, 16, 18].map((h, i) => makePine(h, i)),
     sandTop: [0, 1, 2, 3].map((v) => makeSandTile(v, true)),
     sandstone: [0, 1, 2, 3].map((v) => makeSandTile(v + 4, false)),

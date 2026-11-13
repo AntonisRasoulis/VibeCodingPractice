@@ -817,7 +817,15 @@ class Level {
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
-    if (this.biome === "ruins") { for (const k in weights) delete weights[k]; Object.assign(weights, RUINS.mix); } // (its own mix: no portals or orbs)
+    if (this.biome === "ruins") { // (its own mix: no portals)
+      const orb = weights.orb;
+      for (const k in weights) delete weights[k];
+      Object.assign(weights, RUINS.mix);
+      if (this.realmEnd === undefined) { // (the ruins as the main course, in a race that's all secret biomes: orbs too, and an easy start)
+        if (orb) weights.orb = ORBS.weight.ruins;
+        if (this.col <= 60) for (const k of ["shooter", "saw", "gearLaser"]) delete weights[k];
+      }
+    }
     if (this.biome === "forest") { // (its own mix, so its own dangers and the usual ones all get their turn)
       Object.assign(weights, FOREST.mix);
       if (this.col <= 60) for (const k of ["shooter", "shooterStack", "saw"]) delete weights[k];
@@ -1168,7 +1176,7 @@ class Level {
   // Each biome's special danger. Snow: two bears, at random spots in the biome (at least 70 m apart).
   addBiomeEvents(length) {
     // somewhere in it, a giant sleep mushroom (not in the forest itself), until the race has its one
-    if (this.realmEnd === undefined && this.biome !== "forest" && this.sleepShroomsOn && !this.sleepPlaced) this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
+    if (this.realmEnd === undefined && this.biome !== "forest" && this.biome !== "ruins" && this.sleepShroomsOn && !this.sleepPlaced) this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
     // ...and the arcane ruins' portal (one per race too)
     if (this.realmEnd === undefined && this.biome !== "forest" && this.biome !== "ruins" && this.ruinsOn && !this.ruinsPlaced) this.ruinsAt = this.col + this.rand(30, Math.max(31, length - 60));
     if (this.biome === "prairie") {

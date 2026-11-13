@@ -3133,8 +3133,9 @@ const Game = (() => {
       solo = players === 1;
       const picked = (options.biomeList || BIOMES).filter((b) => BIOMES.includes(b));
       const secret = (options.secretList || SECRET_BIOMES).filter((b) => SECRET_BIOMES.includes(b));
-      // biomes off: the prairie. Every regular biome turned off: the race is in the secret biomes instead
-      const allSecret = secret.filter((b) => b !== "ruins"); // (the ruins are only ever reached through their portal)
+      // biomes off: the prairie. Every regular biome turned off: the race is in the secret biomes instead, as the
+      // main course (no timer, no exit to reach: they just go on, like any biome)
+      const allSecret = secret;
       biomeList = options.biomes !== true ? ["prairie"] : picked.length ? picked : allSecret.length ? allSecret : ["prairie"];
       sleepShrooms = options.biomes !== true || secret.includes("forest"); // (the forest turned off: no way into it)
       ruinsOn = options.biomes !== true || secret.includes("ruins");       // (the ruins turned off: no portal)

@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 110 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 111 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -57,7 +57,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 - **render.js (`Renderer`):** draws each player's view (`drawView`) and the text on top (`drawText`).
 - **sprites.js:** all pixel art, built once at start (`buildSprites`).
 - **main.js:** the page around the game: Start buttons, Biomes on/off and the biome picker (regular biomes, and a
-  "Secret biomes" row: the forest; all regular ones off = a race that's all forest; forest off = no sleep mushrooms), Mode
+  "Secret biomes" row: the forest and the ruins; all regular ones off = a race in the secret ones as plain biomes, no timer or exit (v7.5); forest off = no sleep mushrooms), Mode
   (Normal / Wild), Sound, Pause, win counters, best distance (all remembered in `localStorage`).
 
 ### Important patterns
