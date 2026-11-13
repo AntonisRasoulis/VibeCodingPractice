@@ -589,8 +589,10 @@ class Level {
   // A row of n fire turrets set into the ground (flush with it), from here on
   fireRow(n) {
     const F = FIRE_ROW, x0 = this.col * TILE, gy = this.groundRow * TILE;
-    const kind = this.pickWeighted(F.kinds);
-    this.fireRows.push({ id: this.nextId++, x0, n, gy, kind, speed: F.speed[0] + this.rng() * (F.speed[1] - F.speed[0]), phase: this.rng(), second: n >= F.second && this.rng() < 0.5 });
+    const kind = this.pickWeighted(F.kinds), s = this.rng(), fast = s >= F.fast;
+    // a second flame only joins a low one: always low on a fast row, low or switching on a slow one
+    const second = kind === "low" && n >= F.second && this.rng() < 0.5 ? (!fast && this.rng() < 0.5 ? "switch" : "low") : false;
+    this.fireRows.push({ id: this.nextId++, x0, n, gy, kind, speed: F.speed[0] + s * (F.speed[1] - F.speed[0]), fast, phase: this.rng(), second });
     for (let i = 0; i < n; i++) this.column(this.groundRow, false);
   }
 
@@ -598,10 +600,11 @@ class Level {
   // the flame runs along the row and back, resting (out) a moment at each end; a row of one goes on and off
   fireFlames(row, time) {
     const F = FIRE_ROW, out = [];
-    const tallness = (i, k) => row.kind === "low" ? F.low : row.kind === "tall" ? F.tall : (i + k) % 2 ? F.tall : F.low;
+    // a flame is only tall while it runs right (away from you: you follow behind it); coming back it's always low
+    const tallness = (kind, i, k, right = true) => !right || kind === "low" ? F.low : kind === "tall" ? F.tall : (i + k) % 2 ? F.tall : F.low;
     if (row.n === 1) {
       const T = F.single[0] + F.single[1], u = ((time / T + row.phase) % 1) * T, k = Math.floor(time / T + row.phase);
-      if (u < F.single[0]) out.push({ i: 0, h: tallness(0, k) });
+      if (u < F.single[0]) out.push({ i: 0, h: tallness(row.kind, 0, k) });
       return out;
     }
     const M = (row.n - 1) / row.speed, T = 2 * (M + F.rest);
@@ -611,9 +614,10 @@ class Level {
       if (u < 2 * F.rest + M) return null;
       return row.n - 1 - Math.round((u - 2 * F.rest - M) * row.speed);
     };
+    const right = (u) => u < F.rest + M; // (running right: the first half of its cycle)
     const u = ((time / T + row.phase) % 1) * T, i = at(u);
-    if (i !== null) out.push({ i, h: tallness(i, 0) });
-    if (row.second) { const j = at((u + T / 2) % T); if (j !== null && j !== i) out.push({ i: j, h: F.low }); } // (a second, low flame)
+    if (i !== null) out.push({ i, h: tallness(row.kind, i, 0, right(u)) });
+    if (row.second) { const v = (u + T / 2) % T, j = at(v); if (j !== null && j !== i) out.push({ i: j, h: tallness(row.second, j, 0, right(v)) }); } // (a second flame, half a cycle behind)
     return out;
   }
 

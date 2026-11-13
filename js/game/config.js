@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since. (7: the arcane ruins.)
-const GAME_VERSION = "7.6";
+const GAME_VERSION = "7.7";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -513,12 +513,15 @@ const RUINS = {
 // row one turret at a time, left to right and back. Low flames you jump; tall ones you follow behind (the flame
 // rests a moment at each end, so you can get off the row); some switch between the two as they go.
 const FIRE_ROW = {
-  speed: [5, 11],      // turrets a second the flame runs along the row
+  speed: [6, 10],      // turrets a second the flame runs along the row (you run 12: slow ones half your speed, fast ones a little slower than you)
+  fast: 2 / 3,         // the top third of that range counts as fast (a fast row's second flame is always low)
   rest: 0.55,          // seconds it rests (out) at each end before running back
   low: 11,             // a low flame's height (pixels): jump it
   tall: 46,            // a tall one's (higher than a jump: slip through behind it)
-  kinds: { low: 4, tall: 3, switch: 3 }, // how likely each kind is (switch: tall and low on alternate turrets)
-  second: 6,           // rows this long or longer can have a second, low flame running along them
+  kinds: { low: 4, tall: 3, switch: 3 }, // how likely each kind is (switch: tall and low on alternate turrets). A flame
+                       // is only ever tall while running right (the way you run, so you follow it); coming back it's low
+  second: 6,           // rows this long or longer, with a low flame, can have a second flame: low on a fast row, low
+                       // or switching on a slow one (tall and switching rows never get a second flame)
   single: [0.8, 0.9],  // a row of one: flame on this long, then off this long (seconds)
 };
 

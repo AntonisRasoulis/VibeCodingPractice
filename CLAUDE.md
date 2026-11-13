@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 112 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 113 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -274,7 +274,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       the fire runs along the row one turret at a time, **left to right, then right to left**, at different
       **speeds and heights**: some flames are **low** (jump over them as they pass), some **tall** (too high to
       jump: slip through behind them), and some **switch between high and low** as they go, so you have to
-      time it *and* jump. On **big rows, several fires** can be running along it at once. A turret's grate glows and puffs sparks as it
+      time it *and* jump. On **big rows, several fires** can be running along it at once. **v7.7 (too hard to dodge):** a flame is only tall while running right (coming back it's low); only low-flame rows get a second fire (low on fast rows, low or switching on slow ones); speeds 6-10 turrets/s (you run 12). A turret's grate glows and puffs sparks as it
       changes, **just for looks** (not a warning). Fairness still applies (there must always be a way
       through: test it).
     - **The spike shooter, redone as a laser eye-stone** (mocked up and chosen): a round stone with a narrow
