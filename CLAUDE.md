@@ -268,5 +268,12 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       time it *and* jump. On **big rows, several fires** can be running along it at once. A turret's grate glows and puffs sparks as it
       changes, **just for looks** (not a warning). Fairness still applies (there must always be a way
       through: test it).
+    - **The spike shooter, redone as a laser eye-stone** (mocked up and chosen): a round stone with a narrow
+      teal eye (the old shooter's place and rhythm, shared by both players). **Warning: 0.4 s**: the eye opens
+      wide, the corners glow and faint dotted teal aim lines show exactly where each beam will go. Then each
+      corner fires a **laser that's there instantly, all the way to whatever it hits** (white-hot core, teal
+      edge, a glow; sparks and a scorch mark where it hits the ground), held for **0.5 s**, then fading. Beams
+      stop only at the ground, walls and the screen's edge: they **go straight through players** (one beam
+      can hit both). Fairness: test there's always a safe spot and time to get out of the lines.
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
