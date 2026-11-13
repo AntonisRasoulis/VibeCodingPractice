@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since. (7: the arcane ruins.)
-const GAME_VERSION = "7.1";
+const GAME_VERSION = "7.2";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -531,7 +531,7 @@ const EYE = {
 };
 
 // The ruins' gear lasers: a carved post with a big gear on top carrying a laser. It turns, clicks into place
-// pointing left, down-left, down-right or right (picked at random), warns, fires, and turns again. Faster ones
+// pointing somewhere downwards (picked at random), warns, fires, and turns again. Faster ones
 // sometimes click into place and turn on without firing (a fake-out).
 const GEAR_LASER = {
   turn: 0.6,           // seconds turning (fast ones: turnFast)
@@ -542,6 +542,9 @@ const GEAR_LASER = {
   fastChance: 0.35,    // share of gear lasers that are fast
   fakeChance: 0.3,     // a fast one's chance, each time, of not firing
   heights: [3, 7],     // tiles from the ground up to its gear
+  below: [40, 50, 60, 70], // where it can point: always some way down, this many degrees below flat, to the left or
+                       // the right (on a circle: 220-250 and 290-320 degrees; never straight down along its own post)
+  minTurn: 30,         // degrees: a new aim closer than this to the last one spins it right round instead
 };
 
 // The ruins' gift: the aurora's preservation. Aurora lights circle round you: they block one death (anything

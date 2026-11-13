@@ -288,8 +288,8 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     tall) with iron bands and a pipe of teal energy, a housing on top, and a **big toothed gear** (rim, spokes,
     bolts, a rune at the hub) turned by a small drive gear, carrying a **sleek laser emitter** (pale metal,
     cooling fins, an energy line, a lens ring). It **turns** (about 0.6 s), **clicks into place** (a ratchet
-    catch drops into its teeth) pointing **left, down-left, down-right or right** (45 degree steps, never up;
-    picked at random), **warns 0.4 s** (energy runs up the barrel, the lens glows, a dotted aim line), then
+    catch drops into its teeth) pointing **always some way down** (v7.2: 40-70 degrees below flat, left or right, in
+    10 degree steps, i.e. 220-250 / 290-320 on a circle; never straight down its own post; `GEAR_LASER.below`; picked at random), **warns 0.4 s** (energy runs up the barrel, the lens glows, a dotted aim line), then
     **fires an instant laser** to whatever it hits, held **0.5 s**; then turns again. **Faster ones sometimes
     fake it out**: click into place, hold (no glow) and turn on without firing; slower ones always fire.
     **Its stem (chosen: the carved rune column):** carved stone sections with dark bands, glowing rune panels,

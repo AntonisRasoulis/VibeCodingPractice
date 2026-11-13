@@ -16,6 +16,8 @@ const T_SHOOTER = 3; // a solid block that fires spikes diagonally
 
 // The four diagonal directions a shooter fires in
 const SHOOTER_DIRS = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+// a gear laser's aims, all pointing down: each angle below flat to the right, and mirrored to the left (y points down)
+const GEAR_DIRS = GEAR_LASER.below.map((d) => (d * Math.PI) / 180).flatMap((b) => [b, Math.PI - b]);
 
 const MIN_GROUND_ROW = 8;  // highest the ground surface can go
 const MAX_GROUND_ROW = 12; // lowest the ground surface can go
@@ -325,7 +327,7 @@ class Level {
     if (this.trees.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < ALIVE_TREE.grabReach + HITBOX_W + 8)) return true; // (no coming back where an alive tree strikes)
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
     if (this.fireRows.some((r) => x + HITBOX_W > r.x0 - 4 && x < r.x0 + r.n * TILE + 4)) return true; // (no waiting on a fire row)
-    if (this.gearLasers.some((gl) => [-1, 1].some((sd) => Math.abs(x + HITBOX_W / 2 - (gl.x + sd * (gl.gy - gl.cy))) < 16))) return true; // (where its downward beams land)
+    if (this.gearLasers.some((gl) => Math.abs(x + HITBOX_W / 2 - gl.x) < (gl.gy - gl.cy) / Math.tan((GEAR_LASER.below[0] * Math.PI) / 180) + 16)) return true; // (anywhere its beams can land)
     if (this.ruinsGates.some((g) => g.state !== "broken" && Math.abs(g.x - (x + HITBOX_W / 2)) < RUINS.grab + 8)) return true; // (not on its button, or in its grab)
     if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.capW / 2 + SLEEP_SHROOM.drift * SLEEP_SHROOM.stem / SLEEP_SHROOM.fall + HITBOX_W)) return true; // (no waiting where its spores fall)
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
@@ -647,12 +649,12 @@ class Level {
   // that phase), dir (the way it's locked), fires (false: a fake-out) }. Worked out from the clock.
   gearState(gl, time) {
     const G = GEAR_LASER, turn = gl.fast ? G.turnFast : G.turn, L = turn + G.hold + G.warn + G.beam + 0.1;
-    const DIRS = [Math.PI, Math.PI * 0.75, Math.PI * 0.25, 0]; // left, down-left, down-right, right (y points down)
+    const DIRS = GEAR_DIRS;
     const T = time + gl.phase * L, k = Math.floor(T / L), u = T - k * L;
-    const dirOf = (kk) => DIRS[Math.floor(hash(kk, gl.id) * 4)];
+    const dirOf = (kk) => DIRS[Math.floor(hash(kk, gl.id) * DIRS.length)];
     const from = dirOf(k - 1), to = dirOf(k);
     let delta = ((to - from) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-    if (delta < 0.01) delta = Math.PI * 2; // (the same way again: it still turns, all the way round)
+    if (delta < (G.minTurn * Math.PI) / 180) delta += Math.PI * 2; // (hardly any different: it still turns, all the way round)
     const fires = !(gl.fast && hash(k, gl.id + 7) < G.fakeChance);
     if (u < turn) { const e = u / turn, ease = e * e * (3 - 2 * e); return { ang: from + delta * ease, phase: "turn", u: e, dir: to, fires }; }
     let v = u - turn;
