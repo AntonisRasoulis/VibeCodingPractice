@@ -1358,6 +1358,7 @@ const SECTIONS = {
   // The ruins': a gear laser on a carved post, with flat ground where its beams land on either side
   gearLaser() {
     const G = GEAR_LASER, h = this.rand(G.heights[0], G.heights[1]), reach = h + 3;
+    if (this.groundRow < h + 2) this.groundRow = Math.min(MAX_GROUND_ROW, h + 2); // (a tall one: the ground steps down so its gear stays on screen)
     this.flat(reach, false);
     const gy = this.groundRow * TILE;
     this.gearLasers.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy, cy: gy - h * TILE, fast: this.rng() < G.fastChance, phase: this.rng() });

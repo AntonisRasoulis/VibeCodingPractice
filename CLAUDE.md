@@ -284,8 +284,8 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       edge, a glow; sparks and a scorch mark where it hits the ground), held for **0.5 s**, then fading. Beams
       stop only at the ground, walls and the screen's edge: they **go straight through players** (one beam
       can hit both). Fairness: test there's always a safe spot and time to get out of the lines.
-  - **The gear laser** (a new ruins danger of its own; mocked up): a tall stone post (heights **vary**: short to
-    tall) with iron bands and a pipe of teal energy, a housing on top, and a **big toothed gear** (rim, spokes,
+  - **The gear laser** (a new ruins danger of its own; mocked up): a tall stone post (heights **vary**: 7 sizes, 3 to 9
+    tiles; v7.3 added 8 and 9) with iron bands and a pipe of teal energy, a housing on top, and a **big toothed gear** (rim, spokes,
     bolts, a rune at the hub) turned by a small drive gear, carrying a **sleek laser emitter** (pale metal,
     cooling fins, an energy line, a lens ring). It **turns** (about 0.6 s), **clicks into place** (a ratchet
     catch drops into its teeth) pointing **always some way down** (v7.2: 40-70 degrees below flat, left or right, in
