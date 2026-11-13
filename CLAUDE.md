@@ -285,5 +285,10 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     - **Dying in there:** you respawn inside the stretch as usual (it costs time).
     - **Look:** the aurora vortex in the rock ring, **tinted with the biome's colours** (green for prairie,
       icy white for taiga, sandy gold for desert, deep green for jungle) so you can tell where each goes.
+    - **A stretch replaces that piece of the ruins:** go in at tile 200, run 50 tiles of biome, come out at
+      tile 250 (just as far along, a harder way across). A **forced** one is simply part of the path. An
+      **optional** one is a **shortcut**: it brings you out further along than its length (e.g. 50 tiles of
+      biome coming out at tile 280): harder, but saves time if you don't die in there. (Size the 60 s with
+      the stretches counted as part of the run.)
 - Ideas offered for more "the forest is out to get you": maces that swing harder when you're close,
   eyes blinking in tree trunks, shooters turning to face you.
