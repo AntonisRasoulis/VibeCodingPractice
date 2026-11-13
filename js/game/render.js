@@ -416,12 +416,31 @@ const Renderer = (() => {
     const n = Math.hypot(bm.dx, bm.dy), ux = bm.dx / n, uy = bm.dy / n;
     for (let k = 0; k < bm.len; k++) if ((k + Math.floor(time * 20)) % 4 < 2) P(RUNE, bm.x - camX + ux * k, bm.y + uy * k, 1, 1, 0.5);
   }
-  function drawBeam(bm, camX, fade = 1) { // the beam: a white-hot core, teal round it, a glow, sparks where it hits
-    const n = Math.hypot(bm.dx, bm.dy), ux = bm.dx / n, uy = bm.dy / n;
-    for (let k = 0; k < bm.len; k++) { const x = bm.x - camX + ux * k, y = bm.y + uy * k; P("#2fbfa8", x - 1, y, 3, 1, 0.5 * fade); P(RUNE, x, y - 1, 1, 3, 0.5 * fade); P("#eafff8", x, y, 1, 1, fade); }
+  // A firing laser, alive: it flashes wide as it fires, its edges crackle and flicker, bright pulses of energy race
+  // out along it, sparks spit off its sides, and it thins away at the end. age: seconds since it fired (of `life`).
+  function drawBeam(bm, camX, time, age = 0.25, life = 0.5) {
+    const n = Math.hypot(bm.dx, bm.dy), ux = bm.dx / n, uy = bm.dy / n, nx = -uy, ny = ux;
+    const flash = age < 0.07 ? 1 - age / 0.07 : 0, thin = age > life - 0.12 ? (life - age) / 0.12 : 1; // (wide at first, thinning out at the end)
+    const frame = Math.floor(time * 30);
+    for (let k = 0; k < bm.len; k++) {
+      const x = bm.x - camX + ux * k, y = bm.y + uy * k;
+      const flick = hash(frame, k >> 2), w = (thin < 0.5 ? 0 : 1) + (flick > 0.55 || flash > 0 ? 1 : 0) + (flash > 0.5 ? 1 : 0); // its crackling edge
+      for (let q = -w; q <= w; q++) P(Math.abs(q) === w && w > 0 ? "#2fbfa8" : RUNE, x + nx * q, y + ny * q, 1, 1, (Math.abs(q) === w ? 0.45 : 0.8) * thin);
+      const pulse = ((k - time * 320) % 18 + 18) % 18 < 3; // bright pulses racing out along it
+      P(pulse || flash > 0.3 ? "#ffffff" : "#eafff8", x, y, 1, 1, Math.max(thin, 0.3));
+      if (pulse && thin > 0.5) { P("#eafff8", x + nx, y + ny, 1, 1, 0.7); P("#eafff8", x - nx, y - ny, 1, 1, 0.7); }
+    }
+    for (let i = 0; i < Math.min(12, bm.len / 10); i++) { // sparks spitting off its sides, drifting away
+      const k = hash(frame, i + 40) * bm.len, side = hash(frame, i + 60) > 0.5 ? 1 : -1, off = 2 + hash(frame, i + 80) * 4;
+      P(hash(frame, i + 90) > 0.5 ? "#eafff8" : RUNE, bm.x - camX + ux * k + nx * side * off, bm.y + uy * k + ny * side * off, 1, 1, 0.8 * thin);
+    }
+    drawGlowAt("aurora", 1, bm.x - camX, bm.y, (0.5 + 0.4 * flash) * thin); // where it leaves the crystal
     const ex = bm.x - camX + ux * bm.len, ey = bm.y + uy * bm.len;
-    drawGlowAt("aurora", 1, ex, ey, 0.6 * fade);
-    if (ey < VIEW_H) for (let s = 0; s < 6; s++) P(s % 2 ? "#eafff8" : RUNE, ex + Math.cos(s * 1.1) * (2 + s), ey - 1 - Math.abs(Math.sin(s * 1.7)) * (2 + s), 1, 1, fade);
+    drawGlowAt("aurora", 1, ex, ey, (0.5 + 0.3 * hash(frame, 7)) * thin);
+    if (ey < VIEW_H) for (let i = 0; i < 7; i++) { // sparks bursting up where it hits, fresh every frame
+      const a = -Math.PI / 2 + (hash(frame, i + 20) - 0.5) * 2.4, r = 1 + hash(frame, i + 30) * 7;
+      P(i % 2 ? "#eafff8" : RUNE, ex + Math.cos(a) * r, ey - 1 + Math.sin(a) * r, 1, 1, thin);
+    }
   }
 
   // The laser eye-stone: a round grey stone with four carved points (a teal crystal at each tip) and a 4-point star of
@@ -433,7 +452,7 @@ const Renderer = (() => {
   function drawEyeStone(s, level, camX, time) {
     const st = level.eyeState(s, time), fill = st.firing ? 1 : st.warn, on = st.firing || st.warn > 0, cx = s.x - camX, cy = s.y;
     if (st.warn > 0) for (const bm of level.eyeBeams(s)) drawAim(bm, camX, time);
-    if (st.firing) for (const bm of level.eyeBeams(s)) drawBeam(bm, camX);
+    if (st.firing) { const age = ((time / s.period - s.phase) % 1 + 1) % 1 * s.period; for (const bm of level.eyeBeams(s)) drawBeam(bm, camX, time, age, EYE.beam); }
     for (const [dx, dy] of EYE_DIRS) for (let k = 5; k <= 9; k++) { // the carved points
       const w = k < 7 ? 1.5 : k < 9 ? 1 : 0.5;
       for (let q = -w; q <= w; q += 0.5) P(q * dx * dy < 0 ? ES.light : ES.dark, cx + dx * k + q * dy * 0.7, cy + dy * k - q * dx * 0.7);
@@ -534,7 +553,7 @@ const Renderer = (() => {
       const beam = st.phase === "warn" || st.phase === "fire" ? level.gearBeam(gl, st.ang) : null;
       if (front) {
         if (beam && st.phase === "warn") drawAim(beam, camX, time);
-        if (beam && st.phase === "fire") drawBeam(beam, camX, 1);
+        if (beam && st.phase === "fire") drawBeam(beam, camX, time, st.u * GEAR_LASER.beam, GEAR_LASER.beam);
         continue;
       }
       if (cx < -40 || cx > VIEW_W + 40) continue;

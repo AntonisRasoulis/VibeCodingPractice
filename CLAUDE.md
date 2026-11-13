@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 114 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 115 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -279,7 +279,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       through: test it).
     - **The spike shooter, redone as a laser eye-stone** (v7.8 redesign, chosen G3 + star: a round grey stone with four carved
       points, a teal crystal at each tip, a 4-point star of energy in the middle aimed at the tips; nothing moves, light fills the
-      star from the middle out during the warning; beams start at the crystal tips). Older notes: a round stone with a narrow
+      star from the middle out during the warning; beams start at the crystal tips; v7.9: beams animated in `drawBeam`: flash, crackle, racing pulses, sparks). Older notes: a round stone with a narrow
       teal eye (the old shooter's place and rhythm, shared by both players). **Warning: 0.4 s**: the eye opens
       wide, the corners glow and faint dotted teal aim lines show exactly where each beam will go. Then each
       corner fires a **laser that's there instantly, all the way to whatever it hits** (white-hot core, teal
