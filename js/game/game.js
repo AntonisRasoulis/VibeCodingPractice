@@ -28,9 +28,10 @@ const Game = (() => {
   let biomeList = ["prairie"]; // the biomes this race goes through (biomes off: just the prairie)
   let wild = false;     // Wild mode: the hard one
   let sleepShrooms = true; // are there sleep mushrooms (the way into the enchanted forest) on the main course?
+  let ruinsOn = true;      // ...and a portal to the arcane ruins?
 
   function newWorld(startBiome = "prairie") {
-    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes: biomeList.length > 1, biomeList, wild, sleepShrooms });
+    const level = new Level(Math.floor(Math.random() * 1e9), startBiome, { solo, biomes: biomeList.length > 1, biomeList, wild, sleepShrooms, ruins: ruinsOn });
     level.ensure(VIEW_W * 2);
     const startX = 4 * TILE;
     const startY = level.groundRow * TILE - HITBOX_H;
@@ -63,6 +64,8 @@ const Game = (() => {
       sawBits: [],     // splinters, sparks and dirt thrown about by the forest's saws breaking loose
       quakes: [],      // the ground shaking where one slams down: { x, t }
       wisps: [],       // the magic trailing behind a loose saw: little glowing wisps drifting up and fading
+      builtPortals: [], // the ruins: portals building themselves out of old bricks (to come out of), then falling apart { level, x, gy, t, openAt, breakAt }
+      pushes: [],       // the aurora's preservation: pushes spreading out { level, x, y, t }
       nextCatchup: null, // when (world time) the next purple orb comes for whoever's fallen behind
       warps: [],       // portal gun: someone going into a portal and out of another one far ahead
       grapples: [],    // grapple hooks flying out to the leader, or reeling them back
@@ -152,17 +155,27 @@ const Game = (() => {
 
     const inputs = players.map((p, i) => readInput(i));
     players.forEach((p, i) => p.update(dt, inputs[i], p.realm || level)); // (each on their own course: the main one, or a forest)
+    // The ruins' gift: with no power to use, S / Down sends the aurora's lights out in a push
+    players.forEach((p, i) => { if (inputs[i].firePressed && !p.power && p.aurora && p.aurora.back <= 0 && !p.dead && !p.caught && !p.held) { auroraPush(p); inputs[i].firePressed = false; } });
     updateDreams(dt);
+    updateTrips(dt);
+    updateBuiltPortals(dt);
+    for (const w of world.pushes) w.t += dt;
+    world.pushes = world.pushes.filter((w) => w.t < 0.4);
     updateRootWall(dt);
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
-    for (const f of forests()) onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateLooseMaces(dt); updateSpores(); updateLobbers(dt); updateAliveTrees(dt); levelSounds(); });
+    for (const f of forests()) {
+      if (f.biome === "ruins") onCourse(f, () => { updateBridges(dt); updateRuins(f, dt); levelSounds(); });
+      else onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateLooseMaces(dt); updateSpores(); updateLobbers(dt); updateAliveTrees(dt); levelSounds(); });
+    }
     checkFire();
   }
 
   function mainCourse(dt, inputs) {
     world.players.forEach((p, i) => { if (inputs[i].firePressed) usePower(p, i); });
     updateSleepShrooms();
+    updateRuinsGates();
     updateBridges(dt);
     updateMonsoon(dt);
     const flooded = world.monsoon !== null; // (while it's flooded, every danger waits)
@@ -250,8 +263,15 @@ const Game = (() => {
     for (const s of level.shooters) {
       if (!near(s.x)) continue;
       const volley = Math.floor(level.time / s.period - s.phase);
-      if (s.lastVolley !== undefined && volley !== s.lastVolley) Sound.play("shooterFire");
+      if (s.lastVolley !== undefined && volley !== s.lastVolley) Sound.play(s.eye ? "laserFire" : "shooterFire");
       s.lastVolley = volley;
+    }
+    for (const gl of level.gearLasers) { // the ruins' gear lasers: a click as each locks into place, a zap as it fires
+      if (!near(gl.x)) continue;
+      const st = level.gearState(gl, level.time), was = gl.lastPhase;
+      if (was === "turn" && st.phase !== "turn") Sound.play("gearClick");
+      if (was !== "fire" && st.phase === "fire") Sound.play("laserFire");
+      gl.lastPhase = st.phase;
     }
     for (const m of level.maces) {
       if (!near(m.x) || m.loose) continue;
@@ -1430,7 +1450,7 @@ const Game = (() => {
     for (const p of world.players) {
       if (!p.dream) {
         // the end of the forest: the fireflies come for you
-        if (p.realm && !p.dead && !p.caught && !p.held && p.realm.realmExit !== undefined && p.x >= p.realm.realmExit) {
+        if (p.realm && p.realm.biome === "forest" && !p.dead && !p.caught && !p.held && p.realm.realmExit !== undefined && p.x >= p.realm.realmExit) {
           p.dream = { kind: "fireflies", t: 0 };
           p.held = true;
           p.vx = p.vy = 0;
@@ -1515,6 +1535,202 @@ const Game = (() => {
     p.spin = 0;
     p.tumbleweeds = [];
     p.snowballs = [];
+  }
+
+  // ---- The arcane ruins: its portal, the race against the clock inside, and the ways back out ----
+
+  const freeRunner = (p) => !p.dead && !p.caught && !p.held && !p.dream && !p.trip;
+
+  // The ruins portal on the main course: run over its button and it bursts on (the aurora pulling in anyone
+  // close by); then anyone can jump into it; press the button again (anyone) and it breaks apart
+  function updateRuinsGates() {
+    const { level, players } = world;
+    for (const g of level.ruinsGates) {
+      if (!players.some((p) => Math.abs(p.x - g.x) < VIEW_W)) continue;
+      if (g.state === "on" && world.time - g.openedAt >= RUINS.time) { g.state = "broken"; g.brokenAt = world.time; Sound.play("portalBreak"); } // (its time's up: it crumbles)
+      for (const p of players) {
+        const on = freeRunner(p) && p.onGround && p.x + HITBOX_W > g.x - 4 && p.x < g.x + 4 && Math.abs(p.y + HITBOX_H - g.gy) < 2;
+        if (!on) { if (p.onButton === g.id) p.onButton = null; continue; }
+        if (p.onButton === g.id) continue; // (still standing on it: one press)
+        p.onButton = g.id;
+        if (g.state === "broken") continue;
+        g.presses++;
+        Sound.play("buttonClick");
+        if (g.state === "off") {
+          g.state = "on";
+          g.openedAt = world.time;
+          g.burstAt = world.time;
+          g.realm = makeRuins(g);
+          Sound.play("portalOpen");
+          for (const q of players) if (freeRunner(q) && !q.realm && Math.abs(q.x + HITBOX_W / 2 - g.x) < RUINS.grab) startTrip(q, "in", g); // (the aurora bursts out and grabs whoever's close)
+        } else {
+          g.state = "broken";
+          g.brokenAt = world.time;
+          Sound.play("portalBreak");
+        }
+      }
+      if (g.state !== "on") continue;
+      const cy = g.gy - RUINS.ringR - 1 - RUINS.floatUp;
+      for (const p of players) if (freeRunner(p) && !p.realm && touchesHole(p, g.x, cy)) startTrip(p, "in", g); // (jumping into it)
+    }
+  }
+
+  const touchesHole = (p, x, y) => Math.hypot(clamp(x, p.x, p.x + HITBOX_W) - x, clamp(y, p.y, p.y + HITBOX_H) - y) < RUINS.hole + 1; // (anywhere in its swirl; out of reach standing under it)
+
+  // The arcane ruins behind a portal: the same stretch as the main course from the portal on, calm ground where you
+  // arrive, then RUINS.length tiles to the exit portal
+  function makeRuins(g) {
+    const c0 = Math.floor(g.x / TILE) + 2;
+    const f = new Level(Math.floor(Math.random() * 1e9), "ruins", { solo: world.solo, biomes: false, wild: world.wild, realmEnd: (c0 + RUINS.arrive + RUINS.length) * TILE });
+    f.flat(Math.max(1, c0 - f.col), false);
+    f.flat(RUINS.arrive, false);
+    f.gate = g;
+    f.arriveX = (c0 + 6) * TILE;
+    f.startX = f.arriveX;
+    f.update(world.time);
+    return f;
+  }
+
+  // How many seconds a ruins has left
+  function ruinsLeft(f) {
+    return f && f.gate && f.gate.openedAt !== null ? RUINS.time - (world.time - f.gate.openedAt) : RUINS.time;
+  }
+
+  // Inside the ruins: the exit portal, the clock running out, and (in the last seconds) stones falling
+  function updateRuins(f, dt) {
+    const left = ruinsLeft(f), inside = world.players.filter((p) => p.realm === f && !p.caught && !p.trip);
+    for (const p of inside) {
+      if (left <= 0) { // time's up: the aurora snatches you out as it all comes down
+        if (p.dead) { p.dead = false; p.x = p.respawnX; p.y = p.respawnY; }
+        p.showHit("TIME'S UP!", "#ff5a4a");
+        startTrip(p, "fail", null);
+        continue;
+      }
+      if (freeRunner(p) && f.exitPortal && touchesHole(p, f.exitPortal.x, f.exitPortal.y)) startTrip(p, "out", f.exitPortal);
+      // the last seconds: stones dropping near you (a shadow on the ground first)
+      if (left <= RUINS.collapse[2] && freeRunner(p)) {
+        p.stoneT = (p.stoneT || 0) - dt;
+        if (p.stoneT <= 0) {
+          p.stoneT = RUINS.stoneEvery * (0.7 + Math.random() * 0.6);
+          const x = p.x + HITBOX_W / 2 + (Math.random() * 60 - 12) + p.vx * RUINS.stoneWarn, gy = f.groundTop(x);
+          if (gy !== null) f.stones.push({ x, gy, t: 0, w: 7 + Math.floor(Math.random() * 3) });
+        }
+      }
+    }
+    for (const st of f.stones) {
+      const was = st.t;
+      st.t += dt;
+      if (was < RUINS.stoneWarn + RUINS.stoneFall && st.t >= RUINS.stoneWarn + RUINS.stoneFall) { // it lands: crumbles to bits
+        for (let k = 0; k < 10; k++) world.sawBits.push({ level: f, x: st.x + (Math.random() - 0.5) * st.w, y: st.gy - 3, vx: (Math.random() - 0.5) * 120, vy: -40 - Math.random() * 90, t: 0.4 + Math.random() * 0.3, c: k % 3 ? "#7a8686" : "#4c5656", big: k % 2 === 0 });
+        world.quakes.push({ level: f, x: st.x, t: 0.15 });
+        Sound.play("stoneLand");
+      }
+    }
+    f.stones = f.stones.filter((st) => st.t < RUINS.stoneWarn + RUINS.stoneFall + 0.1);
+  }
+
+  // Going in and out of the ruins: the aurora pulls you into a portal (the screen fading), you're moved across, a
+  // portal builds itself out of old bricks where you come out, out you pop, and it falls apart again.
+  // kind: "in" (into the ruins), "out" (escaped through its exit portal: the gift), "fail" (time's up: thrown back)
+  function startTrip(p, kind, portal) {
+    // where the aurora pulls you: into the portal's swirl (the ruins portal floats once it's on), or (time's up) straight up
+    const to = kind === "in" ? { x: portal.x, y: portal.gy - RUINS.ringR - 1 - RUINS.floatUp } : kind === "out" ? { x: portal.x, y: portal.y } : { x: p.x + HITBOX_W / 2, y: p.y - 24 };
+    p.trip = { kind, t: 0, stage: "pull", fromX: p.x, fromY: p.y, toX: to.x - HITBOX_W / 2, toY: to.y - HITBOX_H / 2, portal };
+    p.held = true;
+    p.vx = p.vy = 0;
+    p.inQuick = false; p.inRiver = null; p.trapped = 0; p.knock = null;
+    Sound.play(kind === "fail" ? "timesUp" : "auroraGrab");
+  }
+
+  function updateTrips(dt) {
+    for (const p of world.players) {
+      const tr = p.trip;
+      if (!tr) continue;
+      if (p.caught) { p.trip = null; continue; }
+      tr.t += dt;
+      if (tr.stage === "pull") { // the aurora wrapping round you and pulling you in
+        const u = Math.min(1, tr.t / RUINS.pullTime), e = u * u * (3 - 2 * u);
+        p.x = tr.fromX + (tr.toX - tr.fromX) * e;
+        p.y = tr.fromY + (tr.toY - tr.fromY) * e;
+        if (u < 1) continue;
+        // across: into the ruins, or back out onto the main course
+        let realm = null, x = p.x;
+        if (tr.kind === "in") { realm = tr.portal.realm; x = realm.arriveX; }
+        else if (tr.kind === "out") x = tr.portal.x + 16;
+        else x = Math.max(0, p.x - RUINS.failBack);
+        moveTo(p, realm, x);
+        p.held = true;
+        const course = realm || world.level;
+        tr.built = { level: course, x: p.x + HITBOX_W / 2, gy: p.y + HITBOX_H, t: 0, openAt: RUINS.buildTime, breakAt: null, kind: tr.kind };
+        world.builtPortals.push(tr.built);
+        tr.landX = p.x; tr.landY = p.y;
+        tr.stage = "build"; tr.t = 0;
+        continue;
+      }
+      if (tr.stage === "build") { // hidden while the bricks fly in and lock together
+        p.x = tr.landX; p.y = tr.landY - 18;
+        if (tr.t < RUINS.buildTime) continue;
+        tr.stage = "pop"; tr.t = 0;
+        Sound.play("portalPop");
+        continue;
+      }
+      if (tr.stage === "pop") { // out you come, dropping to the ground
+        const u = Math.min(1, tr.t / RUINS.outTime);
+        p.x = tr.landX; p.y = tr.landY - 18 * (1 - u * u);
+        if (u < 1) continue;
+        p.y = tr.landY;
+        p.held = false;
+        p.onGround = true;
+        tr.built.breakAt = tr.built.t;
+        if (tr.kind === "out") { // escaped: the aurora's preservation, for the rest of the race
+          p.aurora = { back: 0 };
+          p.showHit("AURORA!", "#7af0d8");
+          p.sparkle("#7af0d8");
+          Sound.play("auroraGift");
+        }
+        p.trip = null;
+      }
+    }
+  }
+
+  // Portals made of old bricks: building themselves (bricks hopping up into a ring), open, then falling apart
+  function updateBuiltPortals(dt) {
+    for (const bp of world.builtPortals) bp.t += dt;
+    world.builtPortals = world.builtPortals.filter((bp) => bp.breakAt === null || bp.t < bp.breakAt + RUINS.breakTime);
+  }
+
+  // How dark someone's screen is (0..1) while the aurora takes them across
+  function tripDark(p) {
+    const tr = p.trip;
+    if (!tr) return 0;
+    if (tr.stage === "pull") return Math.max(0, (tr.t - RUINS.pullTime * 0.55) / (RUINS.pullTime * 0.45));
+    if (tr.stage === "build") return Math.max(0, 1 - tr.t / 0.35);
+    return 0;
+  }
+
+  // The aurora's preservation, used: its lights burst out in a ring, shoving away the other player and any
+  // creature close by (alone: the fire too); then they're gone until they come back
+  function auroraPush(p) {
+    p.aurora.back = AURORA.recharge;
+    const course = p.realm || world.level, cx = p.x + HITBOX_W / 2, cy = p.y + HITBOX_H / 2;
+    world.pushes.push({ level: course, x: cx, y: cy, t: 0 });
+    Sound.play("auroraPush");
+    for (const q of world.players) {
+      if (q === p || !freeRunner(q) || (q.realm || world.level) !== course || Math.abs(q.x + HITBOX_W / 2 - cx) > AURORA.push || Math.abs(q.y - p.y) > AURORA.push) continue;
+      const dir = Math.sign(q.x - p.x) || 1;
+      // back a bit, onto ground (never off an edge)
+      let to = null;
+      for (let d = AURORA.shove; d >= 0 && to === null; d -= 4) {
+        const x = q.x + dir * d, g = course.groundTop(x + 1);
+        if (g !== null && course.groundTop(x + HITBOX_W - 1) === g && g >= q.y + HITBOX_H - 8) to = { x, y: g - HITBOX_H };
+      }
+      if (to) { q.knock = { fromX: q.x, toX: to.x, y: to.y, t: 0 }; q.showHit("PUSHED!", "#7af0d8"); }
+    }
+    if (course === world.level) {
+      for (const bear of world.bears) if (Math.abs(bear.x - cx) < AURORA.push + 16 && bear.state !== "leave") { bear.state = "leave"; bear.x += (Math.sign(bear.x - cx) || -1) * 24; }
+      for (const j of world.jaguars) if (Math.abs(j.x - cx) < AURORA.push + 16) { j.x += (Math.sign(j.x - cx) || -1) * 24; j.attacks = 0; }
+      if (world.solo && p.trackX - world.fire.x < VIEW_W * 0.6) world.fire.x -= AURORA.fireShove; // (alone: it shoves the fire back)
+    }
   }
 
   // ---- The enchanted forest's gift: magic feet ----
@@ -2861,6 +3077,8 @@ const Game = (() => {
 
   return {
     dreamDark,
+    tripDark,
+    ruinsLeft,
     sandstormStrength,
     floodSurface,
     monsoonStrength: () => (world.monsoon ? Math.max(0, Math.min(1, world.monsoon.t / 0.6, (MONSOON.time - world.monsoon.t) / 0.6)) : 0),
@@ -2907,8 +3125,10 @@ const Game = (() => {
       const picked = (options.biomeList || BIOMES).filter((b) => BIOMES.includes(b));
       const secret = (options.secretList || SECRET_BIOMES).filter((b) => SECRET_BIOMES.includes(b));
       // biomes off: the prairie. Every regular biome turned off: the race is in the secret biomes instead
-      biomeList = options.biomes !== true ? ["prairie"] : picked.length ? picked : secret.length ? secret : ["prairie"];
+      const allSecret = secret.filter((b) => b !== "ruins"); // (the ruins are only ever reached through their portal)
+      biomeList = options.biomes !== true ? ["prairie"] : picked.length ? picked : allSecret.length ? allSecret : ["prairie"];
       sleepShrooms = options.biomes !== true || secret.includes("forest"); // (the forest turned off: no way into it)
+      ruinsOn = options.biomes !== true || secret.includes("ruins");       // (the ruins turned off: no portal)
       wild = options.wild === true;
       canvas.height = (solo ? VIEW_H : VIEW_H * 2 + DIVIDER) * SCALE;
       canvas.style.aspectRatio = `auto ${canvas.width} / ${canvas.height}`;

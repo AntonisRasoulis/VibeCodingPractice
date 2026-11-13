@@ -81,7 +81,11 @@ class Player {
     this.skate = 0;               // seconds left on skates (faster on ice)
     this.realm = null;            // the enchanted forest we're in (null: the main course)
     this.dream = null;            // falling asleep (to the forest), the fireflies taking us out, or waking up: { kind, t }
+    this.trip = null;             // being taken in or out of the arcane ruins by the aurora: { kind: in | out | fail, stage: pull | build | pop, t, ... }
     this.catchupGiven = false;    // had our one purple catch-up orb this race
+    this.aurora = null;           // the ruins' gift, the aurora's preservation: { back (seconds until its lights are back: 0 = ready) }
+    this.shieldGrace = 0;         // seconds nothing can hurt us, just after the aurora blocked a death
+    this.knock = null;            // being shoved by someone's aurora push: { fromX, toX, y, t }
     this.lying = false;           // just woken up, still lying down
     this.magicFeet = false;
     this.rootGuard = false;
@@ -140,7 +144,19 @@ class Player {
     if (this.blink > 0) this.blink -= dt;
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
+    if (this.shieldGrace > 0) this.shieldGrace -= dt;
+    if (this.aurora && this.aurora.back > 0) { this.aurora.back -= dt; if (this.aurora.back <= 0) { this.aurora.back = 0; Sound.play("auroraBack"); } }
     if (this.caught) return;
+    if (this.knock && !this.dead) { // shoved by an aurora push: slid back along a little hop, then on our feet again
+      const k = this.knock;
+      k.t += dt;
+      const u = Math.min(1, k.t / 0.28);
+      this.x = k.fromX + (k.toX - k.fromX) * u;
+      this.y = k.y - Math.sin(u * Math.PI) * 8;
+      this.vx = this.vy = 0;
+      if (u >= 1) { this.knock = null; this.y = k.y; this.onGround = true; }
+      return;
+    }
     if (this.held) { this.trapped = 0; this.eatenBy = null; return; } // being carried by a hand (it pulls you out of a trap, or a flytrap)
     if (this.eatenBy && !this.dead) { // being chewed: stuck inside it, can't do a thing
       this.x = this.eatenBy.x - HITBOX_W / 2;
@@ -846,6 +862,28 @@ class Player {
       }
     }
 
+    // The ruins' fire turrets: a flame burning up out of a vent
+    for (const r of level.fireRows) {
+      if (cx < r.x0 - 8 || cx > r.x0 + r.n * TILE + 8) continue;
+      for (const f of level.fireFlames(r, level.time)) if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, r.x0 + f.i * TILE + 2, r.gy - f.h, 4, f.h)) return this.die("SCORCHED!");
+    }
+    // ...its laser eye-stones and gear lasers: a beam passing through you
+    for (const s of level.shooters) {
+      if (!s.eye || Math.abs(s.x - cx) > EYE.reach || !level.eyeState(s, level.time).firing) continue;
+      for (const bm of level.eyeBeams(s)) if (level.beamHits(bm, this.x, this.y, HITBOX_W, HITBOX_H)) return this.die("ZAPPED!");
+    }
+    for (const gl of level.gearLasers) {
+      if (Math.abs(gl.x - cx) > EYE.reach) continue;
+      const st = level.gearState(gl, level.time);
+      if (st.phase === "fire" && level.beamHits(level.gearBeam(gl, st.ang), this.x, this.y, HITBOX_W, HITBOX_H)) return this.die("ZAPPED!");
+    }
+    // ...and, in its last seconds, stones falling on you
+    for (const st of level.stones) {
+      if (st.t < RUINS.stoneWarn || st.t > RUINS.stoneWarn + RUINS.stoneFall + 0.05) continue;
+      const y = (st.t - RUINS.stoneWarn) / RUINS.stoneFall * (st.gy - 6);
+      if (overlaps(this.x, this.y, HITBOX_W, HITBOX_H, st.x - st.w / 2, y - 6, st.w, 6)) return this.die("CRUSHED!");
+    }
+
     // Icicles: hanging or falling, touching one hurts
     for (const ic of level.icicles) {
       if (Math.abs(ic.x - cx) > 16) continue;
@@ -1113,8 +1151,21 @@ class Player {
     if (this.safeSpots.length > 300) this.safeSpots.shift();
   }
 
-  die() {
+  die(word) {
     if (this.dead || this.flood) return; // (nothing can hurt you while it's flooded)
+    if (this.shieldGrace > 0 && this.y < VIEW_H + 4) return; // (the aurora just saved us: a moment to get clear)
+    // The ruins' gift: its lights take the hit instead (anything but a pit), then come back a while later
+    if (this.aurora && this.aurora.back <= 0 && this.y < VIEW_H + 4) {
+      this.aurora.back = AURORA.recharge;
+      this.floatAway = 0; // (it undoes whatever was killing us: a Lobber's float, its poison)
+      if (this.poisonLethal) { this.poisonLethal = false; this.poison = 0; }
+      this.shieldGrace = AURORA.grace;
+      this.showHit("SAVED!", "#7af0d8");
+      this.sparkle("#7af0d8");
+      Sound.play("auroraBlock");
+      return;
+    }
+    if (word) this.showHit(word, word === "SCORCHED!" ? "#8af7df" : word === "CRUSHED!" ? "#b8c4c4" : "#7af0d8");
     this.onPond = null;
     this.trapped = 0;
     this.inSink = null;

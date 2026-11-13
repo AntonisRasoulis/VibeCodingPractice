@@ -388,6 +388,7 @@ kbd {
 .biome-choice.desert { --chip: #ffcc66; }
 .biome-choice.jungle { --chip: #3fbf6a; }
 .biome-choice.forest { --chip: #c080ff; }
+.biome-choice.ruins { --chip: #7af0d8; }
 
 /* the secret biomes get their own row, under a little heading */
 .biome-group-label {

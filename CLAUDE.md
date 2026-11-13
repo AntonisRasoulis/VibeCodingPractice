@@ -127,6 +127,16 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
   (`rootGrab`, `updateRoots`, `world.roots`; drawn by `drawRoots`). Alone: they go off when the fire is
   close and hold it still for 5 s (`world.rootWall`); alone they're not a power at all (`p.rootGuard`, you keep yours).
 
+- **The arcane ruins** (the second secret world; **a first, playable version is built**, v7.0): a portal on the
+  main course (one per race after 400 m) with a button under it; inside, a 60 s race to an exit portal past fire
+  turrets, laser eye-stones and gear lasers, crumbling as time runs out; escape for the aurora's preservation.
+  Code: `RUINS`, `FIRE_ROW`, `EYE`, `GEAR_LASER`, `AURORA` (config); `Level.ruinsGates`, `fireRows`, `gearLasers`,
+  `stones`, `exitPortal`, `fireFlames`, `eyeState` / `eyeBeams`, `gearState` / `gearBeam`, `beamHits` (level);
+  `updateRuinsGates`, `makeRuins`, `updateRuins`, `startTrip` / `updateTrips` (`p.trip`: in, out, fail),
+  `world.builtPortals`, `auroraPush` (game); `drawRuinsBackground`, `drawRuinsTile`, `drawFireRows`, `drawEyeStone`,
+  `drawGearLasers`, `drawRuinsGates`, `drawBuiltPortal`, `drawAuroraLights` (render). The full design (and what's
+  still to build) is under "Still to do" below.
+
 ## Rules of thumb for designing
 
 - **Always fair.** Every danger can be dodged by a normal player: jumpable heights, warnings before
@@ -183,10 +193,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 
 - Maybe a forest animal / chaser (a shadow wolf or an owl were offered).
 - The floating shooters' stumps and thorns are small and dark: could be made easier to see.
-- An **arcane ruins** biome (aurora sky, stone ruins with glowing runes, teal magic flames) was mocked
-  up and liked: the next secret world (not built yet; open questions were asked about the way in, what
-  happens when time runs out, the timer / goal, its dangers, the old obstacles there, 2 players). What the
-  owner has decided so far:
+- The **arcane ruins**: a first version is built (see above). **Still to build:** the biome portals inside it,
+  the old obstacles' stone-and-teal restyle (maces and saws are still steel), more of its own dangers (to be
+  talked through), teal mist in its pits. The full design the owner settled:
   - **A race against the clock:** you have **60 seconds to reach a set point** in the ruins. Fail and you
     die and come back on the main course ("back at the top somehow": details to settle). Make it and you
     win its gift (like the forest's).

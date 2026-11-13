@@ -1059,6 +1059,83 @@ function drawForestMushroom(g, x, base, h, cap) {
   px(g, "#ffffff", x + 4, base - h);
 }
 
+// ---- The arcane ruins ----
+
+const RUINS_SKY = ["#111a24", "#132029", "#15262d", "#172b31", "#193034", "#1b3537", "#1d3a3a"];
+const RUINS_RUNE = "#7af0d8";
+
+// A short, jagged crack in stone: it wanders down and sideways in uneven steps (never two sideways at once:
+// no blocky chunks), sometimes forking, with a lighter edge catching the light. (x, y) is where it starts.
+function stoneCrack(g, x, y, len, dir, seed, col = "#2f3939", lit = "#7a8686") {
+  len = Math.min(len, 6);
+  let X = x, Y = y, prev = 0;
+  for (let i = 0; i < len; i++) {
+    px(g, col, X, Y);
+    if (hash(seed + i, 23) > 0.5) px(g, lit, X + (prev >= 0 ? 1 : -1), Y + 1);
+    const r = hash(seed * 3 + i, 17), [dx, dy] = r < 0.3 ? [dir, 0] : r < 0.6 ? [dir, 1] : r < 0.75 ? [-dir, 1] : [0, 1];
+    X += dx; Y += dy; prev = dx;
+    if (i === 2 && hash(seed, 31) > 0.4) { let bx = X, by = Y; for (let k = 0; k < 2; k++) { bx -= dir; by += hash(seed + k, 41) > 0.5 ? 1 : 0; px(g, col, bx, by); } }
+  }
+}
+
+// The ruins' background: a dark navy-to-teal sky with stars, two stepped aurora bands (green over teal), dark
+// broken pillars and a broken arch far off, and grey rune pillars nearer (with a few small cracks). Each layer
+// repeats sideways. (The runes' glow and the floating rocks are added as it's drawn.)
+function makeRuinsLayers() {
+  const sky = makeCanvas(VIEW_W, VIEW_H);
+  let g = sky.getContext("2d");
+  const bayer = [0, 0.5, 0.75, 0.25];
+  for (let y = 0; y < VIEW_H; y++) for (let x = 0; x < VIEW_W; x++) {
+    const level = (y / (VIEW_H - 1)) * (RUINS_SKY.length - 1), base = Math.floor(level);
+    px(g, RUINS_SKY[level - base > bayer[(x % 2) + (y % 2) * 2] ? Math.min(base + 1, RUINS_SKY.length - 1) : base], x, y);
+  }
+  for (let i = 0; i < 70; i++) px(g, hash(i, 3) > 0.75 ? "#6ae8d4" : "#cfe6e6", Math.floor(hash(i, 1) * VIEW_W), Math.floor(hash(i, 2) * 70), 1, 1);
+  const aurora = makeCanvas(480, 50);
+  g = aurora.getContext("2d");
+  for (const [cy, amp, ph, thick, cols] of [[20, 6, 0.3, 9, ["#24503e", "#2f6b50", "#3f8a63"]], [27, 5, 2.1, 8, ["#1f4656", "#2a5f72", "#3a7f8e"]]]) {
+    for (let x = 0; x < 480; x += 2) {
+      const y0 = Math.round((cy + Math.sin(x / 480 * Math.PI * 2 * 3 + ph) * amp + Math.sin(x / 480 * Math.PI * 2 * 9 + ph * 2) * 1.5) / 2) * 2;
+      for (let k = 0; k < thick; k++) { g.globalAlpha = 0.75; px(g, k < 2 || k > thick - 3 ? cols[0] : k < 4 || k > thick - 5 ? cols[1] : cols[2], x, y0 + k, 2, 1); }
+    }
+  }
+  g.globalAlpha = 1;
+  const far = makeCanvas(480, VIEW_H);
+  g = far.getContext("2d");
+  for (const [x, w, top] of [[18, 6, 52], [68, 6, 66], [150, 7, 58], [262, 7, 56], [330, 6, 60], [420, 6, 64]]) {
+    px(g, "#1a2a2f", x, top, w, VIEW_H - top); px(g, "#1e3036", x - 1, top, w + 2, 2);
+    for (let i = 0; i < w + 2; i++) { const d = Math.floor(hash(x + i, top) * 3); if (d) px(g, RUINS_SKY[3], x - 1 + i, top, 1, d); } // broken, jagged tops
+  }
+  px(g, "#1a2a2f", 198, 42, 8, VIEW_H - 42); px(g, "#1e3036", 197, 40, 10, 2);
+  for (let a = 0; a < 26; a++) { const t = a / 26; px(g, "#1a2a2f", Math.round(206 + t * 22), Math.round(42 - Math.sin(t * Math.PI) * 10), 2, 3); } // a broken arch
+  const mid = makeCanvas(560, VIEW_H);
+  g = mid.getContext("2d");
+  const runes = [];
+  for (const [x, top] of [[90, 42], [330, 50], [470, 46]]) { // grey rune pillars: a capital on top, three teal glyphs, a few small cracks
+    const w = 14;
+    px(g, "#56646a", x, top, w, VIEW_H - top); px(g, "#3c474c", x, top, 1, VIEW_H - top); px(g, "#3c474c", x + w - 1, top, 1, VIEW_H - top); px(g, "#6b7a80", x + 2, top, 1, VIEW_H - top);
+    px(g, "#6b7a80", x - 2, top - 3, w + 4, 3); px(g, "#3c474c", x - 2, top - 1, w + 4, 1);
+    stoneCrack(g, x + 10, top + 2, 5, -1, 3, "#3c474c", "#6b7a80"); stoneCrack(g, x + 4, top + 30, 4, 1, 9, "#3c474c", "#6b7a80");
+    for (const ry of [top + 9, top + 22, top + 35]) { px(g, RUINS_RUNE, x + 4, ry, 5, 1); px(g, RUINS_RUNE, x + 6, ry + 1, 1, 4); px(g, RUINS_RUNE, x + 8, ry + 2, 1, 3); runes.push({ x: x + 7, y: ry + 2 }); }
+  }
+  return { sky, aurora, far, mid, runes };
+}
+
+// The ruins' ground: grey stone bricks in rows (each row's bricks offset by half), drawn in world coordinates so
+// the rows line up across tiles: a strip 112 x 24 that repeats (bricks 14 x 6)
+function makeRuinsBricks() {
+  const c = makeCanvas(112, 24), g = c.getContext("2d");
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 112; x++) {
+    const row = Math.floor(y / 6), bx = (x + (row % 2) * 7) % 14, by = y % 6;
+    px(g, by === 5 || bx === 13 ? "#3e4848" : by === 0 ? "#6d7a7a" : hash(x, y) < 0.06 ? "#4c5757" : "#5c6868", x, y);
+  }
+  return c;
+}
+
+// Small jagged cracks to scatter over the ruins' bricks (8 x 8, see-through)
+function makeRuinsCracks() {
+  return [0, 1, 2, 3, 4, 5].map((v) => { const c = makeCanvas(8, 8), g = c.getContext("2d"); stoneCrack(g, 2 + (v % 4), 1 + (v % 2), 3 + (v % 3), v % 2 ? 1 : -1, v * 7 + 1); return c; });
+}
+
 const FOREST_SKY = ["#24123f", "#2f1850", "#3c1f62", "#4a2672", "#5a2e7e", "#743a88", "#8e4790", "#a65494", "#bf6299", "#d97aa0"];
 
 // The forest's background: a twilight sky, and three layers that each repeat sideways (parallax):
@@ -1646,6 +1723,9 @@ function buildSprites() {
     thorns: [1, 2, 3, 4, 5, 6, 7, 8].map(makeThorns), // thorns[n - 1] is n tiles wide
     jungle: makeJungleLayers(),
     forest: makeForestLayers(),
+    ruins: makeRuinsLayers(),
+    ruinsBricks: makeRuinsBricks(),
+    ruinsCracks: makeRuinsCracks(),
     forestTop: [0, 1, 2, 3].map((v) => makeForestTile(v, true)),
     forestSoil: [0, 1, 2, 3].map((v) => makeForestTile(v + 4, false)),
     forestThorns: [0, 1, 2].map(makeForestThorn),
@@ -1653,7 +1733,7 @@ function buildSprites() {
     sporeShrooms: Object.fromEntries(SPORES.kinds.map((k) => [k, [makeSporeShroom(k, -1), makeSporeShroom(k, 1)]])), // [leaning left, leaning right]
     lobber: { rest: spriteFromRows(LOBBER_REST_ROWS, LOBBER_PALETTE), fire: spriteFromRows(LOBBER_FIRE_ROWS, LOBBER_PALETTE) },
     lobShots: Object.fromEntries(Object.entries(LOB_SHOT_COLORS).map(([k, [c, h]]) => [k, spriteFromRows(LOB_SHOT_ROWS, { c, h, s: "#f0e6f4" })])),
-    glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"], ["lilac", "#c080ff"], ["red", "#ff4a5a"], ["green", "#5aee4a"], ["blue", "#4a8aff"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
+    glows: Object.fromEntries([["pink", "#ff6ad5"], ["cyan", "#6af0ff"], ["lime", "#b8ff6a"], ["firefly", "#f4ff6a"], ["thorn", "#ff5ad0"], ["lilac", "#c080ff"], ["red", "#ff4a5a"], ["green", "#5aee4a"], ["blue", "#4a8aff"], ["teal", "#2fbfa8"], ["aurora", "#7af0d8"]].map(([k, c]) => [k, [3, 5, 9].map((r) => makeGlow(r, c))])),
     flytraps: [makeFlytrapFrames(false), makeFlytrapFrames(true)], // small, big
     idols: makeIdols(),   // the ancient turret: [facing left, facing right] for each glow
     arrows: makeArrows(), // its arrows: [flying left, flying right]

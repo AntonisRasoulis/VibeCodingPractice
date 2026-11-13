@@ -292,6 +292,20 @@ const Sound = (() => {
 
     // Level dangers
     shooterFire: () => tone({ f: 800, to: 250, dur: 0.12, vol: 0.09 }),
+    // the arcane ruins
+    buttonClick: () => { tone({ f: 420, to: 300, dur: 0.06, type: "square", vol: 0.08 }); noise({ filter: "highpass", f: 3000, dur: 0.03, vol: 0.12 }); },
+    portalOpen: () => { noise({ filter: "lowpass", f: 400, to: 2400, dur: 0.6, vol: 0.4 }); tone({ f: 110, to: 330, dur: 0.7, type: "sawtooth", vol: 0.08, vibrato: 30 }); tone({ f: 660, to: 990, dur: 0.6, type: "sine", vol: 0.08, at: 0.15 }); },
+    portalBreak: () => { noise({ filter: "lowpass", f: 1500, to: 120, dur: 0.6, vol: 0.5 }); tone({ f: 160, to: 50, dur: 0.5, type: "sine", vol: 0.3 }); },
+    portalPop: () => { tone({ f: 300, to: 700, dur: 0.18, type: "sine", vol: 0.15 }); noise({ filter: "bandpass", f: 1200, q: 2, dur: 0.15, vol: 0.15 }); },
+    auroraGrab: () => { tone({ f: 520, to: 1040, dur: 0.5, type: "sine", vol: 0.1, vibrato: 18 }); tone({ f: 780, to: 1560, dur: 0.5, type: "triangle", vol: 0.06, at: 0.05 }); noise({ filter: "bandpass", f: 2000, to: 600, q: 3, dur: 0.6, vol: 0.12 }); },
+    timesUp: () => { noise({ filter: "lowpass", f: 900, to: 80, dur: 1.0, vol: 0.6 }); tone({ f: 120, to: 40, dur: 0.9, type: "sawtooth", vol: 0.12 }); },
+    stoneLand: () => { tone({ f: 140, to: 50, dur: 0.18, type: "sine", vol: 0.25 }); noise({ filter: "lowpass", f: 800, to: 150, dur: 0.2, vol: 0.3 }); },
+    laserFire: () => { tone({ f: 1400, to: 300, dur: 0.25, type: "sawtooth", vol: 0.07 }); tone({ f: 2100, to: 600, dur: 0.2, type: "square", vol: 0.03 }); },
+    gearClick: () => { noise({ filter: "highpass", f: 2500, dur: 0.03, vol: 0.18 }); tone({ f: 900, to: 500, dur: 0.04, type: "square", vol: 0.05 }); },
+    auroraBlock: () => { tone({ f: 880, to: 1320, dur: 0.25, type: "triangle", vol: 0.14 }); tone({ f: 1320, to: 1760, dur: 0.3, type: "sine", vol: 0.08, at: 0.08 }); },
+    auroraBack: () => tone({ f: 660, to: 990, dur: 0.2, type: "sine", vol: 0.06 }),
+    auroraPush: () => { noise({ filter: "bandpass", f: 600, to: 2400, q: 1.5, dur: 0.35, vol: 0.3 }); tone({ f: 220, to: 660, dur: 0.3, type: "triangle", vol: 0.12 }); },
+    auroraGift: () => { [0, 0.1, 0.2, 0.3].forEach((at, i) => tone({ f: [523, 659, 784, 1047][i], dur: 0.3, type: "triangle", vol: 0.1, at })); },
     maceSwoosh: () => noise({ filter: "bandpass", f: 400, to: 900, q: 2, dur: 0.28, vol: 0.4, attack: 0.1 }),
   };
 

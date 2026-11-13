@@ -81,6 +81,12 @@ class Level {
     this.realmEnd = options.realmEnd; // (an enchanted forest you're sent to: where it ends, pixels)
     this.sleepShroomsOn = options.sleepShrooms !== false; // (the enchanted forest turned off in the biome picker: no sleep mushrooms)
     this.realmExit = undefined;       // ...and where its calm ground at the end starts, once it's built (the fireflies come there)
+    this.ruinsOn = options.ruins !== false; // (the arcane ruins turned off in the biome picker: no ruins portal)
+    this.ruinsGates = [];     // the ruins portal on the main course (one per race): { id, x, gy, state: off | on | broken, presses, openedAt, realm, burstAt, brokenAt }
+    this.fireRows = [];       // ruins: rows of fire turrets (in place of spikes): { id, x0, n, gy, speed, kind, phase, second }
+    this.gearLasers = [];     // ruins: gear lasers { id, x (the post's middle), gy, cy (the gear's middle), fast, phase }
+    this.stones = [];         // ruins, the last seconds: stones falling { x, t (seconds since its shadow appeared), w, hit }
+    this.exitPortal = null;   // ruins: the way out at its far end { x, y (its middle) }
     this.icicles = [];        // icicles hanging under snowy ledges
     this.snowballSpots = [];  // where snowballs start rolling from
     this.bearSpots = [];      // twice per snow biome: when the leader gets here, a bear charges in
@@ -318,6 +324,9 @@ class Level {
     if (this.turrets.some((t) => this.inTurretZone(t, x + HITBOX_W / 2))) return true;
     if (this.trees.some((t) => Math.abs(t.x - (x + HITBOX_W / 2)) < ALIVE_TREE.grabReach + HITBOX_W + 8)) return true; // (no coming back where an alive tree strikes)
     if (this.onFire(x + HITBOX_W / 2, HITBOX_W / 2 + 4)) return true;
+    if (this.fireRows.some((r) => x + HITBOX_W > r.x0 - 4 && x < r.x0 + r.n * TILE + 4)) return true; // (no waiting on a fire row)
+    if (this.gearLasers.some((gl) => [-1, 1].some((sd) => Math.abs(x + HITBOX_W / 2 - (gl.x + sd * (gl.gy - gl.cy))) < 16))) return true; // (where its downward beams land)
+    if (this.ruinsGates.some((g) => g.state !== "broken" && Math.abs(g.x - (x + HITBOX_W / 2)) < RUINS.grab + 8)) return true; // (not on its button, or in its grab)
     if (this.sleepShrooms.some((g) => Math.abs(g.x + SLEEP_SHROOM.lean - (x + HITBOX_W / 2)) < SLEEP_SHROOM.capW / 2 + SLEEP_SHROOM.drift * SLEEP_SHROOM.stem / SLEEP_SHROOM.fall + HITBOX_W)) return true; // (no waiting where its spores fall)
     return this.icicles.some((ic) => ic.x - x > -10 && ic.x - x < SNOW.icicleTrigger + 16);
   }
@@ -544,6 +553,7 @@ class Level {
   // Every spike in the air from this shooter right now: [{x, y, dx, dy}]
   shooterSpikes(s, time) {
     const out = [];
+    if (s.eye) return out; // (an eye-stone fires lasers instead: eyeState, eyeBeams)
     const life = SHOOTER.range / SHOOTER.speed;
     let k = Math.floor(time / s.period - s.phase);
     for (; ; k--) {
@@ -570,6 +580,105 @@ class Level {
   // How far left and right of its bolt a mace can reach
   maceReach(m) {
     return Math.sin(m.amplitude) * m.length + MACE_RADIUS + 4;
+  }
+
+  // ---- The arcane ruins ----
+
+  // A row of n fire turrets set into the ground (flush with it), from here on
+  fireRow(n) {
+    const F = FIRE_ROW, x0 = this.col * TILE, gy = this.groundRow * TILE;
+    const kind = this.pickWeighted(F.kinds);
+    this.fireRows.push({ id: this.nextId++, x0, n, gy, kind, speed: F.speed[0] + this.rng() * (F.speed[1] - F.speed[0]), phase: this.rng(), second: n >= F.second && this.rng() < 0.5 });
+    for (let i = 0; i < n; i++) this.column(this.groundRow, false);
+  }
+
+  // The flames burning on a fire row right now: [{ i (which turret), h (how tall) }]. Worked out from the clock:
+  // the flame runs along the row and back, resting (out) a moment at each end; a row of one goes on and off
+  fireFlames(row, time) {
+    const F = FIRE_ROW, out = [];
+    const tallness = (i, k) => row.kind === "low" ? F.low : row.kind === "tall" ? F.tall : (i + k) % 2 ? F.tall : F.low;
+    if (row.n === 1) {
+      const T = F.single[0] + F.single[1], u = ((time / T + row.phase) % 1) * T, k = Math.floor(time / T + row.phase);
+      if (u < F.single[0]) out.push({ i: 0, h: tallness(0, k) });
+      return out;
+    }
+    const M = (row.n - 1) / row.speed, T = 2 * (M + F.rest);
+    const at = (u) => { // where the flame is u seconds into its cycle (null: resting at an end)
+      if (u < F.rest) return null;
+      if (u < F.rest + M) return Math.round((u - F.rest) * row.speed);
+      if (u < 2 * F.rest + M) return null;
+      return row.n - 1 - Math.round((u - 2 * F.rest - M) * row.speed);
+    };
+    const u = ((time / T + row.phase) % 1) * T, i = at(u);
+    if (i !== null) out.push({ i, h: tallness(i, 0) });
+    if (row.second) { const j = at((u + T / 2) % T); if (j !== null && j !== i) out.push({ i: j, h: F.low }); } // (a second, low flame)
+    return out;
+  }
+
+  // Where a beam starting at (x, y) going (dx, dy) stops: at solid ground, off the top or bottom of the view, or
+  // at its furthest reach. Returns how long it is (pixels).
+  beamLength(x, y, dx, dy, reach) {
+    const len = Math.hypot(dx, dy), ux = dx / len, uy = dy / len;
+    let k = 0;
+    for (; k < reach; k++) {
+      const bx = x + ux * k, by = y + uy * k;
+      if (by < -4 || by > VIEW_H + 4) break;
+      if (by >= 0 && this.isSolid(Math.floor(bx / TILE), Math.floor(by / TILE))) break;
+    }
+    return k;
+  }
+
+  // An eye-stone's laser state right now: { warn (0..1, the eye opening and aim lines), firing (beams on) }
+  eyeState(s, time) {
+    const k = Math.floor(time / s.period - s.phase), fired = (k + s.phase) * s.period, next = fired + s.period;
+    if (time - fired < EYE.beam) return { warn: 0, firing: true };
+    const until = next - time;
+    return { warn: until < EYE.warn ? 1 - until / EYE.warn : 0, firing: false };
+  }
+
+  // Its four beams (or where they'll be): [{ x, y (start), dx, dy, len }]
+  eyeBeams(s) {
+    if (s.beams) return s.beams;
+    s.beams = SHOOTER_DIRS.map(([dx, dy]) => { const x = s.x + dx * 5, y = s.y + dy * 5; return { x, y, dx, dy, len: this.beamLength(x, y, dx, dy, EYE.reach) }; });
+    return s.beams;
+  }
+
+  // A gear laser right now: { ang (where its barrel points), phase: turn | hold | warn | fire, u (0..1 through
+  // that phase), dir (the way it's locked), fires (false: a fake-out) }. Worked out from the clock.
+  gearState(gl, time) {
+    const G = GEAR_LASER, turn = gl.fast ? G.turnFast : G.turn, L = turn + G.hold + G.warn + G.beam + 0.1;
+    const DIRS = [Math.PI, Math.PI * 0.75, Math.PI * 0.25, 0]; // left, down-left, down-right, right (y points down)
+    const T = time + gl.phase * L, k = Math.floor(T / L), u = T - k * L;
+    const dirOf = (kk) => DIRS[Math.floor(hash(kk, gl.id) * 4)];
+    const from = dirOf(k - 1), to = dirOf(k);
+    let delta = ((to - from) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+    if (delta < 0.01) delta = Math.PI * 2; // (the same way again: it still turns, all the way round)
+    const fires = !(gl.fast && hash(k, gl.id + 7) < G.fakeChance);
+    if (u < turn) { const e = u / turn, ease = e * e * (3 - 2 * e); return { ang: from + delta * ease, phase: "turn", u: e, dir: to, fires }; }
+    let v = u - turn;
+    if (v < G.hold || !fires) return { ang: to, phase: "hold", u: v / G.hold, dir: to, fires };
+    v -= G.hold;
+    if (v < G.warn) return { ang: to, phase: "warn", u: v / G.warn, dir: to, fires };
+    v -= G.warn;
+    if (v < G.beam) return { ang: to, phase: "fire", u: v / G.beam, dir: to, fires };
+    return { ang: to, phase: "hold", u: 1, dir: to, fires };
+  }
+
+  // A gear laser's beam pointing at angle `ang`: { x, y, dx, dy, len }
+  gearBeam(gl, ang) {
+    const dx = Math.round(Math.cos(ang) * 1000) / 1000, dy = Math.round(Math.sin(ang) * 1000) / 1000;
+    const x = gl.x + dx * 19, y = gl.cy + dy * 19;
+    return { x, y, dx, dy, len: this.beamLength(x, y, dx, dy, EYE.reach) };
+  }
+
+  // Does a beam pass through a box? (samples along it)
+  beamHits(bm, x, y, w, h, pad = 1) {
+    const n = Math.hypot(bm.dx, bm.dy), ux = bm.dx / n, uy = bm.dy / n;
+    for (let k = 0; k < bm.len; k += 1.5) {
+      const bx = bm.x + ux * k, by = bm.y + uy * k;
+      if (bx > x - pad && bx < x + w + pad && by > y - pad && by < y + h + pad) return true;
+    }
+    return false;
   }
 
   // ---- Building blocks ----
@@ -647,6 +756,7 @@ class Level {
 
   // In the jungle, spikes are thorn bushes unless `bamboo` gives each stake's height
   spikes(n, bamboo = null) {
+    if (this.biome === "ruins") return this.fireRow(n); // (the ruins' spikes are fire turrets)
     for (let i = 0; i < n; i++) {
       this.column(this.groundRow, this.iceBias)[this.groundRow - 1] = T_SPIKE;
       if (this.biome === "jungle") this.spikeKind[this.cols.length - 1] = bamboo ? bamboo[i] : "thorn";
@@ -670,12 +780,22 @@ class Level {
     if (this.realmEnd !== undefined && this.col * TILE >= this.realmEnd) {
       // The forest's over: calm ground from here on, and the fireflies come once you reach it. (The last
       // section can run a little past realmEnd, so this is where they come, not realmEnd itself: never mid-obstacle.)
-      if (this.realmExit === undefined) this.realmExit = this.col * TILE;
+      if (this.realmExit === undefined) {
+        this.realmExit = this.col * TILE;
+        if (this.biome === "ruins") { // the ruins' way out: a portal floating over calm ground (jump into it)
+          this.flat(8, false);
+          this.exitPortal = { x: this.col * TILE + TILE / 2, y: this.groundRow * TILE - RUINS.ringR - 1 - RUINS.floatUp };
+        }
+      }
       return this.flat(20, false);
     }
     if (this.sleepAt !== undefined && this.col >= this.sleepAt) {
       this.sleepAt = undefined;
       if (this.col >= SLEEP_SHROOM.from) { this.sleepPlaced = true; return SECTIONS.sleepShroom.call(this); } // (one per race: one chance at the forest)
+    }
+    if (this.ruinsAt !== undefined && this.col >= this.ruinsAt) {
+      this.ruinsAt = undefined;
+      if (this.col >= RUINS.from) { this.ruinsPlaced = true; return SECTIONS.ruinsGate.call(this); } // (one per race)
     }
     if (this.col >= this.stretchEnd) {
       this.addBiomeEvents(MISSILE.stretch);
@@ -695,6 +815,7 @@ class Level {
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
+    if (this.biome === "ruins") { for (const k in weights) delete weights[k]; Object.assign(weights, RUINS.mix); } // (its own mix: no portals or orbs)
     if (this.biome === "forest") { // (its own mix, so its own dangers and the usual ones all get their turn)
       Object.assign(weights, FOREST.mix);
       if (this.col <= 60) for (const k of ["shooter", "shooterStack", "saw"]) delete weights[k];
@@ -708,7 +829,7 @@ class Level {
       if (have < this.pondTarget && this.biomeEnd - this.col < (this.pondTarget - have) * 40 + 30) type = "thinIce";
     }
     SECTIONS[type].call(this, this.difficulty());
-    this.flat(this.biome === "forest" ? this.rand(0, FOREST.gap) : this.rand(1, 3), false); // breathing room between sections (never icy; less in the forest: it crowds in on you)
+    this.flat(this.biome === "forest" ? this.rand(0, FOREST.gap) : this.biome === "ruins" ? this.rand(0, RUINS.gap) : this.rand(1, 3), false); // breathing room between sections (never icy; less in the forest and the ruins: they crowd in on you)
     this.scatter();
   }
 
@@ -1046,6 +1167,8 @@ class Level {
   addBiomeEvents(length) {
     // somewhere in it, a giant sleep mushroom (not in the forest itself), until the race has its one
     if (this.realmEnd === undefined && this.biome !== "forest" && this.sleepShroomsOn && !this.sleepPlaced) this.sleepAt = this.col + this.rand(30, Math.max(31, length - 60));
+    // ...and the arcane ruins' portal (one per race too)
+    if (this.realmEnd === undefined && this.biome !== "forest" && this.biome !== "ruins" && this.ruinsOn && !this.ruinsPlaced) this.ruinsAt = this.col + this.rand(30, Math.max(31, length - 60));
     if (this.biome === "prairie") {
       // Missiles: usually 2 (MISSILE.perBiome), spread out across the biome
       const n = Number(this.pickWeighted(MISSILE.perBiome));
@@ -1082,6 +1205,12 @@ const SECTIONS = {
 
   spikes(d) {
     this.flat(2);
+    if (this.biome === "ruins") { // a row of 1-10 fire turrets, with room to land after it
+      this.flat(1);
+      this.spikes(Number(this.pickWeighted({ 1: 2, 2: 3, 3: 3, 4: 3, 5: 2, 6: 2, 7: 1, 8: 1, 9: 1, 10: 1 })));
+      this.flat(this.rand(5, 7), false);
+      return;
+    }
     if (this.biome === "jungle") {
       // Either a wide thorn bush (with a run-up to jump it), or one or two very tall bamboo stakes
       if (this.rng() < 0.5) {
@@ -1212,8 +1341,25 @@ const SECTIONS = {
       y: row * TILE + TILE / 2,
       period: (2.1 + this.rng() * 0.7 - d * 0.4) * this.pace, // each shooter fires at its own pace
       phase: this.rng(),
+      eye: this.biome === "ruins", // (in the ruins: a laser eye-stone)
     });
     this.flat(Math.max(6, height + 5));
+  },
+
+  // The way into the arcane ruins: a portal of stacked rocks, switched off, its button in the ground under it
+  ruinsGate() {
+    this.flat(16, false);
+    this.ruinsGates.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, state: "off", presses: 0, openedAt: null, realm: null, burstAt: -9, brokenAt: -9 });
+    this.flat(20, false);
+  },
+
+  // The ruins': a gear laser on a carved post, with flat ground where its beams land on either side
+  gearLaser() {
+    const G = GEAR_LASER, h = this.rand(G.heights[0], G.heights[1]), reach = h + 3;
+    this.flat(reach, false);
+    const gy = this.groundRow * TILE;
+    this.gearLasers.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy, cy: gy - h * TILE, fast: this.rng() < G.fastChance, phase: this.rng() });
+    this.flat(reach + 1, false);
   },
 
   // The way into the enchanted forest: a giant sleep mushroom, with flat ground all round it

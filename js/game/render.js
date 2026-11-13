@@ -31,7 +31,11 @@ const Renderer = (() => {
       cams[i] += (target - cams[i]) * Math.min(1, dt * 6);
       let camX = Math.round(Math.max(-8, cams[i]));
       // the ground shaking where a saw slams down (only if it's on this screen)
-      if (world.quakes.some((q) => Math.abs(q.x - (camX + VIEW_W / 2)) < VIEW_W * 0.6)) camX += (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 2));
+      if (world.quakes.some((q) => (q.level || world.level) === (p.realm || world.level) && Math.abs(q.x - (camX + VIEW_W / 2)) < VIEW_W * 0.6)) camX += (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 2));
+      if (p.realm && p.realm.biome === "ruins") { // the ruins shaking as they come down
+        const left = Game.ruinsLeft(p.realm);
+        if (left <= RUINS.collapse[2] || (left <= RUINS.collapse[1] && Math.random() < 0.08)) camX += Math.random() < 0.5 ? -1 : 1;
+      }
 
       b.save();
       b.translate(0, i * (VIEW_H + DIVIDER));
@@ -41,10 +45,12 @@ const Renderer = (() => {
       // Each player sees their own course: the main one, or the enchanted forest they're in
       const course = p.realm || world.level, other = world.players[1 - i];
       const mine = (list) => list.filter((e) => (e.level || world.level) === course);
-      const view = Object.assign(Object.create(world), { level: course, sawBits: mine(world.sawBits), wisps: mine(world.wisps), quakes: mine(world.quakes) });
+      const view = Object.assign(Object.create(world), { level: course, sawBits: mine(world.sawBits), wisps: mine(world.wisps), quakes: mine(world.quakes), builtPortals: mine(world.builtPortals), pushes: mine(world.pushes) });
       if (p.realm) Object.assign(view, { inForest: true, monsoon: null, missiles: [], bears: [], jaguars: [], decoys: [], arrows: [], vultures: [], hawks: [], sticks: [], burns: [], drones: [], hands: [], roots: [], bolts: [], monkeys: [], thrownSnowballs: [], grapples: [], vines: [], warps: [] });
       drawView(view, p, other && other.realm === p.realm && !other.dream ? other : null, camX);
       drawDream(p, camX, world.time);
+      const dark = Game.tripDark(p); // (the aurora taking you across: the screen fading out and back)
+      if (dark > 0) { b.fillStyle = `rgba(6, 14, 18, ${dark})`; b.fillRect(0, 0, VIEW_W, VIEW_H); }
       b.restore();
       if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time, p.poisonMax, p.poisonLethal);
     }
@@ -74,6 +80,7 @@ const Renderer = (() => {
       else if (biome === "desert") drawDesertBackground(camX, world.time);
       else if (biome === "jungle") drawJungleBackground(camX);
       else if (biome === "forest") drawForestBackground(camX, world.time);
+      else if (biome === "ruins") drawRuinsBackground(camX, world.time, Game.ruinsLeft(world.level));
       else drawBackground(camX);
     });
     b.globalAlpha = 1;
@@ -84,6 +91,8 @@ const Renderer = (() => {
     drawTurrets(world.level, camX, world.time); // (before the ground, so it hides the part still underground)
     drawAliveTrees(world.level, camX, world.time); // (behind the ground, like the trees in the background)
     drawTiles(world.level, camX, world.time);
+    drawFireRows(world.level, camX, world.time);
+    drawGearLasers(world.level, camX, world.time, false);
     drawTurretDust(world.level, camX, world.time);
     drawSawTracks(world.level, camX);
     drawPalms(world.level, player, camX);
@@ -97,6 +106,8 @@ const Renderer = (() => {
     drawBouncies(world.level, player, camX, world.time);
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
+    drawRuinsGates(world.level, camX, world.time);
+    for (const bp of world.builtPortals) drawBuiltPortal(bp, camX, world.time);
     drawOrbs(world.level, camX, world.time);
     drawTraps(world.level, player, other, camX);
     drawSinkholes(world.level, camX, world.time);
@@ -113,12 +124,13 @@ const Renderer = (() => {
     for (const w of world.warps) drawWarp(w, camX, world.time); // (behind the runner going in or coming out)
 
     // (someone hiding in a bush can't be seen, on either screen)
-    if (other && !other.dead && !other.caught && !other.hiddenIn && !other.eatenBy) {
+    const hiddenTrip = (p) => p.trip && p.trip.stage === "build"; // (inside a portal that's still building itself)
+    if (other && !other.dead && !other.caught && !other.hiddenIn && !other.eatenBy && !hiddenTrip(other)) {
       b.globalAlpha = 0.35; // the other runner shows as a ghost
       drawRunner(other, camX);
       b.globalAlpha = 1;
     }
-    if (!player.dead && !player.caught && !player.hiddenIn && !player.eatenBy && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
+    if (!player.dead && !player.caught && !player.hiddenIn && !player.eatenBy && !hiddenTrip(player) && !(player.blink > 0 && Math.floor(player.blink * 12) % 2)) {
       drawDashEffects(player, camX, world.time);
       drawRunner(player, camX);
       if (player.frozen > 0) drawIce(player, camX);
@@ -140,6 +152,10 @@ const Renderer = (() => {
     for (const p of [player, other]) if (p && !p.hiddenIn) drawBridgeMagic(p, camX, world.time, p === other); // held up over a hole by magic
     for (const r of world.roots) drawRoots(r, camX, world.time); // (in front of whoever they've got hold of)
     drawTreeStrikes(world.level, camX, world.time);
+    drawStones(world.level, camX);
+    drawGearLasers(world.level, camX, world.time, true);
+    for (const p of [player, other]) if (p) { drawAuroraLights(p, camX, world.time, p === other); drawTripRibbons(p, camX, world.time); }
+    drawPushes(world, camX);
     drawCoconuts(world.level, player, camX, world.time); // falling (in front of the runners)
     for (const p of [player, other]) if (p && p.dizzy > 0 && !p.dead) drawDizzy(p, camX, world.time, p === other);
     for (const p of [player, other]) if (p && p.asleep > 0 && !p.dead && !p.hiddenIn) drawSleep(p, camX, world.time, p === other);
@@ -312,6 +328,368 @@ const Renderer = (() => {
       if (on < -0.3) continue;
       drawFirefly(x, y, 0.4 + 0.6 * Math.max(0, on));
     }
+  }
+
+  // ---- The arcane ruins ----
+
+  const RUNE = "#7af0d8";
+  const P = (c, x, y, w = 1, h = 1, a = 1) => { b.globalAlpha = a; b.fillStyle = c; b.fillRect(Math.round(x), Math.round(y), w, h); b.globalAlpha = 1; };
+  const ruinsAt = (level, x) => level.biomeAt(Math.floor(x / TILE)) === "ruins";
+
+  // How far gone the ruins are (0 calm .. 3 the last seconds), from the seconds they have left
+  function collapseOf(left) { const C = RUINS.collapse; return left > C[0] ? 0 : left > C[1] ? 1 : left > C[2] ? 2 : 3; }
+
+  function drawRuinsBackground(camX, time, left) {
+    const L = sprites.ruins, stage = collapseOf(left);
+    b.drawImage(L.sky, 0, 0);
+    const layer = (img, off, alpha = 1) => { off = (off % img.width + img.width) % img.width; b.globalAlpha = alpha; for (let x = -Math.round(off); x < VIEW_W; x += img.width) b.drawImage(img, x, 0); b.globalAlpha = 1; };
+    // the aurora, drifting slowly (flickering as it all comes down)
+    layer(L.aurora, camX * 0.05 + time * 3, stage >= 2 ? 0.5 + 0.5 * Math.abs(Math.sin(time * (stage === 3 ? 13 : 6))) : 1);
+    // broken chunks of stone floating in the sky, a rune glowing on each
+    for (let k = 0; k < 4; k++) {
+      const x = ((k * 137 + 40 - camX * 0.2) % (VIEW_W + 60) + VIEW_W + 60) % (VIEW_W + 60) - 30, y = 20 + k * 8 + Math.sin(time * 0.8 + k) * 2;
+      drawGlowAt("aurora", 0, x, y + 1, 0.35);
+      ["LLLLLLLLL", "dddddddd.", ".dddRddd.", "..ddddd..", "...ddd...", "....d...."].forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== ".") P(ch === "L" ? "#6e7a7e" : ch === "R" ? RUNE : j < 3 ? "#4a5559" : "#363f43", x - 4 + i, y - 2 + j); }));
+    }
+    layer(L.far, camX * 0.15);
+    const off = ((camX * 0.5) % L.mid.width + L.mid.width) % L.mid.width;
+    for (let x0 = -Math.round(off); x0 < VIEW_W; x0 += L.mid.width) {
+      b.drawImage(L.mid, x0, 0);
+      for (const r of L.runes) if (x0 + r.x > -10 && x0 + r.x < VIEW_W + 10) drawGlowAt("aurora", 0, x0 + r.x, r.y, 0.3 + 0.12 * Math.sin(time * 2 + r.y));
+    }
+    // dust drifting down, more and more as time runs out (and bits of stone dropping, near the end)
+    const motes = [6, 12, 20, 32][stage];
+    for (let i = 0; i < motes; i++) { const u = (time * 0.2 * (1 + stage * 0.6) + hash(i, 12)) % 1; P("#8a9a96", hash(i, 11) * VIEW_W + Math.sin(u * 6 + i) * 2, 10 + u * (VIEW_H - 30), 1, 1, 0.5 * (1 - u)); }
+    for (let i = 0; i < stage * 2; i++) { const u = (time * 0.9 + hash(i, 21)) % 1; P(i % 2 ? "#6a7676" : "#4c5656", hash(i, 22) * VIEW_W, u * VIEW_H, 2, 2, 1 - u); }
+  }
+
+  // A ruins ground tile: stone bricks lined up across tiles, a mossy top, a few short cracks and teal sparkles
+  function drawRuinsTile(level, c, r, sx, sy) {
+    b.drawImage(sprites.ruinsBricks, ((c * 8) % 112 + 112) % 112, (r * 8) % 24, 8, 8, sx, sy, 8, 8);
+    const top = level.tile(c, r - 1) === T_EMPTY;
+    if (hash(c, r + 5) < 0.2) b.drawImage(sprites.ruinsCracks[Math.floor(hash(c, r + 6) * 6)], sx, sy + (top ? 3 : 0));
+    if (!top && hash(c, r + 9) < 0.06) { P(RUNE, sx + 3, sy + 2, 1, 3, 0.85); P(RUNE, sx + 2, sy + 3, 3, 1, 0.85); }
+    if (!top) return;
+    P("#4f8a3a", sx, sy, 8, 2); P("#3a6230", sx, sy + 2, 8, 1);
+    for (let x = 0; x < 8; x++) if (hash(c * 8 + x, r) < 0.3) P("#6aa84a", sx + x, sy - 1);
+  }
+
+  // ---- Its fire turrets ----
+
+  function drawVent(x, gy, heat) {
+    P("#7a8686", x + 1, gy - 1, 6, 1); P("#2a3434", x + 1, gy, 6, 2);
+    for (let i = 0; i < 3; i++) P(heat > 0.05 ? "#3fd4b0" : "#1d6a5c", x + 2 + i * 2, gy, 1, 1, 0.4 + 0.6 * heat);
+    P("#4c5757", x, gy - 1, 1, 3); P("#4c5757", x + 7, gy - 1, 1, 3);
+  }
+  function drawFlame(cx, gy, h, t, seed) { // teal magic fire with a white-hot core, flickering, licks coming off its tip
+    drawGlowAt("teal", h > 20 ? 2 : 1, cx, gy - h * 0.45, 0.55);
+    const W = h < 16 ? 3 : 4;
+    for (let y = 0; y < h; y++) {
+      const f = y / h, sway = Math.round(Math.sin(t * 14 + y * 0.45 + seed) * (f * 1.4));
+      let hw = W * Math.pow(1 - f, 0.55) + (f < 0.15 ? f * 4 : 0.6);
+      hw = Math.max(0.5, hw - (Math.sin(t * 20 + y * 0.9 + seed) > 0.6 && f > 0.4 ? 1 : 0));
+      for (let dx = -Math.ceil(hw); dx <= Math.ceil(hw); dx++) {
+        const d = Math.abs(dx) / (hw + 0.01);
+        if (d > 1.05) continue;
+        P(d < 0.35 && f < 0.7 ? "#eafff8" : d < 0.65 ? "#8af7df" : d < 0.9 ? "#3fd4b0" : "#23a08a", cx + dx + sway, gy - 1 - y);
+      }
+    }
+    for (let k = 0; k < 2; k++) { const u = (t * 2.2 + k * 0.5 + seed) % 1; P(k ? "#8af7df" : "#3fd4b0", cx + Math.round(Math.sin(t * 9 + k) * 2), gy - h - 1 - u * 5, 1, 1, 1 - u); }
+  }
+  function drawFireRows(level, camX, time) {
+    for (const row of level.fireRows) {
+      const x0 = row.x0 - camX;
+      if (x0 > VIEW_W + 8 || x0 + row.n * TILE < -8) continue;
+      const lit = level.fireFlames(row, time), before = level.fireFlames(row, time - 0.1);
+      for (let i = 0; i < row.n; i++) {
+        const on = lit.some((f) => f.i === i);
+        drawVent(x0 + i * TILE, row.gy, on ? 1 : 0);
+        if (!on && before.some((f) => f.i === i)) for (let k = 0; k < 5; k++) { const u = (time * 7 + k / 5) % 1; P(k % 2 ? "#8af7df" : "#eafff8", x0 + i * TILE + 4 + Math.sin(k * 2.3) * (2 + u * 4), row.gy - 2 - u * 7, 1, 1, 1 - u); } // sparks puffing as it moves on
+      }
+      for (const f of lit) drawFlame(x0 + f.i * TILE + 4, row.gy, f.h, time, f.i + row.id);
+    }
+  }
+
+  // ---- Lasers (the eye-stones' and the gear lasers') ----
+
+  function drawAim(bm, camX, time) { // the warning: a dotted line where the beam will go
+    const n = Math.hypot(bm.dx, bm.dy), ux = bm.dx / n, uy = bm.dy / n;
+    for (let k = 0; k < bm.len; k++) if ((k + Math.floor(time * 20)) % 4 < 2) P(RUNE, bm.x - camX + ux * k, bm.y + uy * k, 1, 1, 0.5);
+  }
+  function drawBeam(bm, camX, fade = 1) { // the beam: a white-hot core, teal round it, a glow, sparks where it hits
+    const n = Math.hypot(bm.dx, bm.dy), ux = bm.dx / n, uy = bm.dy / n;
+    for (let k = 0; k < bm.len; k++) { const x = bm.x - camX + ux * k, y = bm.y + uy * k; P("#2fbfa8", x - 1, y, 3, 1, 0.5 * fade); P(RUNE, x, y - 1, 1, 3, 0.5 * fade); P("#eafff8", x, y, 1, 1, fade); }
+    const ex = bm.x - camX + ux * bm.len, ey = bm.y + uy * bm.len;
+    drawGlowAt("aurora", 1, ex, ey, 0.6 * fade);
+    if (ey < VIEW_H) for (let s = 0; s < 6; s++) P(s % 2 ? "#eafff8" : RUNE, ex + Math.cos(s * 1.1) * (2 + s), ey - 1 - Math.abs(Math.sin(s * 1.7)) * (2 + s), 1, 1, fade);
+  }
+
+  // The laser eye-stone: a round stone with a narrow teal eye; it opens wide, aims, and fires four beams at once
+  function drawEyeStone(s, level, camX, time) {
+    const st = level.eyeState(s, time), charge = st.firing ? 1 : st.warn, x = s.x - camX - 4, y = s.y - 4;
+    if (st.warn > 0) for (const bm of level.eyeBeams(s)) drawAim(bm, camX, time);
+    if (st.firing) for (const bm of level.eyeBeams(s)) drawBeam(bm, camX);
+    const cx = x + 4, cy = y + 4;
+    for (let yy = -5; yy <= 5; yy++) for (let xx = -5; xx <= 5; xx++) { const d = Math.hypot(xx, yy); if (d > 5.2) continue; P(d > 4.4 ? "#3a4444" : (xx + yy < -2 ? "#8a9696" : "#6a7676"), cx + xx, cy + yy); }
+    const open = 1 + Math.round(charge * 2);
+    P("#0b1422", cx - 3, cy - open + 1, 7, open * 2 - 1); P("#2fbfa8", cx - 1, cy - Math.min(1, open - 1), 3, Math.max(1, open * 2 - 3)); P("#eafff8", cx, cy);
+    P("#3a4444", cx - 4, cy - open, 9, 1); P("#3a4444", cx - 4, cy + open, 9, 1);
+    if (charge > 0.5) drawGlowAt("aurora", 1, cx, cy, 0.45 * charge);
+  }
+
+  // ---- The gear laser: a carved post, a big gear turning on top of it carrying a laser ----
+
+  const GM = { iron: "#4c5658", ironL: "#7a8688", ironD: "#2a3234", rim: "#5e6a6c", bolt: "#a8b4b6", steel: "#c8d4d8", steelD: "#7a8a90" };
+  function drawGear(cx, cy, ang, R) { // teeth, a rim, spokes, a hub with a rune, bolts
+    for (let yy = -R - 2; yy <= R + 2; yy++) for (let xx = -R - 2; xx <= R + 2; xx++) {
+      const d = Math.hypot(xx, yy), a = Math.atan2(yy, xx) - ang, tooth = Math.cos(a * 12) > 0.3;
+      if (d > (tooth ? R + 1.6 : R)) continue;
+      let c = null;
+      if (d > R - 0.5) c = tooth ? (Math.sin(a * 12) > 0 ? GM.ironL : GM.iron) : GM.ironD;
+      else if (d > R - 2.5) c = xx + yy < 0 ? GM.ironL : GM.rim;
+      else if (d > 3.5) c = Math.abs(Math.sin(a * 2)) < 0.22 ? GM.rim : null;
+      else c = d > 1.5 ? GM.iron : GM.ironD;
+      if (c) P(c, cx + xx, cy + yy);
+      if (d > R - 2.5 && d < R - 1.5 && Math.cos(a * 4) > 0.97) P(GM.bolt, cx + xx, cy + yy);
+    }
+    P(RUNE, cx, cy);
+  }
+  function drawEmitter(cx, cy, ang, lit, charge) { // a sleek pale-metal barrel: fins, an energy line, a lens ring
+    const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx;
+    for (let k = 3; k <= 17; k++) {
+      const x = cx + dx * k, y = cy + dy * k, w = k > 14 ? 2 : k > 6 ? 1.5 : 2.5;
+      for (let s = -w; s <= w; s += 0.5) P(Math.abs(s) >= w - 0.5 ? GM.ironD : s < 0 ? GM.steel : GM.steelD, x + nx * s, y + ny * s);
+      P(lit ? "#eafff8" : "#3fbfa8", x, y, 1, 1, lit ? 1 : 0.7);
+      if (k === 8 || k === 10 || k === 12) for (let s = -3.5; s <= 3.5; s += 0.5) P(Math.abs(s) > 3 ? GM.ironD : GM.steelD, x + nx * s, y + ny * s);
+    }
+    const ex = cx + dx * 18, ey = cy + dy * 18;
+    for (let a = 0; a < Math.PI * 2; a += 0.4) P(lit ? RUNE : "#2fbfa8", ex + Math.cos(a) * 2.2, ey + Math.sin(a) * 2.2);
+    P(lit ? "#eafff8" : RUNE, ex - 0.5, ey - 0.5, 2, 2);
+    if (lit) drawGlowAt("aurora", 1, ex, ey, 0.5 + 0.3 * charge);
+  }
+  // small 7 x 7 six-tooth cogs (two frames, so they turn), seen through a little window into the machine
+  const COG = [["..x.x..", ".xxxxx.", "xxx.xxx", ".x.o.x.", "xxx.xxx", ".xxxxx.", "..x.x.."], [".x...x.", ".xxxxx.", "xx...xx", "xx.o.xx", "xx...xx", ".xxxxx.", ".x...x."]];
+  function drawCog(x, y, frame, clip, back) {
+    COG[((frame % 2) + 2) % 2].forEach((r, j) => [...r].forEach((ch, i) => {
+      const X = x + i, Y = y + j;
+      if (X < clip[0] || X >= clip[0] + clip[2] || Y < clip[1] || Y >= clip[1] + clip[3]) return;
+      if (ch === "x") P(back ? (i + j < 5 ? "#5a6668" : i + j > 7 ? "#2a3436" : "#3e4a4c") : (i + j < 5 ? "#a8b4b6" : i + j > 7 ? "#4a5658" : "#7a8688"), X, Y);
+      else if (ch === "o") P(RUNE, X, Y);
+      else if (Math.abs(i - 3) + Math.abs(j - 3) <= 1) P("#1a2224", X, Y);
+    }));
+  }
+  function drawMachineWindow(x, y, mainAng) { // a glimpse into the machine: cogs half hidden behind the stone, more turning deep inside
+    const f = Math.floor(mainAng / (Math.PI / 8) + 100), ox = x + 2, oy = y + 2, ow = 9, oh = 9, clip = [ox, oy, ow, oh];
+    P("#2a3234", x, y, 13, 13); P("#56626a", x + 1, y + 1, 11, 11); P("#8a9696", x + 1, y + 1, 11, 1); P("#3c4848", x + 1, y + 11, 11, 1);
+    P("#0a1012", ox, oy, ow, oh);
+    drawGlowAt("teal", 0, ox + 4, oy + 5, 0.4);
+    for (let yy = -7; yy <= 7; yy++) for (let xx = -7; xx <= 7; xx++) { const d = Math.hypot(xx, yy), a = Math.atan2(yy, xx) - mainAng * 0.5; if (d > (Math.cos(a * 10) > 0.4 ? 6.8 : 5.6) || d < 4.2) continue; const X = ox + 6 + xx, Y = oy + 7 + yy; if (X >= ox && X < ox + ow && Y >= oy && Y < oy + oh) P("#1e2a2c", X, Y); }
+    P("#162022", ox + 3, oy, 1, oh);
+    drawCog(ox + 3, oy + 3, f + 1, clip, true); drawCog(ox - 1, oy - 1, f, clip, false);
+    P("#1a2224", ox, oy, ow, 1); P("#1a2224", ox, oy, 1, oh); P("#6a7676", ox + ow, oy, 1, oh + 1); P("#6a7676", ox, oy + oh, ow, 1);
+    P("#cfe6e6", ox + ow - 2, oy + 1, 1, 1, 0.7);
+    for (const [bx, by] of [[x + 1, y + 1], [x + 11, y + 1], [x + 1, y + 11], [x + 11, y + 11]]) P(GM.bolt, bx, by);
+  }
+  function drawCarvedPost(x, gy, top, time, ang) { // the carved rune column it stands on
+    const w = 13, x0 = x - 6;
+    P(GM.ironD, x0 - 5, gy - 5, w + 10, 5); P("#6a7676", x0 - 4, gy - 5, w + 8, 4); P("#8a9696", x0 - 4, gy - 5, w + 8, 1);
+    P(GM.ironD, x0 - 2, gy - 9, w + 4, 4); P("#6a7676", x0 - 1, gy - 9, w + 2, 3); P("#8a9696", x0 - 1, gy - 9, w + 2, 1);
+    for (const s of [-1, 1]) for (let k = 0; k < 7; k++) P(GM.iron, x + s * (7 + k * 0.6), gy - 9 - k * 2, 2, 2); // braces
+    if (top >= gy - 10) return;
+    P("#2a3234", x0 - 1, top, w + 2, gy - 9 - top); P("#6a7676", x0, top, w, gy - 9 - top); P("#8a9696", x0, top, 2, gy - 9 - top); P("#4c5656", x0 + w - 2, top, 2, gy - 9 - top);
+    const winTop = top + 24, win = winTop < gy - 26;
+    for (let y = top + 8; y < gy - 12; y += 12) { if (win && y + 3 > winTop - 1 && y < winTop + 16) continue; P("#2a3234", x0 - 2, y, w + 4, 3); P("#9aa6a6", x0 - 1, y, w + 2, 1); } // carved bands
+    for (let y = top + 13, i = 0; y < gy - 16; y += 30, i++) { // glowing rune panels
+      P("#1a2a2f", x0 + 3, y, 7, 7); const a = 0.6 + 0.4 * Math.sin(time * 3 + i);
+      P(RUNE, x0 + 4, y + 1, 5, 1, a); P(RUNE, x0 + 6, y + 1, 1, 5, a); P(RUNE, x0 + 4, y + 5, 2, 1, a); drawGlowAt("aurora", 0, x0 + 6, y + 3, 0.25 * a);
+    }
+    if (win) drawMachineWindow(x0, winTop, ang);
+    for (let y = top + 2; y < gy - 10; y++) { const s = Math.sin(y / 5); if (Math.cos(y / 5) > 0) { P(GM.ironD, x + s * 7.5 - 1, y, 3, 1); P((y + Math.floor(time * 30)) % 7 < 2 ? "#eafff8" : "#2fbfa8", x + s * 7.5, y); } } // an energy pipe spiralling up
+    for (const [dx, dy] of [[0, 2], [1, 3], [11, 40], [12, 41]]) if (top + dy < gy - 10) P("#5a9a44", x0 + dx, top + dy); // moss
+  }
+  function drawGearLasers(level, camX, time, front) { // front: just the beams and aim lines (in front of the runners)
+    for (const gl of level.gearLasers) {
+      const st = level.gearState(gl, time), cx = gl.x - camX;
+      const beam = st.phase === "warn" || st.phase === "fire" ? level.gearBeam(gl, st.ang) : null;
+      if (front) {
+        if (beam && st.phase === "warn") drawAim(beam, camX, time);
+        if (beam && st.phase === "fire") drawBeam(beam, camX, 1);
+        continue;
+      }
+      if (cx < -40 || cx > VIEW_W + 40) continue;
+      drawCarvedPost(cx, gl.gy, gl.cy + 12, time, st.ang);
+      P(GM.ironD, cx - 7, gl.cy + 9, 15, 5); P(GM.rim, cx - 6, gl.cy + 10, 13, 3); P(GM.bolt, cx - 5, gl.cy + 11); P(GM.bolt, cx + 5, gl.cy + 11); // the housing
+      drawGear(cx - 1, gl.cy + 13, -st.ang * 2 + 0.3, 5); // the drive gear
+      drawGear(cx, gl.cy, st.ang, 10);
+      const caught = st.phase !== "turn"; // the ratchet catch: dropped into the teeth (the click)
+      P(GM.ironD, cx + 12, gl.cy - 10, 3, 3); P(GM.bolt, cx + 13, gl.cy - 9);
+      for (let k = 0; k < 5; k++) P(k ? GM.ironL : GM.ironD, cx + 13 - k, gl.cy - 9 + (caught ? k : k * 0.4));
+      if (st.phase === "hold" && st.u < 0.3 && st.fires !== undefined) for (const [dx, dy] of [[14, -9], [15, -11], [12, -12]]) P("#eafff8", cx + dx, gl.cy + dy); // the click's spark
+      if (st.phase === "turn") for (let a = 0; a < 1.6; a += 0.12) P("#cfe6e6", cx + Math.cos(st.ang - a) * 12, gl.cy + Math.sin(st.ang - a) * 12, 1, 1, 0.3 * (1 - a / 1.6)); // motion arcs
+      drawEmitter(cx, gl.cy, st.ang, st.phase === "warn" || st.phase === "fire", st.phase === "fire" ? 1 : st.phase === "warn" ? st.u : 0);
+    }
+  }
+
+  // ---- Its portals ----
+
+  // rocks stacked tightly in a circle (scatter / fall: bursting apart)
+  function drawRockRing(cx, cy, R, scatter = 0, fall = 0) {
+    const rock = ["#7a8686", "#6a7676", "#5c6868"];
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 - Math.PI / 2, s = 1 + scatter * (0.6 + hash(i, 5) * 0.8);
+      const x = cx + Math.cos(a) * R * s, y = cy + Math.sin(a) * R * s + (fall * (0.5 + hash(i, 9))) ** 2 * 30;
+      const w = 5 + Math.floor(hash(i, 1) * 2), h = 4 + Math.floor(hash(i, 2) * 2);
+      P("#3a4444", x - w / 2 - 1, y - h / 2 - 1, w + 2, h + 2); P(rock[i % 3], x - w / 2, y - h / 2, w, h); P("#9aa6a6", x - w / 2, y - h / 2, w - 1, 1); P("#3a4444", x - w / 2 + 1, y + h / 2 - 1, w - 1, 1);
+      if (hash(i, 7) > 0.6) { P("#4a5454", x - 1, y - 1); P("#4a5454", x, y); }
+    }
+  }
+  // the portal itself (the aurora vortex): a dark well, thin teal and green streaks curling in, stars deep inside
+  function drawVortex(cx, cy, r, t) {
+    if (r < 1) return;
+    drawGlowAt("teal", 2, cx, cy, 0.25);
+    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+      const d = Math.sqrt(x * x + y * y) / r;
+      if (d > 1) continue;
+      const a = Math.atan2(y, x), arm = Math.sin(a * 4 + Math.log(d + 0.05) * 7 + t * 4);
+      if (d < 0.2) { P("#060a12", cx + x, cy + y); continue; }
+      if (arm > 0.72) { P(Math.floor((a + Math.PI) / (Math.PI / 2)) % 2 ? "#3fae6e" : "#2fbfa8", cx + x, cy + y, 1, 1, 0.35 + 0.65 * d); continue; }
+      if (arm > 0.45) { P("#1f6a46", cx + x, cy + y, 1, 1, 0.6 * d); continue; }
+      P(d < 0.5 ? "#0b1422" : d < 0.85 ? "#12203a" : "#1a3a6a", cx + x, cy + y);
+    }
+    for (let i = 0; i < 5; i++) P("#cfe6e6", cx + Math.cos(i * 2.4 + t) * 3 * hash(i, 1), cy + Math.sin(i * 2.4 + t) * 3 * hash(i, 2), 1, 1, 0.6);
+  }
+  function drawDormant(cx, cy, r) { // switched off: dark stone, a few dim runes
+    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r) P((x + y) % 5 === 0 ? "#1c2a30" : "#16222a", cx + x, cy + y);
+    for (const [x, y] of [[-4, -3], [3, -5], [5, 3], [-3, 5]]) P("#3fbfa8", cx + x, cy + y, 2, 1, 0.5);
+  }
+  function drawRibbons(fx, fy, tx, ty, time, n = 2) { // aurora ribbons reaching from (fx, fy) to (tx, ty)
+    for (let k = 0; k < n; k++) for (let i = 0; i < 26; i++) {
+      const u = i / 25, x = fx + (tx - fx) * u + Math.sin(u * 9 + time * 8 + k * 2) * 3, y = fy + (ty - fy) * u + Math.cos(u * 7 + k) * 3;
+      P(k % 2 ? "#4af0a0" : "#4ab0f0", x, y, 2, 1, 0.9 - u * 0.3); P("#d8fff0", x, y, 1, 1, 0.5);
+    }
+  }
+  function drawRuinsGates(level, camX, time) {
+    const R = RUINS.ringR;
+    for (const g of level.ruinsGates) {
+      const cx = g.x - camX;
+      if (cx < -60 || cx > VIEW_W + 60) continue;
+      const ground = g.gy - R - 1;
+      // the button, flush with the ground under it
+      P("#3a4444", cx - 5, g.gy - 1, 10, 3); P(g.state === "off" ? "#7a8686" : "#5a6666", cx - 4, g.gy - 1, 8, 2); P(g.state === "off" ? "#3fbfa8" : RUNE, cx - 2, g.gy - 1, 4, 1);
+      if (g.state === "on") drawGlowAt("aurora", 0, cx, g.gy, 0.5);
+      if (g.state === "off") { drawDormant(cx, ground, R - 3); drawRockRing(cx, ground, R); continue; }
+      if (g.state === "broken") {
+        const u = Math.min(1, (time - g.brokenAt) / 0.9);
+        if (u < 1) { drawVortex(cx, ground - RUINS.floatUp, Math.round((R - 3) * (1 - u)), time); drawRockRing(cx, ground - RUINS.floatUp, R, u * 0.6, u); }
+        else for (let i = 0; i < 12; i++) { const x = cx - 26 + i * 4.5 + hash(i, 3) * 3, w = 4 + Math.floor(hash(i, 4) * 3); P("#3a4444", x - 1, g.gy - 4, w + 2, 4); P(["#7a8686", "#6a7676", "#5c6868"][i % 3], x, g.gy - 3, w, 3); } // rubble
+        continue;
+      }
+      const rise = Math.min(1, (time - g.burstAt) / 0.3), cy = ground - RUINS.floatUp * rise;
+      drawVortex(cx, cy, R - 3, time);
+      drawRockRing(cx, cy, R);
+      if (time - g.burstAt < 0.7) for (let k = 0; k < 4; k++) { const a = -2.4 + k * 1.3, u = (time - g.burstAt) / 0.7; drawRibbons(cx, cy, cx + Math.cos(a) * 34 * u, cy + Math.sin(a) * 22 * u, time, 1); } // the aurora bursting out
+    }
+    const ex = level.exitPortal; // the ruins' way out
+    if (ex && Math.abs(ex.x - camX - VIEW_W / 2) < VIEW_W) { drawVortex(ex.x - camX, ex.y, R - 3, time); drawRockRing(ex.x - camX, ex.y, R); drawGlowAt("aurora", 2, ex.x - camX, ex.y, 0.25 + 0.1 * Math.sin(time * 3)); }
+  }
+
+  // Portals that build themselves out of old bricks: an old overgrown ruin (half of its ring sticking up like a buried
+  // arch, the rest of its bricks fallen round it); the bricks shiver awake, tumble up and clack into a ring; the
+  // portal opens; then they drop back down and crumble away
+  const BRICKS = Array.from({ length: 16 }, (_, i) => ({ w: 6 + Math.floor(hash(i, 21) * 3), h: 3 + Math.floor(hash(i, 22) * 2), base: ["#8a9494", "#7e8a8a", "#949e9c", "#86908e", "#7a8484"][i % 5], moss: hash(i, 23) > 0.6, rune: i === 3 || i === 11, crack: hash(i, 24) > 0.55, late: i === 7 }));
+  function drawBrick(bk, x, y, ang) {
+    const ca = Math.cos(ang), sa = Math.sin(ang), hw = bk.w / 2, hh = bk.h / 2, R = Math.ceil(Math.hypot(hw, hh)) + 1;
+    for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) {
+      const u = xx * ca + yy * sa, v = -xx * sa + yy * ca;
+      if (Math.abs(u) > hw + 0.5 || Math.abs(v) > hh + 0.5) continue;
+      const edge = Math.abs(u) > hw - 0.5 || Math.abs(v) > hh - 0.5;
+      let c = edge ? "#3c4444" : v < -hh + 1.5 ? "#b0baba" : v > hh - 1.5 ? "#6a7474" : bk.base;
+      if (!edge && bk.moss && v < -hh + 1.5 && Math.abs(u) < hw - 1) c = Math.round(u) % 2 ? "#5a9a44" : "#4a8a3a";
+      if (!edge && bk.rune && Math.abs(u) < 1.2 && Math.abs(v) < 0.8) c = RUNE;
+      if (!edge && bk.crack && Math.round(u) === Math.round(hw / 2) && v > -0.5) c = "#4c5656";
+      P(c, x + xx, y + yy);
+    }
+  }
+  function brickRest(i, cx, R, gy) {
+    const bk = BRICKS[i];
+    if (i >= 13 || i <= 3) { const a = (i / 16) * Math.PI * 2 - Math.PI / 2; return { x: cx + Math.cos(a) * R, y: gy + 2 + Math.sin(a) * R, ang: a + Math.PI / 2 + (hash(i, 40) - 0.5) * 0.12 }; }
+    const [dx, ang, where] = { 12: [-21, 1.3, "g"], 4: [20, 0.08, "g"], 6: [28, 0.04, "s"], 7: [34, -1.25, "g"], 5: [-28, 0.1, "g"], 8: [-10, 0, "p"], 9: [0, 0.12, "p"], 10: [10, -0.05, "p"], 11: [-35, 0.05, "s"] }[i];
+    const half = Math.abs(Math.sin(ang)) > 0.7 ? bk.w / 2 : bk.h / 2;
+    return { x: cx + dx, y: where === "p" ? gy + bk.h / 2 - 2 : gy - half + (where === "s" ? 1 : 0), ang };
+  }
+  function drawBuiltPortal(bp, camX, time) {
+    const cx = bp.x - camX, gy = bp.gy, cy = gy - 24, R = 16;
+    if (cx < -60 || cx > VIEW_W + 60) return;
+    const k = Math.max(0, Math.min(1, (bp.t - 0.25) / (RUINS.buildTime - 0.25)));
+    const fall = bp.breakAt === null ? 0 : Math.min(1, (bp.t - bp.breakAt) / RUINS.breakTime);
+    if (fall > 0.6) b.globalAlpha = (1 - fall) / 0.4; // (crumbling away)
+    const fade = b.globalAlpha;
+    if (bp.t >= RUINS.buildTime && fall < 0.4) drawVortex(cx, cy, Math.round((R - 3) * Math.min(1, (bp.t - RUINS.buildTime) / 0.15) * (1 - fall / 0.4)), time);
+    BRICKS.forEach((bk, i) => {
+      const a = (i / 16) * Math.PI * 2 - Math.PI / 2, ring = [cx + Math.cos(a) * R, cy + Math.sin(a) * R], rest = brickRest(i, cx, R, gy);
+      let kk = Math.max(0, Math.min(1, (k - hash(i, 27) * 0.12 - (bk.late ? 0.18 : 0)) / 0.7));
+      if (fall) kk = 1 - Math.min(1, fall * (0.8 + hash(i, 28) * 0.6));
+      let x, y, ang;
+      if (kk < 0.12) { const s = kk / 0.12; x = rest.x + (Math.sin(time * 60 + i) > 0 ? 0.4 : -0.4) * s; y = rest.y - (i % 2) * s; ang = rest.ang; }
+      else {
+        const s = (kk - 0.12) / 0.88, e = 1 - (1 - s) ** 2, arc = Math.sin(s * Math.PI) * (14 + hash(i, 29) * 10);
+        x = rest.x + (ring[0] - rest.x) * e; y = rest.y + (ring[1] - rest.y) * e - arc;
+        ang = rest.ang + (a + Math.PI / 2 - rest.ang) * e + (1 - e) * (hash(i, 30) > 0.5 ? 1 : -1) * s * 6;
+        if (s > 0.97 && s < 1 && !fall) { P("#ffffff", x - 3, y - 3); P(RUNE, x, y - 4); }
+      }
+      drawBrick(bk, x, y, ang);
+      b.globalAlpha = fade;
+    });
+    if (k <= 0.05 && !fall) { // still lying there, overgrown
+      for (let i = -36; i <= 36; i += 2) { const h = 1 + Math.floor(hash(i, 50) * 3); if (hash(i, 51) > 0.35) P(hash(i, 52) > 0.5 ? "#5aa83a" : "#7ac85a", cx + i, gy - h, 1, h); }
+      for (const [dx, c] of [[-26, "#f07ab0"], [-8, "#ffe070"], [12, "#f07ab0"], [30, "#ffffff"]]) { P("#4a8a3a", cx + dx, gy - 2, 1, 2); P(c, cx + dx, gy - 3); }
+    }
+    b.globalAlpha = 1;
+  }
+
+  // ---- Falling stones (the last seconds), the aurora's preservation, pushes ----
+
+  function drawStones(level, camX) {
+    for (const st of level.stones) {
+      const x = st.x - camX, u = Math.min(1, st.t / RUINS.stoneWarn);
+      P("#0a1012", x - st.w * (0.3 + 0.7 * u) / 2, st.gy - 1, Math.round(st.w * (0.3 + 0.7 * u)), 2, 0.5); // its shadow, growing
+      if (st.t < RUINS.stoneWarn) continue;
+      const y = Math.min(1, (st.t - RUINS.stoneWarn) / RUINS.stoneFall) * (st.gy - 6);
+      P("#3a4444", x - st.w / 2 - 1, y - 7, st.w + 2, 7); P("#6a7676", x - st.w / 2, y - 6, st.w, 5); P("#8a9696", x - st.w / 2, y - 6, st.w - 1, 1);
+    }
+  }
+  function drawAuroraLights(p, camX, time, ghost) { // three little aurora lights circling you while they're ready
+    if (!p.aurora || p.dead || p.caught || p.trip) return;
+    const ready = p.aurora.back <= 0, cx = p.x + HITBOX_W / 2 - camX, cy = p.y + HITBOX_H / 2;
+    if (!ready) return;
+    const alpha = ghost ? 0.35 : 1;
+    for (let k = 0; k < 3; k++) for (let j = 0; j < 5; j++) {
+      const a = time * 2.4 + k * 2.09 - j * 0.16, x = cx + Math.cos(a) * 9, y = cy + Math.sin(a) * 6;
+      P(["#4af0a0", RUNE, "#4ab0f0"][k], x, y, 1, 1, alpha * (1 - j / 5));
+    }
+    drawGlowAt("aurora", 0, cx, cy, 0.15 * alpha);
+  }
+  function drawPushes(world, camX) {
+    for (const w of world.pushes) {
+      const u = w.t / 0.4, r = 6 + u * AURORA.push;
+      for (let a = 0; a < Math.PI * 2; a += 0.12) P(Math.floor(a * 3) % 2 ? "#4af0a0" : RUNE, w.x - camX + Math.cos(a) * r, w.y + Math.sin(a) * r * 0.7, 2, 1, 1 - u);
+    }
+  }
+  function drawTripRibbons(p, camX, time) { // the aurora wrapped round someone being taken across
+    const tr = p.trip;
+    if (!tr || tr.stage !== "pull") return;
+    const cx = p.x + HITBOX_W / 2 - camX, cy = p.y + HITBOX_H / 2;
+    if (tr.portal) drawRibbons(tr.portal.x - camX, tr.portal.y !== undefined ? tr.portal.y : tr.portal.gy - RUINS.ringR - 1 - RUINS.floatUp, cx, cy, time, 2);
+    else drawRibbons(cx, -10, cx, cy, time, 2);
+    for (let k = 0; k < 8; k++) { const a = time * 9 + k * 0.8; P(k % 2 ? "#4af0a0" : "#4ab0f0", cx + Math.cos(a) * 6, cy + Math.sin(a) * 7, 2, 1, 0.9); }
+  }
+
+  // The ruins' platforms: stone slabs with glowing teal runes (the moving one floats on a glow; the crumbling one is cracked)
+  function drawRuinsPlatform(kind, x, y, w, time) {
+    if (kind === "move") drawGlowAt("teal", 1, x + w / 2, y + 5, 0.4 + 0.15 * Math.sin(time * 2));
+    P("#5a6668", x, y, w, 4); P("#7a8688", x, y, w, 1); P("#3f4a4c", x, y + 3, w, 1);
+    for (let i = 2; i < w - 2; i += 6) P(RUNE, x + i, y + 1, 3, 1, kind === "fall" ? 0.4 : 1);
+    if (kind === "fall") for (let k = 4; k < w - 2; k += 9) { P("#2f3939", x + k, y, 1, 2); P("#2f3939", x + k + 1, y + 2, 1, 2); }
   }
 
   // ---- The giant sleep mushroom (the way into the forest) ----
@@ -835,6 +1213,8 @@ const Renderer = (() => {
           const above = level.tile(c, r - 1);
           b.drawImage(above === T_GROUND ? sprites.soil[variant] : sprites.mossTop[variant], sx, sy);
           if (above === T_EMPTY) drawJungleDecoration(c, sx, sy);
+        } else if (t === T_GROUND && biome === "ruins") {
+          drawRuinsTile(level, c, r, sx, sy);
         } else if (t === T_GROUND && biome === "forest") {
           const variant = Math.floor(hash(c, r) * 4);
           const above = level.tile(c, r - 1);
@@ -1971,6 +2351,7 @@ const Renderer = (() => {
         } else if (s && s.t < FALLING.shakeTime) shake = Math.floor(time * 40) % 2 ? 1 : -1;
       }
       if (forestAt(level, p.x + p.w / 2)) { drawForestPlatform(p.kind, sx + shake, Math.round(y), p.w, time, crack); continue; }
+      if (ruinsAt(level, p.x + p.w / 2)) { drawRuinsPlatform(p.kind, sx + shake, Math.round(y), p.w, time); continue; }
       const colors = {
         static: ["#e8b37a", "#a0663a", "#6e4325"],
         move: ["#dfe9f2", "#7a8fa6", "#4d5d70"],
@@ -2123,6 +2504,7 @@ const Renderer = (() => {
   function drawShooters(level, camX, time) {
     for (const s of level.shooters) {
       const sx = s.x - camX;
+      if (s.eye) { if (sx > -EYE.reach && sx < VIEW_W + EYE.reach) drawEyeStone(s, level, camX, time); continue; } // (the ruins' laser eye-stone)
       if (sx < -SHOOTER.range - 8 || sx > VIEW_W + SHOOTER.range + 8) continue;
       const forest = forestAt(level, s.x);
       for (const spike of level.shooterSpikes(s, time)) drawFlyingSpike(spike.x - camX, spike.y, spike.dx, spike.dy, forest);
@@ -3396,11 +3778,23 @@ const Renderer = (() => {
       if (p.poison > 0 && (p.poisonMax === SPORES.time || p.poisonLethal)) effects.push(["green", "POISON"]); // (a spore's, or a Lobber's deadly one)
       if (p.rootGuard) effects.unshift(["roots", "ROOTS"]);       // (alone: the roots guarding you from the fire, till they're used)
       if (p.magicFeet) effects.unshift(["magic", "MAGIC FEET"]); // (the enchanted forest's gift: for good, so no countdown)
+      if (p.aurora) effects.unshift(["aurora", p.aurora.back > 0 ? `AURORA ${Math.ceil(p.aurora.back)}` : "AURORA"]); // (the ruins' gift)
+      if (p.realm && p.realm.biome === "ruins" && !p.caught) { // the ruins' clock (red near the end) and how far the exit is
+        const left = Math.max(0, Game.ruinsLeft(p.realm)), red = left <= RUINS.collapse[2];
+        const pulse = red ? 0.6 + 0.4 * Math.abs(Math.sin(world.time * 6)) : 1;
+        ctx.globalAlpha = pulse;
+        text(ctx, String(Math.ceil(left)), W / 2, top + 30, red ? "#ff5a4a" : "#7af0d8", 22, "center");
+        ctx.globalAlpha = 1;
+        const end = p.realm.exitPortal ? p.realm.exitPortal.x : p.realm.realmEnd + 8 * TILE, u = Math.max(0, Math.min(1, (p.x - p.realm.startX) / (end - p.realm.startX)));
+        ctx.fillStyle = "#0b1a1e"; ctx.fillRect(W / 2 - 100, top + 40, 200, 6);
+        ctx.fillStyle = red ? "#ff5a4a" : "#3fbfa8"; ctx.fillRect(W / 2 - 100, top + 40, Math.round(200 * u), 6);
+        ctx.fillStyle = "#7af0d8"; ctx.fillRect(W / 2 + 100, top + 37, 4, 12);
+      }
       let ex = 12;
       for (const [k, name] of effects) {
         const left = k === "green" ? p.poison : p.spores[k];
-        const label = k === "magic" || k === "roots" ? name : `${name} ${Math.ceil(left)}`;
-        text(ctx, label, ex, top + (p.power ? 52 : 36), k === "magic" ? "#e2a6ff" : k === "roots" ? "#a898b8" : SPORE_COLORS[k].spore, 10);
+        const label = k === "magic" || k === "roots" || k === "aurora" ? name : `${name} ${Math.ceil(left)}`;
+        text(ctx, label, ex, top + (p.power ? 52 : 36), k === "magic" ? "#e2a6ff" : k === "roots" ? "#a898b8" : k === "aurora" ? "#7af0d8" : SPORE_COLORS[k].spore, 10);
         ex += (label.length + 2) * 10;
       }
       if (p.flash > 0) {
@@ -3412,7 +3806,7 @@ const Renderer = (() => {
       if (p.biomeBanner > 0) {
         ctx.globalAlpha = Math.min(1, p.biomeBanner * 2);
         const name = (BIOME_NAMES[p.biome] || p.biome).toUpperCase();
-        const color = { snow: "#e8f6ff", desert: "#ffcc66", jungle: "#5fe07a", forest: "#e2a6ff" }[p.biome] || "#8be070";
+        const color = { snow: "#e8f6ff", desert: "#ffcc66", jungle: "#5fe07a", forest: "#e2a6ff", ruins: "#7af0d8" }[p.biome] || "#8be070";
         text(ctx, name, W / 2, top + 64, color, 18, "center");
         ctx.globalAlpha = 1;
       }

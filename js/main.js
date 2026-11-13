@@ -28,6 +28,10 @@ let secretList = SECRET_BIOMES.slice();
 try {
   const saved = JSON.parse(localStorage.getItem("fire-run-secret-list"));
   if (Array.isArray(saved)) secretList = saved.filter((b) => SECRET_BIOMES.includes(b));
+  // (a secret biome that's new since the list was saved starts on)
+  const seen = JSON.parse(localStorage.getItem("fire-run-secret-known")) || ["forest"];
+  for (const b of SECRET_BIOMES) if (!seen.includes(b) && !secretList.includes(b)) secretList.push(b);
+  localStorage.setItem("fire-run-secret-known", JSON.stringify(SECRET_BIOMES));
 } catch (e) { /* storage blocked, or nothing saved */ }
 if (!biomeList.length && !secretList.length) biomeList = BIOMES.slice();
 let wild = false; // Wild mode (the hard one): off until you pick it (remembered by the browser)

@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
-// the 6th big update (the enchanted forest), 16 small ones since.
-const GAME_VERSION = "6.19";
+// the 6th big update (the enchanted forest), 16 small ones since. (7: the arcane ruins.)
+const GAME_VERSION = "7.0";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -248,8 +248,8 @@ const MISSILE = {
 // after that a race can start in any biome.
 const BIOMES = ["prairie", "snow", "desert", "jungle"];
 // Hidden biomes: never in the normal rotation (you'll only get there through a magic portal)
-const SECRET_BIOMES = ["forest"];
-const BIOME_NAMES = { forest: "enchanted forest", snow: "taiga" }; // what players see (the rest are shown as they are)
+const SECRET_BIOMES = ["forest", "ruins"];
+const BIOME_NAMES = { forest: "enchanted forest", snow: "taiga", ruins: "arcane ruins" }; // what players see (the rest are shown as they are)
 const BIOME_LENGTH = [250, 450]; // random length of each biome, in tiles (meters): about 350 on average
 
 const SNOW = {
@@ -480,6 +480,78 @@ const FOREST = {
   branchHold: 0.175,      // its rotten branches (the crumbling platforms) don't fall: stand on one this long in all
                          // (stepping off doesn't reset it) and it snaps in two, and you drop straight down
   branchCreak: 0.075,    // ...it starts creaking and shaking this long before it snaps (cracks spread all the while)
+};
+
+// ---- The arcane ruins (the second secret world) ----
+// A portal on the main course (one per race): run over the button under it and it bursts on, the aurora pulling
+// in anyone close by. Inside, everyone has 60 seconds (one clock, from when it opened) to reach the exit
+// portal at the far end; the ruins crumble as time runs out. Escape: the aurora's preservation for good.
+const RUINS = {
+  from: 400,           // meters before the portal can turn up (like the sleep mushroom)
+  grab: 40,            // turning it on pulls in anyone within this many pixels of it
+  floatUp: 9,          // once on, it floats this much higher: you have to jump into it
+  ringR: 16,           // the portal ring's radius (pixels)
+  hole: 11,            // ...and the swirl's: you go in by touching it
+  time: 60,            // seconds to reach the exit portal
+  length: 545,         // tiles from where you arrive to the exit portal (sized so a clean run can die 3 times, not 4)
+  arrive: 24,          // calm tiles where you arrive
+  failBack: 80,        // time's up: thrown back out this many pixels behind where you'd got to
+  pullTime: 0.8,       // seconds the aurora takes to pull you in (and the screen to fade)
+  buildTime: 1.0,      // seconds the bricks take to build the portal you come out of...
+  outTime: 0.35,       // ...you coming out of it...
+  breakTime: 0.9,      // ...and it falling apart again
+  collapse: [30, 15, 10], // seconds left when the crumbling gets worse (and in the last of these, stones fall)
+  stoneEvery: 0.7,     // last 10 s: a stone falls near each runner about this often (seconds)
+  stoneWarn: 0.6,      // ...its shadow grows on the ground this long first
+  stoneFall: 0.35,     // ...then it drops this fast (seconds from the top to the ground)
+  mix: { flat: 1, step: 3, spikes: 7, gap: 4, floating: 3, moving: 2, falling: 2, mace: 3, saw: 3, shooter: 5, gearLaser: 5 }, // the ruins' sections (spikes are its fire turrets, shooters its laser eye-stones)
+  gap: 1,              // flat tiles between its sections: 0 to this
+};
+
+// The ruins' fire turrets (in place of spikes): stone vents in the ground with a teal flame running along the
+// row one turret at a time, left to right and back. Low flames you jump; tall ones you follow behind (the flame
+// rests a moment at each end, so you can get off the row); some switch between the two as they go.
+const FIRE_ROW = {
+  speed: [5, 11],      // turrets a second the flame runs along the row
+  rest: 0.55,          // seconds it rests (out) at each end before running back
+  low: 11,             // a low flame's height (pixels): jump it
+  tall: 46,            // a tall one's (higher than a jump: slip through behind it)
+  kinds: { low: 4, tall: 3, switch: 3 }, // how likely each kind is (switch: tall and low on alternate turrets)
+  second: 6,           // rows this long or longer can have a second, low flame running along them
+  single: [0.8, 0.9],  // a row of one: flame on this long, then off this long (seconds)
+};
+
+// The ruins' laser eye-stones (in place of spike shooters): the eye opens, its corners glow and aim lines show
+// where its four diagonal beams will go; then they're there at once, all the way to whatever they hit
+const EYE = {
+  warn: 0.4,           // seconds of warning (eye open, aim lines)
+  beam: 0.5,           // seconds the beams stay on
+  reach: 420,          // the furthest a beam goes (pixels), if nothing stops it
+};
+
+// The ruins' gear lasers: a carved post with a big gear on top carrying a laser. It turns, clicks into place
+// pointing left, down-left, down-right or right (picked at random), warns, fires, and turns again. Faster ones
+// sometimes click into place and turn on without firing (a fake-out).
+const GEAR_LASER = {
+  turn: 0.6,           // seconds turning (fast ones: turnFast)
+  turnFast: 0.38,
+  hold: 0.25,          // after the click, before the warning starts
+  warn: 0.4,           // seconds of warning (energy up the barrel, the lens glowing, an aim line)
+  beam: 0.5,           // seconds the beam stays on
+  fastChance: 0.35,    // share of gear lasers that are fast
+  fakeChance: 0.3,     // a fast one's chance, each time, of not firing
+  heights: [3, 7],     // tiles from the ground up to its gear
+};
+
+// The ruins' gift: the aurora's preservation. Aurora lights circle round you: they block one death (anything
+// but the fire or a pit), then fade and come back after `recharge`. With no power held, S / Down sends them out
+// in a push instead (same recharge): it shoves away the other player and creatures near you (alone: the fire too).
+const AURORA = {
+  recharge: 5,         // seconds until the lights are back
+  grace: 0.8,          // after blocking a death, nothing can hurt you for this long (to get clear)
+  push: 44,            // the push reaches this far (pixels)
+  shove: 28,           // ...and shoves the other player back this far
+  fireShove: 70,       // alone: it shoves the fire back this far
 };
 
 // The enchanted forest's gift: whoever makes it out has magic feet for the rest of the race. Magic holds
