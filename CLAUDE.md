@@ -283,6 +283,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     picked at random), **warns 0.4 s** (energy runs up the barrel, the lens glows, a dotted aim line), then
     **fires an instant laser** to whatever it hits, held **0.5 s**; then turns again. **Faster ones sometimes
     fake it out**: click into place, hold (no glow) and turn on without firing; slower ones always fire.
+    **Its stem (chosen: the carved rune column):** carved stone sections with dark bands, glowing rune panels,
+    a teal energy pipe spiralling up it, a stepped base with iron braces, a little moss and a crack; and a
+    small window with **one small gear** in it (a hand-drawn 9 x 9 cog: eight teeth, a teal axle) that
+    **turns with the big gear on top** (its frame comes from the big gear's angle: spinning while that
+    turns, still when it's locked). Not two gears (the owner didn't like those).
   - **Biome portals inside the ruins:** **1-2 per visit**, each sending you into a **ramped-up stretch of
     another biome** for a while, then back into the ruins. Settled:
     - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).
