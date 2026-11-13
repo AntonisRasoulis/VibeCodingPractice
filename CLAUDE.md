@@ -285,9 +285,11 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     fake it out**: click into place, hold (no glow) and turn on without firing; slower ones always fire.
     **Its stem (chosen: the carved rune column):** carved stone sections with dark bands, glowing rune panels,
     a teal energy pipe spiralling up it, a stepped base with iron braces, a little moss and a crack; and a
-    small window with **one small gear** in it (a hand-drawn 9 x 9 cog: eight teeth, a teal axle) that
-    **turns with the big gear on top** (its frame comes from the big gear's angle: spinning while that
-    turns, still when it's locked). Not two gears (the owner didn't like those).
+    small **gearbox window**: a recessed housing (shadowed inner walls, a riveted back plate) with **two small
+    six-tooth cogs** (hand-drawn 7 x 7, teal axles), **one top left, one bottom right**, meshing on the
+    diagonal, each held by an iron bracket from the side wall (so they don't look like they float). They
+    **turn with the big gear on top**, opposite ways (their frame comes from the big gear's angle: spinning
+    while it turns, still when it's locked). The rune panels and carved bands keep clear of the window.
   - **Biome portals inside the ruins:** **1-2 per visit**, each sending you into a **ramped-up stretch of
     another biome** for a while, then back into the ruins. Settled:
     - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).
