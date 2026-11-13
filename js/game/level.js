@@ -784,7 +784,7 @@ class Level {
         this.realmExit = this.col * TILE;
         if (this.biome === "ruins") { // the ruins' way out: a portal floating over calm ground (jump into it)
           this.flat(8, false);
-          this.exitPortal = { x: this.col * TILE + TILE / 2, y: this.groundRow * TILE - RUINS.ringR - 1 - RUINS.floatUp };
+          this.exitPortal = { x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, y: this.groundRow * TILE - RUINS.gateUp }; // (the clean gateway, standing open: y is its ring's middle)
         }
       }
       return this.flat(20, false);

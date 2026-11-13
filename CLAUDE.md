@@ -299,7 +299,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     diagonal, each held by an iron bracket from the side wall (so they don't look like they float). They
     **turn with the big gear on top**, opposite ways (their frame comes from the big gear's angle: spinning
     while it turns, still when it's locked). The rune panels and carved bands keep clear of the window.
-  - **Portal rework (asked after testing v7.0; being mocked up):** the **main-course portal is the old overgrown
+  - **Portal rework (built in v7.1):** the **main-course portal is the old overgrown
     brick arch** (not the stacked-rock ring): it lies half-buried until the button is pressed, then its bricks hop
     up into a ring, the vortex opens and the aurora grabs whoever's near; the ring then floats open (jump in).
     A second press: the vortex closes and the bricks **tumble back down into the old arch, lying there for good**.
@@ -308,7 +308,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     glowing teal runes), **held up between two carved rune pillars on a carved stone base** (the opening raised:
     you jump into it). Coming out of any portal: the ring builds, you come out, then its bricks **settle back
     into their resting shape** (the old arch on the main course; resting on the base between the pillars in the
-    ruins). The ruins' exit uses the clean gateway too.
+    ruins). The ruins' exit uses the clean gateway too. The clean gateway's bricks **rest as a beautiful stone arch**
+    (a glowing keystone at the top) that **unrolls into the ring**. Code: `drawBrickPortal(style "old" | "clean")`,
+    `drawGateway`, `world.builtPortals` with `state` rest / build / open / close (never removed), `f.arriveGate`.
   - **Biome portals inside the ruins:** **1-2 per visit**, each sending you into a **ramped-up stretch of
     another biome** for a while, then back into the ruins. Settled:
     - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).

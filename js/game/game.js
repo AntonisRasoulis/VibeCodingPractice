@@ -64,7 +64,7 @@ const Game = (() => {
       sawBits: [],     // splinters, sparks and dirt thrown about by the forest's saws breaking loose
       quakes: [],      // the ground shaking where one slams down: { x, t }
       wisps: [],       // the magic trailing behind a loose saw: little glowing wisps drifting up and fading
-      builtPortals: [], // the ruins: portals building themselves out of old bricks (to come out of), then falling apart { level, x, gy, t, openAt, breakAt }
+      builtPortals: [], // brick portals you come out of: they build, open, close and rest again, never removed { level, x, gy, cy, style, state, t }
       pushes: [],       // the aurora's preservation: pushes spreading out { level, x, y, t }
       nextCatchup: null, // when (world time) the next purple orb comes for whoever's fallen behind
       warps: [],       // portal gun: someone going into a portal and out of another one far ahead
@@ -1571,6 +1571,7 @@ const Game = (() => {
       }
       if (g.state !== "on") continue;
       const cy = g.gy - RUINS.ringR - 1 - RUINS.floatUp;
+      if (world.time - g.burstAt < RUINS.buildTime) continue; // (its ring is still building)
       for (const p of players) if (freeRunner(p) && !p.realm && touchesHole(p, g.x, cy)) startTrip(p, "in", g); // (jumping into it)
     }
   }
@@ -1586,6 +1587,9 @@ const Game = (() => {
     f.flat(RUINS.arrive, false);
     f.gate = g;
     f.arriveX = (c0 + 6) * TILE;
+    // where you arrive: a clean gateway (a stone arch between two rune pillars), resting until someone comes through
+    f.arriveGate = { level: f, x: f.arriveX + HITBOX_W / 2, gy: f.groundRow * TILE, cy: f.groundRow * TILE - RUINS.gateUp, style: "clean", state: "rest", t: 0 };
+    world.builtPortals.push(f.arriveGate);
     f.startX = f.arriveX;
     f.update(world.time);
     return f;
@@ -1653,35 +1657,38 @@ const Game = (() => {
         p.x = tr.fromX + (tr.toX - tr.fromX) * e;
         p.y = tr.fromY + (tr.toY - tr.fromY) * e;
         if (u < 1) continue;
-        // across: into the ruins, or back out onto the main course
+        // across: into the ruins (its clean gateway where you arrive), or back out onto the main course (an old brick
+        // portal builds itself where you land, and stays there afterwards)
         let realm = null, x = p.x;
         if (tr.kind === "in") { realm = tr.portal.realm; x = realm.arriveX; }
         else if (tr.kind === "out") x = tr.portal.x + 16;
         else x = Math.max(0, p.x - RUINS.failBack);
         moveTo(p, realm, x);
         p.held = true;
-        const course = realm || world.level;
-        tr.built = { level: course, x: p.x + HITBOX_W / 2, gy: p.y + HITBOX_H, t: 0, openAt: RUINS.buildTime, breakAt: null, kind: tr.kind };
-        world.builtPortals.push(tr.built);
+        if (tr.kind === "in") tr.built = realm.arriveGate;
+        else { tr.built = { level: world.level, x: p.x + HITBOX_W / 2, gy: p.y + HITBOX_H, cy: p.y + HITBOX_H - 24, style: "old", state: "rest", t: 0 }; world.builtPortals.push(tr.built); }
+        Object.assign(tr.built, { state: "build", t: 0 });
         tr.landX = p.x; tr.landY = p.y;
         tr.stage = "build"; tr.t = 0;
         continue;
       }
-      if (tr.stage === "build") { // hidden while the bricks fly in and lock together
-        p.x = tr.landX; p.y = tr.landY - 18;
+      const midY = tr.built.cy - HITBOX_H / 2; // (inside its ring)
+      if (tr.stage === "build") { // hidden while the bricks gather into a ring
+        p.x = tr.landX; p.y = midY;
         if (tr.t < RUINS.buildTime) continue;
         tr.stage = "pop"; tr.t = 0;
+        Object.assign(tr.built, { state: "open", t: 0 });
         Sound.play("portalPop");
         continue;
       }
       if (tr.stage === "pop") { // out you come, dropping to the ground
         const u = Math.min(1, tr.t / RUINS.outTime);
-        p.x = tr.landX; p.y = tr.landY - 18 * (1 - u * u);
+        p.x = tr.landX; p.y = midY + (tr.landY - midY) * u * u;
         if (u < 1) continue;
         p.y = tr.landY;
         p.held = false;
         p.onGround = true;
-        tr.built.breakAt = tr.built.t;
+        Object.assign(tr.built, { state: "close", t: 0 }); // (its vortex closes and its bricks go back to resting: it stays)
         if (tr.kind === "out") { // escaped: the aurora's preservation, for the rest of the race
           p.aurora = { back: 0 };
           p.showHit("AURORA!", "#7af0d8");
@@ -1693,10 +1700,12 @@ const Game = (() => {
     }
   }
 
-  // Portals made of old bricks: building themselves (bricks hopping up into a ring), open, then falling apart
+  // Brick portals: building (bricks gathering into a ring), open, closing (back to resting), resting. Never removed.
   function updateBuiltPortals(dt) {
-    for (const bp of world.builtPortals) bp.t += dt;
-    world.builtPortals = world.builtPortals.filter((bp) => bp.breakAt === null || bp.t < bp.breakAt + RUINS.breakTime);
+    for (const bp of world.builtPortals) {
+      bp.t += dt;
+      if (bp.state === "close" && bp.t >= RUINS.breakTime) Object.assign(bp, { state: "rest", t: 0 });
+    }
   }
 
   // How dark someone's screen is (0..1) while the aurora takes them across

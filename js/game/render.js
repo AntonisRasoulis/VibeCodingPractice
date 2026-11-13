@@ -568,34 +568,31 @@ const Renderer = (() => {
       P(k % 2 ? "#4af0a0" : "#4ab0f0", x, y, 2, 1, 0.9 - u * 0.3); P("#d8fff0", x, y, 1, 1, 0.5);
     }
   }
+  // The ruins portal on the main course: an old overgrown arch with the button under it. The button wakes its bricks
+  // up into a ring (the vortex opening); a second press (or its time running out) sends them tumbling back into the arch
   function drawRuinsGates(level, camX, time) {
-    const R = RUINS.ringR;
     for (const g of level.ruinsGates) {
       const cx = g.x - camX;
       if (cx < -60 || cx > VIEW_W + 60) continue;
-      const ground = g.gy - R - 1;
-      // the button, flush with the ground under it
-      P("#3a4444", cx - 5, g.gy - 1, 10, 3); P(g.state === "off" ? "#7a8686" : "#5a6666", cx - 4, g.gy - 1, 8, 2); P(g.state === "off" ? "#3fbfa8" : RUNE, cx - 2, g.gy - 1, 4, 1);
+      P("#3a4444", cx - 5, g.gy - 1, 10, 3); P(g.state === "off" ? "#7a8686" : "#5a6666", cx - 4, g.gy - 1, 8, 2); P(g.state === "off" ? "#3fbfa8" : RUNE, cx - 2, g.gy - 1, 4, 1); // the button
       if (g.state === "on") drawGlowAt("aurora", 0, cx, g.gy, 0.5);
-      if (g.state === "off") { drawDormant(cx, ground, R - 3); drawRockRing(cx, ground, R); continue; }
-      if (g.state === "broken") {
-        const u = Math.min(1, (time - g.brokenAt) / 0.9);
-        if (u < 1) { drawVortex(cx, ground - RUINS.floatUp, Math.round((R - 3) * (1 - u)), time); drawRockRing(cx, ground - RUINS.floatUp, R, u * 0.6, u); }
-        else for (let i = 0; i < 12; i++) { const x = cx - 26 + i * 4.5 + hash(i, 3) * 3, w = 4 + Math.floor(hash(i, 4) * 3); P("#3a4444", x - 1, g.gy - 4, w + 2, 4); P(["#7a8686", "#6a7676", "#5c6868"][i % 3], x, g.gy - 3, w, 3); } // rubble
-        continue;
-      }
-      const rise = Math.min(1, (time - g.burstAt) / 0.3), cy = ground - RUINS.floatUp * rise;
-      drawVortex(cx, cy, R - 3, time);
-      drawRockRing(cx, cy, R);
-      if (time - g.burstAt < 0.7) for (let k = 0; k < 4; k++) { const a = -2.4 + k * 1.3, u = (time - g.burstAt) / 0.7; drawRibbons(cx, cy, cx + Math.cos(a) * 34 * u, cy + Math.sin(a) * 22 * u, time, 1); } // the aurora bursting out
+      const cy = g.gy - RUINS.ringR - 1 - RUINS.floatUp;
+      if (g.state === "off") { drawBrickPortal("old", cx, g.gy, cy, 0, 0, 0, time); continue; }
+      if (g.state === "broken") { const f = Math.min(1, (time - g.brokenAt) / RUINS.breakTime); drawBrickPortal("old", cx, g.gy, cy, f < 1 ? 1 : 0, f < 1 ? f : 0, f < 0.4 ? 1 - f / 0.4 : 0, time); continue; }
+      const u = (time - g.burstAt) / RUINS.buildTime;
+      drawBrickPortal("old", cx, g.gy, cy, Math.min(1, u), 0, u >= 1 ? Math.min(1, (u - 1) * 6) : 0, time);
+      if (time - g.burstAt < 0.7) for (let k = 0; k < 4; k++) { const a = -2.4 + k * 1.3, v = (time - g.burstAt) / 0.7; drawRibbons(cx, cy, cx + Math.cos(a) * 34 * v, cy + Math.sin(a) * 22 * v, time, 1); } // the aurora bursting out
     }
-    const ex = level.exitPortal; // the ruins' way out
-    if (ex && Math.abs(ex.x - camX - VIEW_W / 2) < VIEW_W) { drawVortex(ex.x - camX, ex.y, R - 3, time); drawRockRing(ex.x - camX, ex.y, R); drawGlowAt("aurora", 2, ex.x - camX, ex.y, 0.25 + 0.1 * Math.sin(time * 3)); }
+    const ex = level.exitPortal; // the ruins' way out: the clean gateway, standing open
+    if (ex && Math.abs(ex.x - camX - VIEW_W / 2) < VIEW_W) { drawBrickPortal("clean", ex.x - camX, ex.gy, ex.y, 1, 0, 1, time); drawGlowAt("aurora", 2, ex.x - camX, ex.y, 0.2 + 0.1 * Math.sin(time * 3)); }
   }
 
-  // Portals that build themselves out of old bricks: an old overgrown ruin (half of its ring sticking up like a buried
-  // arch, the rest of its bricks fallen round it); the bricks shiver awake, tumble up and clack into a ring; the
-  // portal opens; then they drop back down and crumble away
+  // Portals that build themselves out of bricks. "old" (the main course): an overgrown old ruin, half its ring sticking
+  // up like a buried arch and its other bricks fallen round it, a mossy stump by it; the bricks shiver awake, tumble up
+  // and clack into a ring. "clean" (the ruins, not worn by time): a stone arch between two carved rune pillars on a
+  // carved base, a glowing keystone at its top; it unrolls into the ring. Either way: k (0 resting .. 1 a ring),
+  // fall (0 .. 1: back to resting), open (0 .. 1: the vortex). They never disappear.
+  // the old bricks: each its own size and shade of grey, some mossy, some cracked, two with a rune
   const BRICKS = Array.from({ length: 16 }, (_, i) => ({ w: 6 + Math.floor(hash(i, 21) * 3), h: 3 + Math.floor(hash(i, 22) * 2), base: ["#8a9494", "#7e8a8a", "#949e9c", "#86908e", "#7a8484"][i % 5], moss: hash(i, 23) > 0.6, rune: i === 3 || i === 11, crack: hash(i, 24) > 0.55, late: i === 7 }));
   function drawBrick(bk, x, y, ang) {
     const ca = Math.cos(ang), sa = Math.sin(ang), hw = bk.w / 2, hh = bk.h / 2, R = Math.ceil(Math.hypot(hw, hh)) + 1;
@@ -617,34 +614,75 @@ const Renderer = (() => {
     const half = Math.abs(Math.sin(ang)) > 0.7 ? bk.w / 2 : bk.h / 2;
     return { x: cx + dx, y: where === "p" ? gy + bk.h / 2 - 2 : gy - half + (where === "s" ? 1 : 0), ang };
   }
-  function drawBuiltPortal(bp, camX, time) {
-    const cx = bp.x - camX, gy = bp.gy, cy = gy - 24, R = 16;
-    if (cx < -60 || cx > VIEW_W + 60) return;
-    const k = Math.max(0, Math.min(1, (bp.t - 0.25) / (RUINS.buildTime - 0.25)));
-    const fall = bp.breakAt === null ? 0 : Math.min(1, (bp.t - bp.breakAt) / RUINS.breakTime);
-    if (fall > 0.6) b.globalAlpha = (1 - fall) / 0.4; // (crumbling away)
-    const fade = b.globalAlpha;
-    if (bp.t >= RUINS.buildTime && fall < 0.4) drawVortex(cx, cy, Math.round((R - 3) * Math.min(1, (bp.t - RUINS.buildTime) / 0.15) * (1 - fall / 0.4)), time);
-    BRICKS.forEach((bk, i) => {
-      const a = (i / 16) * Math.PI * 2 - Math.PI / 2, ring = [cx + Math.cos(a) * R, cy + Math.sin(a) * R], rest = brickRest(i, cx, R, gy);
-      let kk = Math.max(0, Math.min(1, (k - hash(i, 27) * 0.12 - (bk.late ? 0.18 : 0)) / 0.7));
+  function drawCleanBrick(x, y, ang, rune, lit) {
+    const ca = Math.cos(ang), sa = Math.sin(ang), hw = 3, hh = 2;
+    for (let yy = -4; yy <= 4; yy++) for (let xx = -4; xx <= 4; xx++) {
+      const u = xx * ca + yy * sa, v = -xx * sa + yy * ca;
+      if (Math.abs(u) > hw + 0.5 || Math.abs(v) > hh + 0.5) continue;
+      const edge = Math.abs(u) > hw - 0.5 || Math.abs(v) > hh - 0.5;
+      P(edge ? "#344040" : rune && Math.abs(u) < 1.2 && Math.abs(v) < 0.8 ? (lit ? "#eafff8" : RUNE) : v < -hh + 1.5 ? "#c8d2d2" : v > hh - 1.5 ? "#7e8a8a" : "#a2aeae", x + xx, y + yy);
+    }
+    if (rune) drawGlowAt("aurora", 0, x, y, lit ? 0.45 : 0.2);
+  }
+  function drawGateway(cx, gy, cy) { // the clean gateway's base, pillars and the arms that hold its ring
+    P("#2a3234", cx - 31, gy - 6, 62, 6); P("#7a8686", cx - 30, gy - 6, 60, 5); P("#a8b4b4", cx - 30, gy - 6, 60, 1); P("#56626a", cx - 30, gy - 2, 60, 1);
+    P("#2a3234", cx - 27, gy - 9, 54, 3); P("#8a9696", cx - 26, gy - 9, 52, 2); P("#b8c4c4", cx - 26, gy - 9, 52, 1);
+    for (let x = cx - 26; x < cx + 26; x += 4) P(RUNE, x, gy - 4, 2, 1, 0.8);
+    for (const x of [cx - 30, cx + 22]) {
+      const top = gy - 58, w = 8;
+      P("#2a3234", x - 1, top, w + 2, gy - 9 - top); P("#7a8686", x, top, w, gy - 9 - top); P("#9aa6a6", x, top, 1, gy - 9 - top); P("#56626a", x + w - 1, top, 1, gy - 9 - top);
+      P("#9aa6a6", x - 2, top - 3, w + 4, 3); P("#3c4848", x - 2, top - 1, w + 4, 1);
+      for (let y = top + 6; y < gy - 17; y += 11) { P(RUNE, x + 2, y, 4, 1); P(RUNE, x + 3, y + 1, 1, 3); P(RUNE, x + 5, y + 2, 1, 2); drawGlowAt("aurora", 0, x + 4, y + 2, 0.3); }
+    }
+    for (const sd of [-1, 1]) { const x0 = sd < 0 ? cx - 22 : cx + 18; P("#2a3234", x0, cy - 3, 4, 6); P("#8a9696", x0, cy - 2, 4, 4); P("#b8c4c4", x0, cy - 2, 4, 1); P(RUNE, sd < 0 ? x0 + 3 : x0, cy); }
+  }
+  function drawBrickPortal(style, cx, gy, cy, k, fall, open, time) {
+    if (cx < -70 || cx > VIEW_W + 70) return;
+    const clean = style === "clean", R = clean ? 15 : 16;
+    if (clean) drawGateway(cx, gy, cy);
+    else { // the mossy old stump beside it
+      const x = cx - 34; P("#6a7474", x, gy - 14, 8, 14); P("#808a8a", x, gy - 14, 8, 1); P("#4c5656", x + 7, gy - 13, 1, 13);
+      for (const [dx, dy] of [[1, -13], [2, -14], [5, -13], [6, -14]]) P("#5a9a44", x + dx, gy + dy); P(RUNE, x + 2, gy - 6, 3, 1, 0.35);
+    }
+    if (open > 0) drawVortex(cx, cy, Math.round((R - 3) * open), time);
+    const locked = k >= 1 && !fall;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2 - Math.PI / 2, ring = [cx + Math.cos(a) * R, cy + Math.sin(a) * R];
+      let rest;
+      if (clean) { const ra = Math.PI + ((i + 0.5) / 16) * Math.PI; rest = { x: cx + Math.cos(ra) * 19, y: cy + Math.sin(ra) * 19, ang: ra, key: i === 7 || i === 8 }; }
+      else rest = brickRest(i, cx, R, gy);
+      const bk = BRICKS[i];
+      let kk = Math.max(0, Math.min(1, (k - hash(i, 27) * 0.12 - (!clean && bk.late ? 0.18 : 0)) / (clean ? 0.85 : 0.7)));
       if (fall) kk = 1 - Math.min(1, fall * (0.8 + hash(i, 28) * 0.6));
       let x, y, ang;
-      if (kk < 0.12) { const s = kk / 0.12; x = rest.x + (Math.sin(time * 60 + i) > 0 ? 0.4 : -0.4) * s; y = rest.y - (i % 2) * s; ang = rest.ang; }
+      if (kk < 0.1) { const s = kk / 0.1; x = rest.x + (Math.sin(time * 60 + i) > 0 ? 0.4 : -0.4) * s; y = rest.y - (i % 2) * s; ang = rest.ang; }
       else {
-        const s = (kk - 0.12) / 0.88, e = 1 - (1 - s) ** 2, arc = Math.sin(s * Math.PI) * (14 + hash(i, 29) * 10);
-        x = rest.x + (ring[0] - rest.x) * e; y = rest.y + (ring[1] - rest.y) * e - arc;
-        ang = rest.ang + (a + Math.PI / 2 - rest.ang) * e + (1 - e) * (hash(i, 30) > 0.5 ? 1 : -1) * s * 6;
+        const s = (kk - 0.1) / 0.9, e = 1 - (1 - s) ** 2;
+        if (clean) { // unrolling along the curve into the ring
+          const ra = Math.atan2(rest.y - cy, rest.x - cx), rr = Math.hypot(rest.x - cx, rest.y - cy); let ta = a;
+          while (ta - ra > Math.PI) ta -= Math.PI * 2; while (ra - ta > Math.PI) ta += Math.PI * 2;
+          const an = ra + (ta - ra) * e, rad = rr + (R - rr) * e; x = cx + Math.cos(an) * rad; y = cy + Math.sin(an) * rad - Math.sin(s * Math.PI) * 2;
+        } else { const arc = Math.sin(s * Math.PI) * (14 + hash(i, 29) * 10); x = rest.x + (ring[0] - rest.x) * e; y = rest.y + (ring[1] - rest.y) * e - arc; }
+        ang = rest.ang + (a + Math.PI / 2 - rest.ang) * e + (1 - e) * (hash(i, 30) > 0.5 ? 1 : -1) * s * (clean ? 3 : 6);
         if (s > 0.97 && s < 1 && !fall) { P("#ffffff", x - 3, y - 3); P(RUNE, x, y - 4); }
       }
-      drawBrick(bk, x, y, ang);
-      b.globalAlpha = fade;
-    });
-    if (k <= 0.05 && !fall) { // still lying there, overgrown
+      if (clean) drawCleanBrick(x, y, ang, i % 2 === 0 || (rest.key && kk < 0.1), locked || (rest.key && kk < 0.1));
+      else drawBrick(bk, x, y, ang);
+    }
+    if (clean && locked) for (let i = 0; i < 16; i++) { const a = ((i + 0.5) / 16) * Math.PI * 2 - Math.PI / 2; P(RUNE, cx + Math.cos(a) * R, cy + Math.sin(a) * R, 1, 1, 0.8); } // its joints lit
+    if (clean && k <= 0 && !fall) { drawGlowAt("aurora", 1, cx, cy - 19, 0.35); for (let i = 0; i < 15; i++) { const a = Math.PI + ((i + 1) / 16) * Math.PI; P(RUNE, cx + Math.cos(a) * 19, cy + Math.sin(a) * 19, 1, 1, 0.5); } } // the arch at rest
+    if (!clean && k <= 0.05 && !fall) { // the old one lying there, overgrown
       for (let i = -36; i <= 36; i += 2) { const h = 1 + Math.floor(hash(i, 50) * 3); if (hash(i, 51) > 0.35) P(hash(i, 52) > 0.5 ? "#5aa83a" : "#7ac85a", cx + i, gy - h, 1, h); }
+      for (let a = -Math.PI * 0.85; a < -Math.PI * 0.25; a += 0.06) { const vy = gy + 2 + Math.sin(a) * (R + 3) + 1; if (vy < gy) P("#3f8a3a", cx + Math.cos(a) * (R + 3), vy); } // a vine over it
       for (const [dx, c] of [[-26, "#f07ab0"], [-8, "#ffe070"], [12, "#f07ab0"], [30, "#ffffff"]]) { P("#4a8a3a", cx + dx, gy - 2, 1, 2); P(c, cx + dx, gy - 3); }
     }
-    b.globalAlpha = 1;
+  }
+  function drawBuiltPortal(bp, camX, time) {
+    const T = RUINS, u = bp.t;
+    const k = bp.state === "rest" ? 0 : bp.state === "build" ? Math.max(0, Math.min(1, (u - 0.25) / (T.buildTime - 0.25))) : 1;
+    const fall = bp.state === "close" ? Math.min(1, u / T.breakTime) : 0;
+    const open = bp.state === "open" ? Math.min(1, u / 0.15) : bp.state === "close" ? Math.max(0, 1 - u / 0.3) : 0;
+    drawBrickPortal(bp.style, bp.x - camX, bp.gy, bp.cy, k, fall, open, time);
   }
 
   // ---- Falling stones (the last seconds), the aurora's preservation, pushes ----
