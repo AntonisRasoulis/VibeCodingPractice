@@ -424,17 +424,38 @@ const Renderer = (() => {
     if (ey < VIEW_H) for (let s = 0; s < 6; s++) P(s % 2 ? "#eafff8" : RUNE, ex + Math.cos(s * 1.1) * (2 + s), ey - 1 - Math.abs(Math.sin(s * 1.7)) * (2 + s), 1, 1, fade);
   }
 
-  // The laser eye-stone: a round stone with a narrow teal eye; it opens wide, aims, and fires four beams at once
+  // The laser eye-stone: a round grey stone with four carved points (a teal crystal at each tip) and a 4-point star of
+  // energy in its middle, aimed at the tips. Warning: light fills the star from its middle out and the crystals light
+  // up; then the four beams fire from the crystal tips. Nothing on it moves: only the light changes.
+  const EYE_DIRS = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+  const ES = { edge: "#262e30", hi: "#d4dcdc", light: "#a8b2b2", mid: "#8a9494", dark: "#687272", deep: "#4e5858" };
+  const esShade = (xx, yy, R) => { const l = (-xx - yy) / (R * 1.4); return l > 0.55 ? ES.hi : l > 0.2 ? ES.light : l > -0.25 ? ES.mid : l > -0.6 ? ES.dark : ES.deep; };
   function drawEyeStone(s, level, camX, time) {
-    const st = level.eyeState(s, time), charge = st.firing ? 1 : st.warn, x = s.x - camX - 4, y = s.y - 4;
+    const st = level.eyeState(s, time), fill = st.firing ? 1 : st.warn, on = st.firing || st.warn > 0, cx = s.x - camX, cy = s.y;
     if (st.warn > 0) for (const bm of level.eyeBeams(s)) drawAim(bm, camX, time);
     if (st.firing) for (const bm of level.eyeBeams(s)) drawBeam(bm, camX);
-    const cx = x + 4, cy = y + 4;
-    for (let yy = -5; yy <= 5; yy++) for (let xx = -5; xx <= 5; xx++) { const d = Math.hypot(xx, yy); if (d > 5.2) continue; P(d > 4.4 ? "#3a4444" : (xx + yy < -2 ? "#8a9696" : "#6a7676"), cx + xx, cy + yy); }
-    const open = 1 + Math.round(charge * 2);
-    P("#0b1422", cx - 3, cy - open + 1, 7, open * 2 - 1); P("#2fbfa8", cx - 1, cy - Math.min(1, open - 1), 3, Math.max(1, open * 2 - 3)); P("#eafff8", cx, cy);
-    P("#3a4444", cx - 4, cy - open, 9, 1); P("#3a4444", cx - 4, cy + open, 9, 1);
-    if (charge > 0.5) drawGlowAt("aurora", 1, cx, cy, 0.45 * charge);
+    for (const [dx, dy] of EYE_DIRS) for (let k = 5; k <= 9; k++) { // the carved points
+      const w = k < 7 ? 1.5 : k < 9 ? 1 : 0.5;
+      for (let q = -w; q <= w; q += 0.5) P(q * dx * dy < 0 ? ES.light : ES.dark, cx + dx * k + q * dy * 0.7, cy + dy * k - q * dx * 0.7);
+    }
+    const R = 6;
+    for (let yy = -R - 1; yy <= R + 1; yy++) for (let xx = -R - 1; xx <= R + 1; xx++) { // the round stone
+      const d = Math.hypot(xx, yy);
+      if (d > R + 1.3) continue;
+      P(d > R + 0.3 ? ES.edge : d > R - 0.7 ? (-xx - yy > 0 ? ES.hi : ES.dark) : esShade(xx, yy, R), cx + xx, cy + yy);
+    }
+    for (const [dx, dy] of EYE_DIRS) for (let k = 6; k <= 7; k++) { P(ES.edge, cx + dx * k, cy + dy * k + 1); P(st.firing ? "#eafff8" : on ? RUNE : "#2a8a7c", cx + dx * k, cy + dy * k, 1, 1, on ? 1 : 0.9); } // inlaid channels
+    const px = [[0, 0, 0], [0, -1, 0.3], [0, 1, 0.3], [-1, 0, 0.3], [1, 0, 0.3]]; // the star: fat in the middle, sharp points
+    for (const [dx, dy] of EYE_DIRS) for (let k = 1; k <= 3; k++) { px.push([dx * k, dy * k, k]); if (k === 1) px.push([dx * 2, dy, 1.5], [dx, dy * 2, 1.5]); }
+    for (const [x, y] of px) for (const [ox, oy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) P("#0b1422", cx + x + ox, cy + y + oy, 1, 1, 0.55);
+    for (const [x, y, k] of px) { const u = k / 3; P(u <= fill * 1.05 && fill > 0 ? "#eafff8" : u < 0.3 ? RUNE : u < 0.7 ? "#3fbfa8" : "#2fbfa8", cx + x, cy + y); }
+    drawGlowAt("aurora", fill > 0.6 ? 1 : 0, cx, cy, 0.25 + 0.6 * fill);
+    for (const [dx, dy] of EYE_DIRS) { // the crystals at the tips
+      const x = cx + dx * 9, y = cy + dy * 9;
+      P(ES.edge, x - 1, y - 1, 3, 3); P("#1d6a60", x - 1, y, 3, 1); P("#1d6a60", x, y - 1, 1, 3);
+      P(st.firing ? "#eafff8" : on ? RUNE : "#3fbfa8", x, y);
+      drawGlowAt("aurora", 0, x, y, on ? 0.35 + 0.4 * fill : 0.12);
+    }
   }
 
   // ---- The gear laser: a carved post, a big gear turning on top of it carrying a laser ----

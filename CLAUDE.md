@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 113 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 114 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -277,7 +277,9 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
       time it *and* jump. On **big rows, several fires** can be running along it at once. **v7.7 (too hard to dodge):** a flame is only tall while running right (coming back it's low); only low-flame rows get a second fire (low on fast rows, low or switching on slow ones); speeds 6-10 turrets/s (you run 12). A turret's grate glows and puffs sparks as it
       changes, **just for looks** (not a warning). Fairness still applies (there must always be a way
       through: test it).
-    - **The spike shooter, redone as a laser eye-stone** (mocked up and chosen): a round stone with a narrow
+    - **The spike shooter, redone as a laser eye-stone** (v7.8 redesign, chosen G3 + star: a round grey stone with four carved
+      points, a teal crystal at each tip, a 4-point star of energy in the middle aimed at the tips; nothing moves, light fills the
+      star from the middle out during the warning; beams start at the crystal tips). Older notes: a round stone with a narrow
       teal eye (the old shooter's place and rhythm, shared by both players). **Warning: 0.4 s**: the eye opens
       wide, the corners glow and faint dotted teal aim lines show exactly where each beam will go. Then each
       corner fires a **laser that's there instantly, all the way to whatever it hits** (white-hot core, teal

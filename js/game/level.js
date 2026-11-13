@@ -643,9 +643,9 @@ class Level {
   }
 
   // Its four beams (or where they'll be): [{ x, y (start), dx, dy, len }]
-  eyeBeams(s) {
+  eyeBeams(s) { // (they start at the crystal tips)
     if (s.beams) return s.beams;
-    s.beams = SHOOTER_DIRS.map(([dx, dy]) => { const x = s.x + dx * 5, y = s.y + dy * 5; return { x, y, dx, dy, len: this.beamLength(x, y, dx, dy, EYE.reach) }; });
+    s.beams = SHOOTER_DIRS.map(([dx, dy]) => { const x = s.x + dx * 9, y = s.y + dy * 9; return { x, y, dx, dy, len: this.beamLength(x, y, dx, dy, EYE.reach) }; });
     return s.beams;
   }
 
