@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since. (7: the arcane ruins.)
-const GAME_VERSION = "7.11";
+const GAME_VERSION = "7.12";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -494,7 +494,7 @@ const RUINS = {
   gateUp: 33,          // the ruins' clean gateways: how high their ring's middle is above the ground
   hole: 11,            // ...and the swirl's: you go in by touching it
   time: 20,            // seconds to reach the exit portal (from when the portal opened)
-  length: 90,          // tiles from where you arrive to the exit portal (sized so a clean run can die 3 times, not 4: about 12.5 s clean, 2 s a death)
+  length: 130,         // tiles from where you arrive to the exit portal (sized so you can die once and still make it, but not twice: about 17 s clean)
   arrive: 12,          // calm tiles where you arrive
   failBack: 80,        // time's up: thrown back out this many pixels behind where you'd got to
   pullTime: 0.8,       // seconds the aurora takes to pull you in (and the screen to fade)

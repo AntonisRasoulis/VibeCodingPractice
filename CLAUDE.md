@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 117 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 118 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -196,7 +196,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 - The **arcane ruins**: a first version is built (see above). **Still to build:** the biome portals inside it,
   the old obstacles' stone-and-teal restyle (maces and saws are still steel), more of its own dangers (to be
   talked through), teal mist in its pits. The full design the owner settled:
-  - **A race against the clock:** you have **20 seconds to reach a set point** (v7.6: cut from 60 s, which is a long time in this game; 90 tiles after 12 calm ones) in the ruins. Fail and you
+  - **A race against the clock:** you have **20 seconds to reach a set point** (v7.6: cut from 60 s, which is a long time in this game; v7.12: 130 tiles after 12 calm ones, so one death is fine but two are too many) in the ruins. Fail and you
     die and come back on the main course ("back at the top somehow": details to settle). Make it and you
     win its gift (like the forest's).
   - **The gift: the aurora's preservation.** Aurora lights circle round you for the rest of the race.
@@ -233,8 +233,8 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     ground first, like the floating rocks). At zero it all comes crashing down ("TIME'S UP!"), and at the last
     moment the **aurora grabs you and throws you back through a portal onto the main course, about 10 tiles
     (80 px) behind** the distance you'd reached, with no gift (never dropping in from the top of the screen).
-  - **How tight 60 s is:** fair but tense. Sized so that a runner who never has to stop or turn back can die
-    **3 times and still make it, but not 4** (measure what a death really costs: the 1 s respawn plus the
+  - **How tight the clock is:** fair but tense. Sized so that a runner who never has to stop or turn back can die
+    **once and still make it, but not twice** (v7.12; it was 3 but not 4) (measure what a death really costs: the 1 s respawn plus the
     ground lost, and size the goal's distance from that).
   - **Timer and goal:** a big countdown at the top of your view, in the ruins' colors (teal / aurora, not
     red), turning red only when you're running out of time; a bar shows how far the goal is.
