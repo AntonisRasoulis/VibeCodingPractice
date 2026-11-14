@@ -107,6 +107,7 @@ const Renderer = (() => {
     drawPlatforms(world.level, player, camX, world.time);
     drawPortals(world.level, camX, world.time);
     drawRuinsGates(world.level, camX, world.time);
+    drawBiomeGates(world.level, camX, world.time);
     for (const bp of world.builtPortals) drawBuiltPortal(bp, camX, world.time);
     drawOrbs(world.level, camX, world.time);
     drawTraps(world.level, player, other, camX);
@@ -584,17 +585,27 @@ const Renderer = (() => {
     }
   }
   // the portal itself (the aurora vortex): a dark well, thin teal and green streaks curling in, stars deep inside
-  function drawVortex(cx, cy, r, t) {
+  // each portal's colours: the ruins' own aurora, or a biome portal's tint (so you can tell where it goes):
+  // [streak, streak, faint streak, inner well, middle, rim]
+  const VORTEX = {
+    ruins: ["#3fae6e", "#2fbfa8", "#1f6a46", "#0b1422", "#12203a", "#1a3a6a"],
+    prairie: ["#b8e04a", "#f0dc60", "#6a8a2a", "#0e140a", "#1e2a12", "#4a5a1e"],
+    snow: ["#e8f6ff", "#a8d8f0", "#5a8aaa", "#0b1422", "#1a2c44", "#4a6e90"],
+    desert: ["#ffcc66", "#f0a040", "#8a5a20", "#140e06", "#2e1e0c", "#6a4418"],
+    jungle: ["#2fbf5a", "#1a8a3a", "#0e5a24", "#020c06", "#06200e", "#0e3a1a"],
+  };
+  function drawVortex(cx, cy, r, t, tint = "ruins") {
     if (r < 1) return;
+    const V = VORTEX[tint];
     drawGlowAt("teal", 2, cx, cy, 0.25);
     for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
       const d = Math.sqrt(x * x + y * y) / r;
       if (d > 1) continue;
       const a = Math.atan2(y, x), arm = Math.sin(a * 4 + Math.log(d + 0.05) * 7 + t * 4);
       if (d < 0.2) { P("#060a12", cx + x, cy + y); continue; }
-      if (arm > 0.72) { P(Math.floor((a + Math.PI) / (Math.PI / 2)) % 2 ? "#3fae6e" : "#2fbfa8", cx + x, cy + y, 1, 1, 0.35 + 0.65 * d); continue; }
-      if (arm > 0.45) { P("#1f6a46", cx + x, cy + y, 1, 1, 0.6 * d); continue; }
-      P(d < 0.5 ? "#0b1422" : d < 0.85 ? "#12203a" : "#1a3a6a", cx + x, cy + y);
+      if (arm > 0.72) { P(Math.floor((a + Math.PI) / (Math.PI / 2)) % 2 ? V[0] : V[1], cx + x, cy + y, 1, 1, 0.35 + 0.65 * d); continue; }
+      if (arm > 0.45) { P(V[2], cx + x, cy + y, 1, 1, 0.6 * d); continue; }
+      P(d < 0.5 ? V[3] : d < 0.85 ? V[4] : V[5], cx + x, cy + y);
     }
     for (let i = 0; i < 5; i++) P("#cfe6e6", cx + Math.cos(i * 2.4 + t) * 3 * hash(i, 1), cy + Math.sin(i * 2.4 + t) * 3 * hash(i, 2), 1, 1, 0.6);
   }
@@ -625,6 +636,20 @@ const Renderer = (() => {
     }
     const ex = level.exitPortal; // the ruins' way out: the clean gateway, standing open
     if (ex && Math.abs(ex.x - camX - VIEW_W / 2) < VIEW_W) { drawBrickPortal("clean", ex.x - camX, ex.gy, ex.y, 1, 0, 1, time); drawGlowAt("aurora", 2, ex.x - camX, ex.y, 0.2 + 0.1 * Math.sin(time * 3)); }
+  }
+
+  // Biome portals inside the ruins: a forced one is a clean gateway on the path, an optional one (a shortcut) a small
+  // floating ring of stones; either way its vortex is tinted with the biome it sends you to
+  function drawBiomeGates(level, camX, time) {
+    for (const bg of level.biomeGates) {
+      const cx = bg.x - camX;
+      if (cx < -70 || cx > VIEW_W + 70) continue;
+      if (bg.forced) { drawBrickPortal("clean", cx, bg.gy, bg.gy - RUINS.gateUp, 1, 0, 1, time, bg.biome); continue; }
+      const cy = bg.gy - 22 + Math.round(Math.sin(time * 2 + bg.x) * 1.5);
+      drawGlowAt("teal", 1, cx, bg.gy - 1, 0.2); // (its soft light on the ground under it)
+      drawVortex(cx, cy, 8, time, bg.biome);
+      drawRockRing(cx, cy, 11);
+    }
   }
 
   // Portals that build themselves out of bricks. "old" (the main course): an overgrown old ruin, half its ring sticking
@@ -676,7 +701,7 @@ const Renderer = (() => {
     }
     for (const sd of [-1, 1]) { const x0 = sd < 0 ? cx - 22 : cx + 18; P("#2a3234", x0, cy - 3, 4, 6); P("#8a9696", x0, cy - 2, 4, 4); P("#b8c4c4", x0, cy - 2, 4, 1); P(RUNE, sd < 0 ? x0 + 3 : x0, cy); }
   }
-  function drawBrickPortal(style, cx, gy, cy, k, fall, open, time) {
+  function drawBrickPortal(style, cx, gy, cy, k, fall, open, time, tint = "ruins") {
     if (cx < -70 || cx > VIEW_W + 70) return;
     const clean = style === "clean", R = clean ? 15 : 16;
     if (clean) drawGateway(cx, gy, cy);
@@ -684,7 +709,7 @@ const Renderer = (() => {
       const x = cx - 34; P("#6a7474", x, gy - 14, 8, 14); P("#808a8a", x, gy - 14, 8, 1); P("#4c5656", x + 7, gy - 13, 1, 13);
       for (const [dx, dy] of [[1, -13], [2, -14], [5, -13], [6, -14]]) P("#5a9a44", x + dx, gy + dy); P(RUNE, x + 2, gy - 6, 3, 1, 0.35);
     }
-    if (open > 0) drawVortex(cx, cy, Math.round((R - 3) * open), time);
+    if (open > 0) drawVortex(cx, cy, Math.round((R - 3) * open), time, tint);
     const locked = k >= 1 && !fall;
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2 - Math.PI / 2, ring = [cx + Math.cos(a) * R, cy + Math.sin(a) * R];

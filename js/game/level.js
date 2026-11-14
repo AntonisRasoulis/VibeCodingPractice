@@ -88,6 +88,7 @@ class Level {
     this.ruinsOn = options.ruins !== false; // (the arcane ruins turned off in the biome picker: no ruins portal)
     this.ruinsGates = [];     // the ruins portal on the main course (one per race): { id, x, gy, state: off | on | broken, presses, openedAt, realm, burstAt, brokenAt }
     this.fireRows = [];       // ruins: rows of fire turrets (in place of spikes): { id, x0, n, gy, speed, kind, phase, second }
+    this.biomeGates = [];     // ruins: portals to a short stretch of another biome { x, gy, biome, forced }
     this.gearLasers = [];     // ruins: gear lasers { id, x (the post's middle), gy, cy (the gear's middle), fast, phase }
     this.stones = [];         // ruins, the last seconds: stones falling { x, t (seconds since its shadow appeared), w, hit }
     this.exitPortal = null;   // ruins: the way out at its far end { x, y (its middle) }
