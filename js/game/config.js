@@ -1,7 +1,7 @@
 // The game's version, shown left of the logo. The first number goes up for big updates (a new biome, a new
 // secret world...), the second for smaller additions and fixes (back to 0 with each big update): 6.16 means
 // the 6th big update (the enchanted forest), 16 small ones since. (7: the arcane ruins.)
-const GAME_VERSION = "7.13";
+const GAME_VERSION = "7.14";
 
 // Tunable numbers for the game. Change these to adjust how it feels.
 // Distances are in game pixels; one tile is 8 pixels (about "1 meter").
@@ -494,7 +494,7 @@ const RUINS = {
   gateUp: 33,          // the ruins' clean gateways: how high their ring's middle is above the ground
   hole: 11,            // ...and the swirl's: you go in by touching it
   time: 20,            // seconds to reach the exit portal (from when the portal opened)
-  length: 150,         // tiles from where you arrive to the exit portal, with its two biome portals on the way (sized so you can die once and still make it, but not twice: about 16.5 s clean)
+  length: 156,         // tiles from where you arrive to the exit portal, with its two biome portals on the way (sized so you can die once and still make it, but not twice: about 17 s clean)
   arrive: 12,          // calm tiles where you arrive
   failBack: 80,        // time's up: thrown back out this many pixels behind where you'd got to
   pullTime: 0.8,       // seconds the aurora takes to pull you in (and the screen to fade)
@@ -510,9 +510,9 @@ const RUINS = {
   // biome portals: each visit has two, one on the path (forced: a clean gateway you run through) and one optional
   // (a small floating ring of stones you jump into), each sending you through a short, packed stretch of a biome
   legLength: [20, 25], // tiles of biome in a stretch
-  shortcut: 20,        // an optional one brings you out this many tiles further on than its stretch is long
-  forcedAt: [14, 22],  // tiles after the calm arrival where the forced one stands
-  optionalAfter: [4, 10], // ...and the optional one, this many tiles after you're back from the forced one's stretch
+  shortcut: 25,        // an optional one brings you out this many tiles further on than its stretch is long (about 2 s saved)
+  forcedAt: [4, 10],   // tiles after the calm arrival from which the forced one comes next (it waits for the section in hand: usually 10-35 in)
+  optionalAfter: [2, 6], // ...and the optional one, this many tiles after you're back from the forced one's stretch
   legGap: 1,           // flat tiles between a stretch's sections (packed closer than usual, 1-3, but always somewhere to stand)
 };
 

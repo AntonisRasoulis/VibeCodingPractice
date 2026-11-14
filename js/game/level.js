@@ -1388,11 +1388,16 @@ const SECTIONS = {
   // The ruins' biome portals: a forced one (a clean gateway on the path: running through it takes you in; the ruins
   // behind it is calm, as no one runs there) or an optional one (a small ring floating a jump up: jump in for a shortcut)
   biomeGate(forced) {
-    const L = this.rand(RUINS.legLength[0], RUINS.legLength[1]), biome = forced ? this.legBiomes[0] : this.legBiomes[1];
+    let L = this.rand(RUINS.legLength[0], RUINS.legLength[1]);
+    const biome = forced ? this.legBiomes[0] : this.legBiomes[1];
+    if (!forced) { // (its shortcut has to land well before the exit: a shorter stretch if need be, or none at all if there's no room)
+      L = Math.min(L, Math.floor(this.realmEnd / TILE) - 8 - RUINS.shortcut - (this.col + 8));
+      if (L < 8) return this.flat(4, false);
+    }
     this.flat(4, false);
     const g = { id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, biome, forced, L, leg: null };
     this.biomeGates.push(g);
-    if (forced) { this.flat(L + 18, false); this.optionalAt = this.col + this.rand(RUINS.optionalAfter[0], RUINS.optionalAfter[1]); return; } // (calm: you come back out somewhere along here, as far along as the stretch took you)
+    if (forced) { this.flat(L + 16, false); this.optionalAt = this.col + this.rand(RUINS.optionalAfter[0], RUINS.optionalAfter[1]); return; } // (calm: you come back out somewhere along here, as far along as the stretch took you)
     this.flat(4, false);
     g.landCol = Math.floor(g.x / TILE) + L + RUINS.shortcut;
     this.landingFor = g;
