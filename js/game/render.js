@@ -51,6 +51,7 @@ const Renderer = (() => {
       drawDream(p, camX, world.time);
       const dark = Game.tripDark(p); // (the aurora taking you across: the screen fading out and back)
       if (dark > 0) { b.fillStyle = `rgba(6, 14, 18, ${dark})`; b.fillRect(0, 0, VIEW_W, VIEW_H); }
+      if (p.warpFlash > 0) { b.fillStyle = `rgba(234, 255, 248, ${p.warpFlash * 2.4})`; b.fillRect(0, 0, VIEW_W, VIEW_H); } // (through a biome portal: a flash of light)
       b.restore();
       if (p.poison > 0) drawPoison(i * (VIEW_H + DIVIDER), p.poison, world.time, p.poisonMax, p.poisonLethal);
     }
@@ -3882,13 +3883,14 @@ const Renderer = (() => {
       if (p.rootGuard) effects.unshift(["roots", "ROOTS"]);       // (alone: the roots guarding you from the fire, till they're used)
       if (p.magicFeet) effects.unshift(["magic", "MAGIC FEET"]); // (the enchanted forest's gift: for good, so no countdown)
       if (p.aurora) effects.unshift(["aurora", p.aurora.back > 0 ? `AURORA ${Math.ceil(p.aurora.back)}` : "AURORA"]); // (the ruins' gift)
-      if (p.realm && p.realm.biome === "ruins" && !p.caught) { // the ruins' clock (red near the end) and how far the exit is
-        const left = Math.max(0, Game.ruinsLeft(p.realm)), red = left <= RUINS.collapse[2];
+      const ruinsOf = p.realm && (p.realm.biome === "ruins" ? p.realm : p.realm.parent); // (a biome portal's stretch: its ruins' clock still runs)
+      if (ruinsOf && !p.caught) { // the ruins' clock (red near the end) and how far the exit is
+        const R = ruinsOf, left = Math.max(0, Game.ruinsLeft(R)), red = left <= RUINS.collapse[2];
         const pulse = red ? 0.6 + 0.4 * Math.abs(Math.sin(world.time * 6)) : 1;
         ctx.globalAlpha = pulse;
         text(ctx, String(Math.ceil(left)), W / 2, top + 30, red ? "#ff5a4a" : "#7af0d8", 22, "center");
         ctx.globalAlpha = 1;
-        const end = p.realm.exitPortal ? p.realm.exitPortal.x : p.realm.realmEnd + 8 * TILE, u = Math.max(0, Math.min(1, (p.x - p.realm.startX) / (end - p.realm.startX)));
+        const end = R.exitPortal ? R.exitPortal.x : R.realmEnd + 8 * TILE, u = Math.max(0, Math.min(1, (p.x - R.startX) / (end - R.startX)));
         ctx.fillStyle = "#0b1a1e"; ctx.fillRect(W / 2 - 100, top + 40, 200, 6);
         ctx.fillStyle = red ? "#ff5a4a" : "#3fbfa8"; ctx.fillRect(W / 2 - 100, top + 40, Math.round(200 * u), 6);
         ctx.fillStyle = "#7af0d8"; ctx.fillRect(W / 2 + 100, top + 37, 4, 12);

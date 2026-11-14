@@ -82,6 +82,7 @@ class Level {
     this.ice = [];            // ice[x] = true where the ground's surface is slippery ice
     this.signs = [];          // wooden signs where a new biome starts
     this.sleepShrooms = [];   // giant sleep mushrooms (the way into the enchanted forest): { id, x (its foot), gy, seed, forest }
+    this.leg = options.leg === true; // (a ruins biome portal's short stretch of a biome)
     this.realmEnd = options.realmEnd; // (an enchanted forest you're sent to: where it ends, pixels)
     this.sleepShroomsOn = options.sleepShrooms !== false; // (the enchanted forest turned off in the biome picker: no sleep mushrooms)
     this.realmExit = undefined;       // ...and where its calm ground at the end starts, once it's built (the fireflies come there)
@@ -789,6 +790,18 @@ class Level {
   // ---- Sections ----
 
   addSection() {
+    if (this.biome === "ruins" && this.realmEnd !== undefined) { // the ruins' biome portals (see makeRuins)
+      if (this.forcedAt !== undefined && this.col >= this.forcedAt) { this.forcedAt = undefined; return SECTIONS.biomeGate.call(this, true); }
+      const lastChance = this.realmEnd / TILE - (RUINS.legLength[1] + RUINS.shortcut + 16); // (its shortcut has to land before the exit)
+      if (this.optionalAt !== undefined && this.forcedAt === undefined && (this.col >= this.optionalAt || this.col >= lastChance)) { this.optionalAt = undefined; return SECTIONS.biomeGate.call(this, false); }
+      if (this.landingFor && this.col >= this.landingFor.landCol - 3) { // where an optional one's shortcut brings you out: calm ground
+        this.flat(3, false);
+        this.landingFor.outX = this.col * TILE;
+        this.landingFor = null;
+        return this.flat(7, false);
+      }
+    }
+    if (this.leg && this.col * TILE < this.realmEnd && this.realmEnd / TILE - this.col < 12) return this.flat(Math.ceil(this.realmEnd / TILE - this.col), false); // (a stretch: nothing long right at its end)
     if (this.realmEnd !== undefined && this.col * TILE >= this.realmEnd) {
       // The forest's over: calm ground from here on, and the fireflies come once you reach it. (The last
       // section can run a little past realmEnd, so this is where they come, not realmEnd itself: never mid-obstacle.)
@@ -827,6 +840,11 @@ class Level {
     if (this.biome === "desert" && this.col > 60) weights.sinkhole = 3;
     if (this.biome === "jungle" && this.col > 40) weights.river = 4;
     if (this.biome === "jungle" && this.col > 60) Object.assign(weights, { flytrap: 7, turret: 5 });
+    if (this.leg) { // a biome portal's stretch: that biome's dangers packed in (none that need a lot of room or the main course)
+      for (const k of ["orb", "portal", "river", "thinIce", "turret", "bush", "flat"]) delete weights[k];
+      if (this.biome === "prairie") weights.trap = 4;
+      if (this.biome === "snow") weights.icicles = 7;
+    }
     if (this.biome === "ruins") { // (its own mix: no portals)
       const orb = weights.orb;
       for (const k in weights) delete weights[k];
@@ -849,7 +867,7 @@ class Level {
       if (have < this.pondTarget && this.biomeEnd - this.col < (this.pondTarget - have) * 40 + 30) type = "thinIce";
     }
     SECTIONS[type].call(this, this.difficulty());
-    this.flat(this.biome === "forest" ? this.rand(0, FOREST.gap) : this.biome === "ruins" ? this.rand(0, RUINS.gap) : this.rand(1, 3), false); // breathing room between sections (never icy; less in the forest and the ruins: they crowd in on you)
+    this.flat(this.leg ? RUINS.legGap : this.biome === "forest" ? this.rand(0, FOREST.gap) : this.biome === "ruins" ? this.rand(0, RUINS.gap) : this.rand(1, 3), false); // breathing room between sections (never icy; less in the forest and the ruins: they crowd in on you)
     this.scatter();
   }
 
@@ -1367,6 +1385,19 @@ const SECTIONS = {
   },
 
   // The way into the arcane ruins: a portal of stacked rocks, switched off, its button in the ground under it
+  // The ruins' biome portals: a forced one (a clean gateway on the path: running through it takes you in; the ruins
+  // behind it is calm, as no one runs there) or an optional one (a small ring floating a jump up: jump in for a shortcut)
+  biomeGate(forced) {
+    const L = this.rand(RUINS.legLength[0], RUINS.legLength[1]), biome = forced ? this.legBiomes[0] : this.legBiomes[1];
+    this.flat(4, false);
+    const g = { id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, biome, forced, L, leg: null };
+    this.biomeGates.push(g);
+    if (forced) { this.flat(L + 18, false); this.optionalAt = this.col + this.rand(RUINS.optionalAfter[0], RUINS.optionalAfter[1]); return; } // (calm: you come back out somewhere along here, as far along as the stretch took you)
+    this.flat(4, false);
+    g.landCol = Math.floor(g.x / TILE) + L + RUINS.shortcut;
+    this.landingFor = g;
+  },
+
   ruinsGate() {
     this.flat(16, false);
     this.ruinsGates.push({ id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, state: "off", presses: 0, openedAt: null, realm: null, burstAt: -9, brokenAt: -9 });

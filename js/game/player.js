@@ -85,6 +85,7 @@ class Player {
     this.catchupGiven = false;    // had our one purple catch-up orb this race
     this.aurora = null;           // the ruins' gift, the aurora's preservation: { back (seconds until its lights are back: 0 = ready) }
     this.shieldGrace = 0;         // seconds nothing can hurt us, just after the aurora blocked a death
+    this.warpFlash = 0;           // through one of the ruins' biome portals: a flash of light that fades (seconds)
     this.knock = null;            // being shoved by someone's aurora push: { fromX, toX, y, t }
     this.lying = false;           // just woken up, still lying down
     this.magicFeet = false;
@@ -145,6 +146,7 @@ class Player {
     if (this.flash > 0) this.flash -= dt * 2;
     if (this.hitTextTime > 0) this.hitTextTime -= dt;
     if (this.shieldGrace > 0) this.shieldGrace -= dt;
+    if (this.warpFlash > 0) this.warpFlash -= dt;
     if (this.aurora && this.aurora.back > 0) { this.aurora.back -= dt; if (this.aurora.back <= 0) { this.aurora.back = 0; Sound.play("auroraBack"); } }
     if (this.caught) return;
     if (this.knock && !this.dead) { // shoved by an aurora push: slid back along a little hop, then on our feet again

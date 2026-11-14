@@ -166,7 +166,8 @@ const Game = (() => {
     // The main course's dangers only see who's on it: anyone off in a forest (or on their way) counts as out of the race
     onCourse(level, () => mainCourse(dt, inputs));
     for (const f of forests()) {
-      if (f.biome === "ruins") onCourse(f, () => { updateBridges(dt); updateRuins(f, dt); levelSounds(); });
+      if (f.biome === "ruins") onCourse(f, () => { updateBridges(dt); updateRuins(f, dt); updateBiomeGates(f); levelSounds(); });
+      else if (f.leg) onCourse(f, () => { updateBridges(dt); updateFlytraps(dt); checkThinIce(); levelSounds(); updateLeg(f); });
       else onCourse(f, () => { updateBridges(dt); updateLooseSaws(dt); updateLooseMaces(dt); updateSpores(); updateLobbers(dt); updateAliveTrees(dt); levelSounds(); });
     }
     checkFire();
@@ -1591,8 +1592,67 @@ const Game = (() => {
     f.arriveGate = { level: f, x: f.arriveX + HITBOX_W / 2, gy: f.groundRow * TILE, cy: f.groundRow * TILE - RUINS.gateUp, style: "clean", state: "rest", t: 0 };
     world.builtPortals.push(f.arriveGate);
     f.startX = f.arriveX;
+    // its two biome portals (one forced, one optional), going to the biomes picked for this race (just one or none picked: any)
+    const picked = biomeList.filter((b) => BIOMES.includes(b)), pool = picked.length > 1 ? picked : BIOMES;
+    f.legBiomes = [0, 1].map(() => pool[Math.floor(Math.random() * pool.length)]);
+    const a = c0 + RUINS.arrive;
+    f.forcedAt = a + RUINS.forcedAt[0] + Math.floor(Math.random() * (RUINS.forcedAt[1] - RUINS.forcedAt[0] + 1));
     f.update(world.time);
     return f;
+  }
+
+  // ---- The ruins' biome portals: a short, packed stretch of another biome, then back into the ruins ----
+
+  // Into one: its stretch is a course of its own (made the first time anyone goes in, shared after that), covering
+  // the same x as the ruins from the portal on; you come back out at outX (further on, for an optional one)
+  function enterLeg(p, g, f) {
+    if (!g.leg) {
+      const c0 = Math.floor(g.x / TILE);
+      // where it ends: forced, after its length (you come back out just as far along); optional, the shortcut's length
+      // short of where it brings you out (the calm landing the ruins made for it)
+      if (!g.forced) f.ensure(g.landCol * TILE + 40 * TILE);
+      const endCol = g.forced || g.outX === undefined ? c0 + 3 + g.L : Math.round(g.outX / TILE) - RUINS.shortcut - 1;
+      const leg = new Level(Math.floor(Math.random() * 1e9), g.biome, { solo: world.solo, biomes: false, wild: world.wild, leg: true, realmEnd: endCol * TILE });
+      leg.flat(Math.max(1, c0 - leg.col), false);
+      leg.flat(3, false);
+      leg.parent = f; leg.gate = f.gate; leg.biomeGate = g; leg.startX = f.startX;
+      leg.ensure(endCol * TILE + 40 * TILE);
+      if (g.forced) g.outX = leg.realmExit + TILE;
+      leg.update(world.time);
+      g.leg = leg;
+    }
+    moveTo(p, g.leg, g.x);
+    legFlash(p, g.biome);
+  }
+  function legFlash(p, biome) { // a burst of the portal's colours as you come through
+    p.sparkle({ prairie: "#b8e04a", snow: "#e8f6ff", desert: "#ffcc66", jungle: "#2fbf5a", ruins: "#7af0d8" }[biome]);
+    p.warpFlash = 0.25;
+    Sound.play("portalPop");
+  }
+  // In the ruins: run through a forced one, or jump into an optional one
+  function updateBiomeGates(f) {
+    for (const g of f.biomeGates) for (const p of world.players) {
+      if (p.realm !== f || !freeRunner(p) || (g.went && g.went.includes(p))) continue; // (each takes you through once)
+      if (g.forced ? p.x + HITBOX_W / 2 >= g.x : touchesHole(p, g.x, g.gy - 22)) { (g.went = g.went || []).push(p); enterLeg(p, g, f); }
+    }
+  }
+  // In a stretch: reach its end and you're back in the ruins; the ruins' clock still counts down in here
+  function updateLeg(leg) {
+    const f = leg.parent, g = leg.biomeGate;
+    leg.ensure(leg.realmEnd + 30 * TILE);
+    for (const p of world.players) {
+      if (p.realm !== leg || p.caught || p.trip) continue;
+      if (ruinsLeft(f) <= 0) {
+        if (p.dead) { p.dead = false; p.x = p.respawnX; p.y = p.respawnY; }
+        p.showHit("TIME'S UP!", "#ff5a4a");
+        startTrip(p, "fail", null);
+        continue;
+      }
+      if (freeRunner(p) && leg.realmExit !== undefined && p.x >= leg.realmExit + TILE) {
+        moveTo(p, f, g.outX !== undefined ? g.outX : p.x);
+        legFlash(p, "ruins");
+      }
+    }
   }
 
   // How many seconds a ruins has left

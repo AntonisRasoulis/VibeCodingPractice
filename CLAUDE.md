@@ -18,7 +18,7 @@ costs ground to the fire. 1 Player: one big view, race the fire for distance (be
 - Repo: `AntonisRasoulis/VibeCodingPractice`. Development branch: `claude/nice-meitner-muga6l`
   (a fresh chat may be given a different branch: use the one you're told).
 - Published as a claude.ai Artifact (a single bundled HTML file):
-  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 118 at the time of writing). Always
+  **https://claude.ai/artifact/Uh5CKSPymdWERadhojnY7P** (Version 119 at the time of writing). Always
   republish to this same URL (pass it as `url`); never create a new artifact for the game.
 
 ## Style
@@ -193,8 +193,7 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
 
 - Maybe a forest animal / chaser (a shadow wolf or an owl were offered).
 - The floating shooters' stumps and thorns are small and dark: could be made easier to see.
-- The **arcane ruins**: a first version is built (see above). **Still to build:** the biome portals inside it,
-  the old obstacles' stone-and-teal restyle (maces and saws are still steel), more of its own dangers (to be
+- The **arcane ruins**: a first version is built (see above). **Still to build:** the old obstacles' stone-and-teal restyle (maces and saws are still steel), more of its own dangers (to be
   talked through), teal mist in its pits. The full design the owner settled:
   - **A race against the clock:** you have **20 seconds to reach a set point** (v7.6: cut from 60 s, which is a long time in this game; v7.12: 130 tiles after 12 calm ones, so one death is fine but two are too many) in the ruins. Fail and you
     die and come back on the main course ("back at the top somehow": details to settle). Make it and you
@@ -313,7 +312,10 @@ Scripts load in this order (all globals, no modules), each with a `?v=` cache-bu
     ruins). The ruins' exit uses the clean gateway too. The clean gateway's bricks **rest as a beautiful stone arch**
     (a glowing keystone at the top) that **unrolls into the ring**. Code: `drawBrickPortal(style "old" | "clean")`,
     `drawGateway`, `world.builtPortals` with `state` rest / build / open / close (never removed), `f.arriveGate`.
-  - **Biome portals inside the ruins:** **1-2 per visit**, each sending you into a **ramped-up stretch of
+  - **Biome portals inside the ruins (built v7.13):** **exactly 2 per visit: one forced (the clean gateway, run through it), one
+    optional (a small floating ring of stones, jump in; a shortcut out 20 tiles further on)**; stretches 20-25 tiles; ruins 150
+    tiles so one death is fine, two too many. Code: `Level.biomeGates`, `SECTIONS.biomeGate`, `leg` levels, `enterLeg`,
+    `updateBiomeGates`, `updateLeg`, `drawBiomeGates`, `VORTEX` tints. Older plan: each sending you into a **ramped-up stretch of
     another biome** for a while, then back into the ruins. Settled:
     - **Some optional, some forced** (a mix: some you choose to jump into, some sit right on the path).
     - **Which biomes:** only the ones turned on in the picker for that race; if just one biome is picked,
