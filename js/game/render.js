@@ -33,7 +33,7 @@ const Renderer = (() => {
       // the ground shaking where a saw slams down (only if it's on this screen)
       if (world.quakes.some((q) => (q.level || world.level) === (p.realm || world.level) && Math.abs(q.x - (camX + VIEW_W / 2)) < VIEW_W * 0.6)) camX += (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 2));
       if (p.realm && p.realm.biome === "ruins") { // the ruins shaking as they come down
-        const left = Game.ruinsLeft(p.realm);
+        const left = Game.ruinsLeft(p.realm, p);
         if (left <= RUINS.collapse[2] || (left <= RUINS.collapse[1] && Math.random() < 0.08)) camX += Math.random() < 0.5 ? -1 : 1;
       }
 
@@ -81,7 +81,7 @@ const Renderer = (() => {
       else if (biome === "desert") drawDesertBackground(camX, world.time);
       else if (biome === "jungle") drawJungleBackground(camX);
       else if (biome === "forest") drawForestBackground(camX, world.time);
-      else if (biome === "ruins") drawRuinsBackground(camX, world.time, Game.ruinsLeft(world.level));
+      else if (biome === "ruins") drawRuinsBackground(camX, world.time, Game.ruinsLeft(world.level, player));
       else drawBackground(camX);
     });
     b.globalAlpha = 1;
@@ -3885,7 +3885,7 @@ const Renderer = (() => {
       if (p.aurora) effects.unshift(["aurora", p.aurora.back > 0 ? `AURORA ${Math.ceil(p.aurora.back)}` : "AURORA"]); // (the ruins' gift)
       const ruinsOf = p.realm && (p.realm.biome === "ruins" ? p.realm : p.realm.parent); // (a biome portal's stretch: its ruins' clock still runs)
       if (ruinsOf && !p.caught) { // the ruins' clock (red near the end) and how far the exit is
-        const R = ruinsOf, left = Math.max(0, Game.ruinsLeft(R)), red = left <= RUINS.collapse[2];
+        const R = ruinsOf, left = Math.max(0, Game.ruinsLeft(R, p)), red = left <= RUINS.collapse[2];
         const pulse = red ? 0.6 + 0.4 * Math.abs(Math.sin(world.time * 6)) : 1;
         ctx.globalAlpha = pulse;
         text(ctx, String(Math.ceil(left)), W / 2, top + 30, red ? "#ff5a4a" : "#7af0d8", 22, "center");

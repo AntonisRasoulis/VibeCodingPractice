@@ -1607,17 +1607,16 @@ const Game = (() => {
   // the same x as the ruins from the portal on; you come back out at outX (further on, for an optional one)
   function enterLeg(p, g, f) {
     if (!g.leg) {
-      const c0 = Math.floor(g.x / TILE);
-      // where it ends: forced, after its length (you come back out just as far along); optional, the shortcut's length
-      // short of where it brings you out (the calm landing the ruins made for it)
+      // where it ends: you come back out just as far along as it took you (an optional one's stretch runs to the calm patch
+      // the ruins left for it, wherever that ended up)
       if (!g.forced) f.ensure(g.landCol * TILE + 40 * TILE);
-      const endCol = g.forced || g.outX === undefined ? c0 + 3 + g.L : Math.round(g.outX / TILE) - RUINS.shortcut - 1;
+      const c0 = Math.floor(g.x / TILE), endCol = g.forced || g.calmX === undefined ? c0 + 3 + g.L : Math.round(g.calmX / TILE) + 1;
       const leg = new Level(Math.floor(Math.random() * 1e9), g.biome, { solo: world.solo, biomes: false, wild: world.wild, leg: true, realmEnd: endCol * TILE });
       leg.flat(Math.max(1, c0 - leg.col), false);
       leg.flat(3, false);
       leg.parent = f; leg.gate = f.gate; leg.biomeGate = g; leg.startX = f.startX;
       leg.ensure(endCol * TILE + 40 * TILE);
-      if (g.forced) g.outX = leg.realmExit + TILE;
+      g.outX = leg.realmExit + TILE;
       leg.update(world.time);
       g.leg = leg;
     }
@@ -1642,7 +1641,7 @@ const Game = (() => {
     leg.ensure(leg.realmEnd + 30 * TILE);
     for (const p of world.players) {
       if (p.realm !== leg || p.caught || p.trip) continue;
-      if (ruinsLeft(f) <= 0) {
+      if (ruinsLeft(f, p) <= 0) {
         if (p.dead) { p.dead = false; p.x = p.respawnX; p.y = p.respawnY; }
         p.showHit("TIME'S UP!", "#ff5a4a");
         startTrip(p, "fail", null);
@@ -1651,19 +1650,26 @@ const Game = (() => {
       if (freeRunner(p) && leg.realmExit !== undefined && p.x >= leg.realmExit + TILE) {
         moveTo(p, f, g.outX !== undefined ? g.outX : p.x);
         legFlash(p, "ruins");
+        if (!g.forced) { // through an optional one: more time on your clock
+          p.ruinsBonus = (p.ruinsBonus || 0) + RUINS.timeBonus;
+          p.showHit(`+${RUINS.timeBonus} SECONDS!`, "#7af0d8");
+          Sound.play("auroraBack");
+        }
       }
     }
   }
 
   // How many seconds a ruins has left
-  function ruinsLeft(f) {
-    return f && f.gate && f.gate.openedAt !== null ? RUINS.time - (world.time - f.gate.openedAt) : RUINS.time;
+  function ruinsLeft(f, p) { // (p: whose clock: an optional biome portal gives you more time)
+    const R = f && f.parent ? f.parent : f, bonus = p ? p.ruinsBonus || 0 : 0;
+    return (R && R.gate && R.gate.openedAt !== null ? RUINS.time - (world.time - R.gate.openedAt) : RUINS.time) + bonus;
   }
 
   // Inside the ruins: the exit portal, the clock running out, and (in the last seconds) stones falling
   function updateRuins(f, dt) {
-    const left = ruinsLeft(f), inside = world.players.filter((p) => p.realm === f && !p.caught && !p.trip);
+    const inside = world.players.filter((p) => p.realm === f && !p.caught && !p.trip);
     for (const p of inside) {
+      const left = ruinsLeft(f, p);
       if (left <= 0) { // time's up: the aurora snatches you out as it all comes down
         if (p.dead) { p.dead = false; p.x = p.respawnX; p.y = p.respawnY; }
         p.showHit("TIME'S UP!", "#ff5a4a");
@@ -1725,7 +1731,7 @@ const Game = (() => {
         else x = Math.max(0, p.x - RUINS.failBack);
         moveTo(p, realm, x);
         p.held = true;
-        if (tr.kind === "in") tr.built = realm.arriveGate;
+        if (tr.kind === "in") { tr.built = realm.arriveGate; p.ruinsBonus = 0; } // (a fresh clock: no extra time carried in)
         else { tr.built = { level: world.level, x: p.x + HITBOX_W / 2, gy: p.y + HITBOX_H, cy: p.y + HITBOX_H - 24, style: "old", state: "rest", t: 0 }; world.builtPortals.push(tr.built); }
         Object.assign(tr.built, { state: "build", t: 0 });
         tr.landX = p.x; tr.landY = p.y;

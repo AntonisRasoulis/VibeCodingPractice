@@ -791,15 +791,14 @@ class Level {
 
   addSection() {
     if (this.biome === "ruins" && this.realmEnd !== undefined) { // the ruins' biome portals (see makeRuins)
-      if (this.forcedAt !== undefined && this.col >= this.forcedAt) { this.forcedAt = undefined; return SECTIONS.biomeGate.call(this, true); }
-      const lastChance = this.realmEnd / TILE - (RUINS.legLength[1] + RUINS.shortcut + 16); // (its shortcut has to land before the exit)
-      if (this.optionalAt !== undefined && this.forcedAt === undefined && (this.col >= this.optionalAt || this.col >= lastChance)) { this.optionalAt = undefined; return SECTIONS.biomeGate.call(this, false); }
-      if (this.landingFor && this.col >= this.landingFor.landCol - 3) { // where an optional one's shortcut brings you out: calm ground
-        this.flat(3, false);
-        this.landingFor.outX = this.col * TILE;
+      if (this.landingFor && this.col >= this.landingFor.landCol - 2) { // where an optional one's stretch lets you out: calm ground
+        this.landingFor.calmX = this.col * TILE;
         this.landingFor = null;
-        return this.flat(7, false);
+        return this.flat(16, false);
       }
+      if (this.forcedAt !== undefined && this.col >= this.forcedAt) { this.forcedAt = undefined; return SECTIONS.biomeGate.call(this, true); }
+      const lastChance = this.realmEnd / TILE - (RUINS.legLength[1] + 30); // (it, its stretch and the calm after it have to fit before the exit)
+      if (this.optionalAt !== undefined && this.forcedAt === undefined && (this.col >= this.optionalAt || this.col >= lastChance)) { this.optionalAt = undefined; return SECTIONS.biomeGate.call(this, false); }
     }
     if (this.leg && this.col * TILE < this.realmEnd && this.realmEnd / TILE - this.col < 12) return this.flat(Math.ceil(this.realmEnd / TILE - this.col), false); // (a stretch: nothing long right at its end)
     if (this.realmEnd !== undefined && this.col * TILE >= this.realmEnd) {
@@ -1386,20 +1385,26 @@ const SECTIONS = {
 
   // The way into the arcane ruins: a portal of stacked rocks, switched off, its button in the ground under it
   // The ruins' biome portals: a forced one (a clean gateway on the path: running through it takes you in; the ruins
-  // behind it is calm, as no one runs there) or an optional one (a small ring floating a jump up: jump in for a shortcut)
+  // behind it is calm, as no one runs there) or an optional one (a small ring floating a jump up: jump in and make it
+  // through its stretch for more time on your clock)
   biomeGate(forced) {
     let L = this.rand(RUINS.legLength[0], RUINS.legLength[1]);
     const biome = forced ? this.legBiomes[0] : this.legBiomes[1];
-    if (!forced) { // (its shortcut has to land well before the exit: a shorter stretch if need be, or none at all if there's no room)
-      L = Math.min(L, Math.floor(this.realmEnd / TILE) - 8 - RUINS.shortcut - (this.col + 8));
+    if (!forced) { // (it, its stretch and the calm where you come out have to fit before the exit: a shorter stretch if need be, or none)
+      L = Math.min(L, Math.floor(this.realmEnd / TILE) - 8 - (this.col + 8) - 20);
       if (L < 8) return this.flat(4, false);
     }
     this.flat(4, false);
     const g = { id: this.nextId++, x: this.col * TILE + TILE / 2, gy: this.groundRow * TILE, biome, forced, L, leg: null };
     this.biomeGates.push(g);
-    if (forced) { this.flat(L + 16, false); this.optionalAt = this.col + this.rand(RUINS.optionalAfter[0], RUINS.optionalAfter[1]); return; } // (calm: you come back out somewhere along here, as far along as the stretch took you)
+    if (forced) { // (no one runs the ruins behind it: calm, and you come back out somewhere along here)
+      this.flat(L + 16, false);
+      this.optionalAt = this.col + this.rand(RUINS.optionalAfter[0], RUINS.optionalAfter[1]);
+      return;
+    }
+    // (an optional one: the ruins carry on as usual for anyone who runs past it, with a calm patch where its stretch lets you out)
     this.flat(4, false);
-    g.landCol = Math.floor(g.x / TILE) + L + RUINS.shortcut;
+    g.landCol = Math.floor(g.x / TILE) + 3 + L;
     this.landingFor = g;
   },
 
